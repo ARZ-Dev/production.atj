@@ -1,0 +1,1 @@
+<li><a wire:click="logout" class="dropdown-item" href="javascript:void(0)"><i class="bi bi-box-arrow-right me-1"></i>Sign Out</a></li>
