@@ -6,6 +6,8 @@ use App\Livewire\Companies\CompanyIndex;
 use App\Livewire\DashboardView;
 use App\Livewire\Factories\FactoryCreate;
 use App\Livewire\Factories\FactoryIndex;
+use App\Livewire\MachineTypes\MachineTypeCreate;
+use App\Livewire\MachineTypes\MachineTypeIndex;
 use App\Livewire\ProductionLines\ProductionLineCreate;
 use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RolesPermissions\PermissionView;
@@ -69,14 +71,14 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     });
 
     // |--------------------------------------------------------------------------
-    // | Warehouses
+    // | Machine Types
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'warehouses'], function () {
-        Route::get('/', WarehouseIndex::class)->name('warehouses');
-        Route::get('/create', WarehouseCreate::class)->name('warehouses.create');
-        Route::get('/edit/{id}', WarehouseCreate::class)->name('warehouses.edit');
-        Route::get('/view/{id}', WarehouseCreate::class)->name('warehouses.view');
+    Route::group(['prefix' => 'machine-types'], function () {
+        Route::get('/', MachineTypeIndex::class)->name('machine-types');
+        Route::get('/create', MachineTypeCreate::class)->name('machine-types.create');
+        Route::get('/edit/{id}', MachineTypeCreate::class)->name('machine-types.edit');
+        Route::get('/view/{id}', MachineTypeCreate::class)->name('machine-types.view');
     });
 
     // |--------------------------------------------------------------------------

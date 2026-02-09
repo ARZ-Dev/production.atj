@@ -39,7 +39,6 @@ class WarehouseTypeIndex extends Component
         }
         $warehouseType->delete();
 
-        $this->warehouseTypes = WarehouseType::all();
 
         return to_route('warehouse-types')->with('success', 'Warehouse Type deleted successfully.');
     }

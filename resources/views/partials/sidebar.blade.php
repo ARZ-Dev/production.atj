@@ -69,12 +69,12 @@
                                 </li>
                                 @endcanany
 
-                                @canany(['warehouseType-list', 'warehouse-list', 'factory-list'])
+                                @canany(['warehouseType-list', 'machineType-list', 'factory-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseWarehouses"
-                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/warehouses*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'active' : '' }}"
+                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'active' : '' }}"
                                         data-bs-toggle="collapse"
-                                        aria-expanded="{{ request()->is('admin/warehouse-types*') || request()->is('admin/warehouses*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'true' : 'false' }}"
+                                        aria-expanded="{{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'true' : 'false' }}"
                                         aria-controls="collapseWarehouses">
                                         <i class="bi bi-house pe-nav-icon"></i>
                                         <span class="pe-nav-content">Facilities</span>
@@ -82,15 +82,7 @@
                                     </a>
 
                                     <ul class="pe-slide-menu collapse" id="collapseWarehouses">
-                                        @can('factory-list')
-                                        <li class="pe-slide-item">
-                                            <a href="{{ route('factories') }}"
-                                                class="pe-nav-link {{ request()->is('admin/factories*') ? " active" : ""
-                                                }}">
-                                                Factories
-                                            </a>
-                                        </li>
-                                        @endcan
+
                                         @can('warehouseType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('warehouse-types') }}"
@@ -100,12 +92,21 @@
                                             </a>
                                         </li>
                                         @endcan
-                                        @can('warehouse-list')
+                                        @can('machineType-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('warehouses') }}"
-                                                class="pe-nav-link {{ request()->is('admin/warehouses*') ? " active"
+                                            <a href="{{ route('machine-types') }}"
+                                                class="pe-nav-link {{ request()->is('admin/machine-types*') ? " active"
                                                 : "" }}">
-                                                Warehouses
+                                                Machine Types
+                                            </a>
+                                        </li>
+                                        @endcan
+                                        @can('factory-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('factories') }}"
+                                                class="pe-nav-link {{ request()->is('admin/factories*') ? " active" : ""
+                                                }}">
+                                                Factories
                                             </a>
                                         </li>
                                         @endcan

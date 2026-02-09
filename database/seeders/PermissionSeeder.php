@@ -69,6 +69,13 @@ class PermissionSeeder extends Seeder
             'productionLine-view',
             'productionLine-delete',
 
+            // Machine Types Page
+            'machineType-list',
+            'machineType-create',
+            'machineType-edit',
+            'machineType-view',
+            'machineType-delete',
+
 
 
         ];
