@@ -12,7 +12,7 @@ class WarehouseTypeCreate extends Component
 
     use AuthorizesRequests;
 
-    public $warehouseType; 
+    public $warehouseType;
     public $companies = [];
     public $company_id;
     public $id;
@@ -23,10 +23,10 @@ class WarehouseTypeCreate extends Component
     public function mount($id = 0)
     {
         $this->authorize('warehouseType-create');
-        if(auth()->user()->hasRole('Super Admin')){
+        if(authUser()->hasRole('Super Admin')){
             $this->companies = Company::all();
         }else{
-            $this->company_id = auth()->user()->company_id;
+            $this->company_id = authUser()->company_id;
         }
 
         if ($id) {

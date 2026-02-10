@@ -13,7 +13,7 @@ class Login extends Component
 
     public function mount()
     {
-        if (auth()->user()) {
+        if (authUser()) {
             return to_route('dashboard');
         }
     }

@@ -84,7 +84,7 @@
                     </div>
                     <!-- Add role form -->
                     <form wire:submit.prevent="store" id="addRoleForm" class="row g-3">
-                        @if (auth()->user()->hasRole('Super Admin'))
+                        @if (authUser()->hasRole('Super Admin'))
                         <div class="col-12" wire:ignore>
                             <label class="form-label" for="company_id">Company <span
                                     class="text-danger">*</span></label>
@@ -188,7 +188,7 @@
                 </div>
                 <div class="modal-body">
                     <form wire:submit.prevent="store" id="addRoleForm" class="row g-3">
-                        @if(auth()->user()->hasRole('Super Admin'))
+                        @if(authUser()->hasRole('Super Admin'))
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="company_id">Company</label>
                             <div wire:ignore>
@@ -298,7 +298,7 @@
             let role = params[0];
             $('#company_id').selectpicker('val', role.company_id.toString());
         })
-        
+
     </script>
     @endscript
 </div>

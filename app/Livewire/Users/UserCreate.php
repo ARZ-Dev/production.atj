@@ -97,7 +97,7 @@ class UserCreate extends Component
         $this->validate();
 
         $user = User::create([
-            'company_id' => $this->company_id ?? auth()->user()->company_id,
+            'company_id' => $this->company_id ?? authUser()->company_id,
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
             'username' => $this->username,

@@ -29,16 +29,16 @@ class WarehouseCreate extends Component
     {
         $this->authorize('warehouse-create');
 
-        if(auth()->user()->hasRole('Super Admin'))
+        if(authUser()->hasRole('Super Admin'))
         {
             $this->companies = Company::all();
 
         }
         else{
-            $this->company_id = auth()->user()->company_id;
+            $this->company_id = authUser()->company_id;
             $this->warehouseTypes = WarehouseType::where('company_id', $this->company_id)->get();
         }
-        
+
         if ($id) {
             $this->editing = true;
             $this->warehouse = Warehouse::findOrFail($id);
@@ -75,7 +75,7 @@ class WarehouseCreate extends Component
             $this->warehouse->update([
                 'name' => $this->name,
                 'warehouse_type_id' => $this->warehouse_type_id,
-                'company_id' => $this->company_id ? $this->company_id : auth()->user()->company_id,
+                'company_id' => $this->company_id ? $this->company_id : authUser()->company_id,
                 'address' => $this->address,
             ]);
 
@@ -84,7 +84,7 @@ class WarehouseCreate extends Component
             Warehouse::create([
                 'name' => $this->name,
                 'warehouse_type_id' => $this->warehouse_type_id,
-                'company_id' => $this->company_id ? $this->company_id : auth()->user()->company_id,
+                'company_id' => $this->company_id ? $this->company_id : authUser()->company_id,
                 'address' => $this->address,
             ]);
 

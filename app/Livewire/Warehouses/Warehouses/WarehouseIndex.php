@@ -18,12 +18,12 @@ class WarehouseIndex extends Component
     {
         $this->authorize('warehouse-list');
 
-        if(auth()->user()->hasRole('Super Admin'))
+        if(authUser()->hasRole('Super Admin'))
         {
             $this->warehouses = Warehouse::with('warehouseType','company')->get();
         }else{
             $this->warehouses = Warehouse::with('warehouseType','company')
-                ->where('company_id',auth()->user()->company_id)
+                ->where('company_id',authUser()->company_id)
                 ->get();
         }
     }

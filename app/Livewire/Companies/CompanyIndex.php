@@ -17,11 +17,11 @@ class CompanyIndex extends Component
     {
         $this->authorize('company-list');
 
-        if(auth()->user()->hasRole('Super Admin'))
+        if(authUser()->hasRole('Super Admin'))
         {
             $this->companies = Company::all();
         } else {
-            $this->companies = Company::where('id', auth()->user()->company_id)->get();
+            $this->companies = Company::where('id', authUser()->company_id)->get();
         }
     }
 
@@ -36,7 +36,7 @@ class CompanyIndex extends Component
         return to_route('companies')->with('success', 'Company has been deleted successfully!');
     }
 
-    
+
     public function render()
     {
         return view('livewire.companies.company-index');

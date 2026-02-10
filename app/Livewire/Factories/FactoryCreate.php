@@ -35,10 +35,10 @@ class FactoryCreate extends Component
             $this->authorize('factory-create');
         }
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->companies = Company::all();
         }else{
-            $this->company_id = auth()->user()->company_id;
+            $this->company_id = authUser()->company_id;
             $this->warehouseTypes = WarehouseType::where('company_id', $this->company_id)->get();
         }
 

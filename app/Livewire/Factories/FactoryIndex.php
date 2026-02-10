@@ -17,10 +17,10 @@ class FactoryIndex extends Component
     {
         $this->authorize('factory-list');
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->factories = Factory::all();
         } else {
-            $this->factories = Factory::where('company_id', auth()->user()->company_id)->get();
+            $this->factories = Factory::where('company_id', authUser()->company_id)->get();
         }
     }
 

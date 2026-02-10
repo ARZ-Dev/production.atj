@@ -16,11 +16,11 @@ class MachineTypeIndex extends Component
     {
         $this->authorize('machineType-list');
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->machineTypes = MachineType::with('company')->get();
         } else {
             $this->machineTypes = MachineType::with('company')
-                ->where('company_id', auth()->user()->company_id)
+                ->where('company_id', authUser()->company_id)
                 ->get();
         }
 

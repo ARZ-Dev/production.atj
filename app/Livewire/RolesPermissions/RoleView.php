@@ -107,7 +107,7 @@ class RoleView extends Component
             $this->authorize('role-edit');
 
             $this->role->update([
-                'company_id' => $this->company_id ?? auth()->user()->company_id,
+                'company_id' => $this->company_id ?? authUser()->company_id,
                 'name' => $this->name,
             ]);
 
@@ -115,7 +115,7 @@ class RoleView extends Component
             $this->authorize('role-create');
 
             $this->role = Role::create([
-                'company_id' => $this->company_id ?? auth()->user()->company_id,
+                'company_id' => $this->company_id ?? authUser()->company_id,
                 'name' => $this->name,
             ]);
         }

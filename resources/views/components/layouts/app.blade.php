@@ -1,15 +1,15 @@
 <x-layouts.base>
 
-  @guest
-  {{ $slot }}
-  @endguest
+{{--  @guest--}}
+{{--  {{ $slot }}--}}
+{{--  @endguest--}}
 
   <div id="layout-wrapper">
-    @auth
+{{--    @auth--}}
 
     <main class="app-wrapper">
       <div class="container-fluid">
-        
+
         @include('partials.page-title')
         @include('partials.header')
         @include('partials.sidebar')
@@ -21,12 +21,12 @@
 
         @include('partials.switcher')
         @include('partials.scroll-to-top')
-        
-        
+
+
       </div>
     </main>
     @include('partials.footer')
-    @endauth
+{{--    @endauth--}}
   </div>
 
 </x-layouts.base>
