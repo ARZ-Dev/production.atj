@@ -27,4 +27,14 @@ class Company extends Model
         return $this->hasMany(Warehouse::class);
     }
 
+    public function shifts()
+    {
+        return $this->hasMany(Shift::class);
+    }
+
+    public function eventTypes()
+    {
+        return $this->hasMany(EventType::class);
+    }
+    
 }

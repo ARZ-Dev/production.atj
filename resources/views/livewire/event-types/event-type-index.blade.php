@@ -3,10 +3,10 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Production Line List</h5>
-                    @can('productionLine-create')
-                    <a href="{{ route('production-lines.create', ['factoryId' => $factoryId]) }}" class="btn btn-primary">
-                        <i class="bi bi-plus-lg me-1"></i> Add New Production Line
+                    <h5 class="card-title mb-0">Event Types List</h5>
+                    @can('eventType-create')
+                    <a href="{{ route('event-types.create') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i> Add New Event Type
                     </a>
                     @endcan
                 </div>
@@ -16,22 +16,24 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Factory</th>
-                                <th>Warehouses Name</th>
-                                <th>Machines Name</th>
+                                <th>Company</th>
+                                <th>Name</th>
+                                <th>Has Recipe</th>
+                                <th>Duration</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($productions as $production)
+                            @foreach($eventTypes as $eventType)
                             <tr>
-                                <td>{{ $production->id }}</td>
-                                <td>{{ $production->factory->name }}</td>
-                                <td>{{ $production->warehouses->pluck('name')->join(', ') ?: 'N/A' }}</td>
-                                <td>{{ $production->machines->pluck('name')->join(', ') ?: 'N/A' }}</td>
-                                <td>
-                                    @can('productionLine-edit')
-                                    <a href="{{ route('production-lines.edit', ['id' => $production->id, 'factoryId' => $factoryId]) }}"
+                                <td>{{ $eventType->id }}</td>
+                                <td>{{ $eventType->company->name }}</td>
+                                <td>{{ $eventType->name }}</td>
+                                <td>{{ $eventType->has_recipe ? 'Yes' : 'No' }}</td>
+                                <td>{{ $eventType->duration }} Minute</td>
+                                    <td>
+                                    @can('eventType-edit')
+                                    <a href="{{ route('event-types.edit', $eventType->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
@@ -39,15 +41,14 @@
                                     </a>
                                     @endcan
 
-                                    @can('productionLine-delete')
+                                    @can('eventType-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
-                                        data-id="{{ $production->id }}" data-bs-toggle="tooltip"
+                                        data-id="{{ $eventType->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     @endcan
-
 
                                 </td>
                             </tr>

@@ -4,6 +4,8 @@ use App\Livewire\Auth\Login;
 use App\Livewire\Companies\CompanyCreate;
 use App\Livewire\Companies\CompanyIndex;
 use App\Livewire\DashboardView;
+use App\Livewire\EventTypes\EventTypeCreate;
+use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\Factories\FactoryCreate;
 use App\Livewire\Factories\FactoryIndex;
 use App\Livewire\MachineTypes\MachineTypeCreate;
@@ -12,6 +14,8 @@ use App\Livewire\ProductionLines\ProductionLineCreate;
 use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\RolesPermissions\RoleView;
+use App\Livewire\Shifts\ShiftCreate;
+use App\Livewire\Shifts\ShiftIndex;
 use App\Livewire\Users\UserCreate;
 use App\Livewire\Users\UserIndex;
 use App\Livewire\Warehouses\Warehouses\WarehouseCreate;
@@ -103,7 +107,27 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         Route::get('/{factoryId}/view/{id}', ProductionLineCreate::class)->name('production-lines.view');
     });
 
+    // |--------------------------------------------------------------------------
+    // | Shift
+    // |--------------------------------------------------------------------------
 
+    Route::group(['prefix' => 'shifts'], function () {
+        Route::get('/', ShiftIndex::class)->name('shifts');
+        Route::get('/create', ShiftCreate::class)->name('shifts.create');
+        Route::get('/edit/{id}', ShiftCreate::class)->name('shifts.edit');
+        Route::get('/view/{id}', ShiftCreate::class)->name('shifts.view');
+    });
+
+
+    // |--------------------------------------------------------------------------
+    // | Event Types
+    // |--------------------------------------------------------------------------  
+    Route::group(['prefix' => 'event-types'], function () {
+        Route::get('/', EventTypeIndex::class)->name('event-types');
+        Route::get('/create', EventTypeCreate::class)->name('event-types.create');
+        Route::get('/edit/{id}', EventTypeCreate::class)->name('event-types.edit');
+        Route::get('/view/{id}', EventTypeCreate::class)->name('event-types.view');
+    });
 });
 
 // Route::get('{any}',[DashboardController::class, 'index'])->where('any', '.*'); // Catch-all route for the dashboard.
