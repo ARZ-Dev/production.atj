@@ -3,10 +3,10 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Production Line List</h5>
-                    @can('productionLine-create')
-                    <a href="{{ route('production-lines.create', ['factoryId' => $factoryId]) }}" class="btn btn-primary">
-                        <i class="bi bi-plus-lg me-1"></i> Add New Production Line
+                    <h5 class="card-title mb-0">Shifts List</h5>
+                    @can('shift-create')
+                    <a href="{{ route('shifts.create') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i> Add New Shift
                     </a>
                     @endcan
                 </div>
@@ -16,22 +16,24 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Factory</th>
-                                <th>Warehouses Name</th>
-                                <th>Machines Name</th>
+                                <th>Company</th>
+                                <th>Name</th>
+                                <th>From</th>
+                                <th>To</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($productions as $production)
+                            @foreach($shifts as $shift)
                             <tr>
-                                <td>{{ $production->id }}</td>
-                                <td>{{ $production->factory->name }}</td>
-                                <td>{{ $production->warehouses->pluck('name')->join(', ') ?: 'N/A' }}</td>
-                                <td>{{ $production->machines->pluck('name')->join(', ') ?: 'N/A' }}</td>
-                                <td>
-                                    @can('productionLine-edit')
-                                    <a href="{{ route('production-lines.edit', ['id' => $production->id, 'factoryId' => $factoryId]) }}"
+                                <td>{{ $shift->id }}</td>
+                                <td>{{ $shift->company->name }}</td>
+                                <td>{{ $shift->name }}</td>
+                                <td>{{ \Carbon\Carbon::parse($shift->from_time)->format('h:i A') }}</td>
+                                <td>{{ \Carbon\Carbon::parse($shift->to_time)->format('h:i A') }}</td>
+                                    <td>
+                                    @can('shift-edit')
+                                    <a href="{{ route('shifts.edit', $shift->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
@@ -39,15 +41,14 @@
                                     </a>
                                     @endcan
 
-                                    @can('productionLine-delete')
+                                    @can('shift-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
-                                        data-id="{{ $production->id }}" data-bs-toggle="tooltip"
+                                        data-id="{{ $shift->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     @endcan
-
 
                                 </td>
                             </tr>
