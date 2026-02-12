@@ -42,6 +42,17 @@ class AuthUser implements Authenticatable
     }
 
     /**
+     * Check if user has any of the given permissions.
+     */
+    public function hasAnyPermission(array $permissions): bool
+    {
+        if (in_array('super-admin', $this->roles)) {
+            return true;
+        }
+        return !empty(array_intersect($this->permissions, $permissions));
+    }
+
+    /**
      * Check if user has a given role.
      */
     public function hasRole(string $role): bool
