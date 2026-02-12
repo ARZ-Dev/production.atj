@@ -50,7 +50,6 @@ class EventTypeCreate extends Component
         return [
             'name' => 'required|string|max:255',
             'has_recipe' => 'boolean',
-            'duration' => 'integer|min:0',
             'recipe_id' => 'nullable|exists:recipes,id',
             'company_id' => 'required|exists:companies,id',
         ];
