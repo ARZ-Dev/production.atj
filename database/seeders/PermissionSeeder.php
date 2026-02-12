@@ -90,7 +90,12 @@ class PermissionSeeder extends Seeder
             'shift-view',
             'shift-delete',
 
-
+            // Event Types Page
+            'eventType-list',
+            'eventType-create',
+            'eventType-edit',
+            'eventType-view',
+            'eventType-delete',
 
         ];
         

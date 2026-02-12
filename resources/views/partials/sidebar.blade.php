@@ -114,12 +114,12 @@
                                     </ul>
                                 </li>
                                 @endcanany
-                                @canany(['shift-list'])
+                                @canany(['shift-list', 'eventType-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseShifts"
-                                        class="pe-nav-link {{ request()->is('admin/shifts*') ? 'active' : '' }}"
+                                        class="pe-nav-link {{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'active' : '' }}"
                                         data-bs-toggle="collapse"
-                                        aria-expanded="{{ request()->is('admin/shifts*') ? 'true' : 'false' }}"
+                                        aria-expanded="{{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'true' : 'false' }}"
                                         aria-controls="collapseShifts">
                                         <i class="bi bi-calendar-event pe-nav-icon"></i>
                                         <span class="pe-nav-content">Scheduling & Events</span>
@@ -133,6 +133,14 @@
                                             <a href="{{ route('shifts') }}"
                                                 class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : "" }}">
                                                 Shifts
+                                            </a>
+                                        </li>
+                                        @endcan
+                                        @can('eventType-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('event-types') }}"
+                                                class="pe-nav-link {{ request()->is('admin/event-types*') ? " active" : "" }}">
+                                                Event Types
                                             </a>
                                         </li>
                                         @endcan

@@ -4,6 +4,8 @@ use App\Livewire\Auth\Login;
 use App\Livewire\Companies\CompanyCreate;
 use App\Livewire\Companies\CompanyIndex;
 use App\Livewire\DashboardView;
+use App\Livewire\EventTypes\EventTypeCreate;
+use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\Factories\FactoryCreate;
 use App\Livewire\Factories\FactoryIndex;
 use App\Livewire\MachineTypes\MachineTypeCreate;
@@ -116,6 +118,16 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         Route::get('/view/{id}', ShiftCreate::class)->name('shifts.view');
     });
 
+
+    // |--------------------------------------------------------------------------
+    // | Event Types
+    // |--------------------------------------------------------------------------  
+    Route::group(['prefix' => 'event-types'], function () {
+        Route::get('/', EventTypeIndex::class)->name('event-types');
+        Route::get('/create', EventTypeCreate::class)->name('event-types.create');
+        Route::get('/edit/{id}', EventTypeCreate::class)->name('event-types.edit');
+        Route::get('/view/{id}', EventTypeCreate::class)->name('event-types.view');
+    });
 });
 
 // Route::get('{any}',[DashboardController::class, 'index'])->where('any', '.*'); // Catch-all route for the dashboard.
