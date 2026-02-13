@@ -113,9 +113,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
     Route::group(['prefix' => 'shifts'], function () {
         Route::get('/', ShiftIndex::class)->name('shifts');
-        Route::get('/create', ShiftCreate::class)->name('shifts.create');
-        Route::get('/edit/{id}', ShiftCreate::class)->name('shifts.edit');
-        Route::get('/view/{id}', ShiftCreate::class)->name('shifts.view');
+     
     });
 
 
@@ -124,9 +122,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------  
     Route::group(['prefix' => 'event-types'], function () {
         Route::get('/', EventTypeIndex::class)->name('event-types');
-        Route::get('/create', EventTypeCreate::class)->name('event-types.create');
-        Route::get('/edit/{id}', EventTypeCreate::class)->name('event-types.edit');
-        Route::get('/view/{id}', EventTypeCreate::class)->name('event-types.view');
+       
     });
 });
 
