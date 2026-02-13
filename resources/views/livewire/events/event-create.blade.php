@@ -2,7 +2,8 @@
     <form>
         <div class="row">
             <div class="col-12">
-                {{-- Company Selection (Super Admin Only) --}}
+
+                {{-- Header Card --}}
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">Events</h6>
@@ -10,6 +11,8 @@
                             <i class="bi bi-arrow-left me-1"></i>Back
                         </a>
                     </div>
+
+                    {{-- Company Selection (Super Admin Only) --}}
                     @if(auth()->user()->hasRole('Super Admin'))
                     <div class="card-body">
                         <div class="row g-4">
@@ -26,7 +29,9 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                @error('company_id') <div class="text-danger">{{ $message }}</div> @enderror
+                                @error('company_id')
+                                <div class="text-danger">{{ $message }}</div>
+                                @enderror
                             </div>
                         </div>
                     </div>
@@ -43,6 +48,7 @@
                     </div>
                     <div class="card-body">
 
+                        {{-- Empty State --}}
                         @if(empty($events))
                         <div class="text-center text-muted py-4">
                             <i class="bi bi-calendar-plus fs-1 d-block mb-2"></i>
@@ -50,9 +56,11 @@
                         </div>
                         @endif
 
+                        {{-- Event Cards --}}
                         @foreach($events as $index => $event)
-                        <div class="card border shadow-sm mb-3"
-                            wire:key="event-{{ $index }}-{{ $event['id'] ?? 'new' }}">
+                        <div class="card border shadow-sm mb-3" wire:key="event-{{ $index }}-{{ $event['id'] ?? 'new' }}">
+
+                            {{-- Event Card Header --}}
                             <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
                                 <span class="fw-semibold text-primary">
                                     <i class="bi bi-calendar-event me-1"></i>Event #{{ $index + 1 }}
@@ -69,6 +77,8 @@
                                 </button>
                                 @endif
                             </div>
+
+                            {{-- Event Card Body --}}
                             <div class="card-body">
                                 <div class="row g-3">
 
@@ -80,13 +90,17 @@
                                         <div wire:ignore>
                                             <select wire:model="events.{{ $index }}.event_type_id"
                                                 id="event_type_id_{{ $index }}"
-                                                class="selectpicker w-100 event-type-select" title="Select Event Type"
-                                                data-style="btn-default" data-live-search="true" data-icon-base="ti"
-                                                data-size="5" data-tick-icon="ti-check text-white"
+                                                class="selectpicker w-100 event-type-select"
+                                                title="Select Event Type"
+                                                data-style="btn-default"
+                                                data-live-search="true"
+                                                data-icon-base="ti"
+                                                data-size="5"
+                                                data-tick-icon="ti-check text-white"
                                                 data-index="{{ $index }}">
                                                 @foreach($eventTypes as $type)
                                                 <option value="{{ $type['id'] }}"
-                                                    @selected($type['id']==$events[$index]['event_type_id'])>
+                                                    @selected($type['id'] == $events[$index]['event_type_id'])>
                                                     {{ $type['name'] }}
                                                 </option>
                                                 @endforeach
@@ -102,15 +116,19 @@
                                         <label class="form-label">
                                             Event Name <span class="text-danger">*</span>
                                         </label>
-                                        <input type="text" class="form-control" wire:model="events.{{ $index }}.name"
+                                        <input type="text"
+                                            class="form-control"
+                                            wire:model="events.{{ $index }}.name"
                                             placeholder="Enter event name">
                                         @error('events.' . $index . '.name')
                                         <div class="text-danger small mt-1">{{ $message }}</div>
                                         @enderror
                                     </div>
 
-                                    {{-- Duration Display --}}
+                                    {{-- Fields shown after event type is selected --}}
                                     @if(!empty($event['event_type_id']))
+
+                                    {{-- Duration --}}
                                     <div class="col-md-4">
                                         <label class="form-label">
                                             {{ $event['has_recipe'] ? 'Recipe Duration (per batch)' : 'Duration' }}
@@ -121,16 +139,17 @@
                                             <span class="input-group-text">minutes</span>
                                         </div>
                                     </div>
-                                    @endif
 
-                                    {{-- Batch Count (only if has_recipe) --}}
+                                    {{-- Batch Count + Total Duration (recipe only) --}}
                                     @if(!empty($event['has_recipe']))
                                     <div class="col-md-4">
                                         <label class="form-label">
                                             Number of Batches <span class="text-danger">*</span>
                                         </label>
-                                        <input type="number" class="form-control"
-                                            wire:model.live="events.{{ $index }}.batch_count" min="1"
+                                        <input type="number"
+                                            class="form-control"
+                                            wire:model.live="events.{{ $index }}.batch_count"
+                                            min="1"
                                             placeholder="Enter batch count">
                                         @error('events.' . $index . '.batch_count')
                                         <div class="text-danger small mt-1">{{ $message }}</div>
@@ -150,29 +169,32 @@
                                     </div>
                                     @endif
 
-                                    {{-- Time Fields --}}
-                                    @if(!empty($event['event_type_id']))
+                                    {{-- Time Section --}}
                                     <div class="col-12">
                                         <hr class="my-2">
                                     </div>
 
+                                    {{-- From Time --}}
                                     <div class="col-md-4">
                                         <label class="form-label">
                                             From Time <span class="text-danger">*</span>
                                         </label>
-                                        <input type="time" class="form-control"
+                                        <input type="time"
+                                            class="form-control"
                                             wire:model.live="events.{{ $index }}.from_time">
                                         @error('events.' . $index . '.from_time')
                                         <div class="text-danger small mt-1">{{ $message }}</div>
                                         @enderror
                                     </div>
 
+                                    {{-- To Time (auto-calculated) --}}
                                     <div class="col-md-4">
                                         <label class="form-label">To Time</label>
                                         <div class="input-group">
                                             <input type="text"
                                                 class="form-control bg-light fw-bold {{ $event['to_time'] ? 'text-success' : '' }}"
-                                                readonly value="{{ $event['to_time'] ?: '—' }}">
+                                                readonly
+                                                value="{{ $event['to_time'] ?: '—' }}">
                                             <span class="input-group-text">
                                                 <i class="bi bi-clock"></i>
                                             </span>
@@ -180,12 +202,12 @@
                                         @if($event['to_time'])
                                         <small class="text-muted">
                                             <i class="bi bi-info-circle me-1"></i>
-                                            Auto-calculated: {{ $event['total_duration'] }} min from {{
-                                            $event['from_time'] }}
+                                            Auto-calculated: {{ $event['total_duration'] }} min from {{ $event['from_time'] }}
                                         </small>
                                         @endif
                                     </div>
 
+                                    {{-- Time Summary Badge --}}
                                     <div class="col-md-4 d-flex align-items-end">
                                         @if($event['to_time'] && $event['from_time'])
                                         <div class="alert alert-light border mb-0 py-2 px-3 w-100">
@@ -197,7 +219,8 @@
                                         </div>
                                         @endif
                                     </div>
-                                    @endif
+
+                                    @endif {{-- end event_type_id check --}}
 
                                 </div>
                             </div>
@@ -213,20 +236,22 @@
                         <i class="bi bi-check-lg me-1"></i>Save Events
                     </button>
                 </div>
+
             </div>
         </div>
     </form>
 
     @script
     <script>
-        // Initialize selectpicker
+        // Initialize all selectpickers
         $('.selectpicker').selectpicker();
 
-        Livewire.hook('morph.added', ({ el }) => {
+        // Re-init on Livewire DOM additions
+        Livewire.hook('morph.added', ({el}) => {
             $(el).find('.selectpicker').selectpicker();
         });
 
-        // Handle selectpicker change → sync to Livewire
+        // Sync selectpicker changes to Livewire
         $(document).on('change', '.selectpicker', function () {
             let wireModel = $(this).attr('wire:model');
             if (wireModel) {
@@ -234,14 +259,14 @@
             }
         });
 
-        // Handle event type selection → call component method
+        // Event type selection → call component method
         $(document).on('change', '.event-type-select', function () {
             let index = $(this).data('index');
             let value = $(this).val();
             $wire.call('onEventTypeChanged', index, value);
         });
 
-        // Handle company change → dispatch event
+        // Company change → dispatch event
         $(document).on('change', '#company_id', function () {
             $wire.dispatch('getEventTypes', {
                 companyId: $(this).val()
@@ -254,7 +279,42 @@
             setOptions($('.event-type-select'), eventTypes);
         });
 
-     
+        // SweetAlert confirmation for removing existing events
+        $wire.on('swal:confirm', function (params) {
+            let data = params[0];
+            Swal.fire({
+                title: data.title,
+                text: data.text,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: data.confirmButtonText,
+                cancelButtonText: data.cancelButtonText,
+                customClass: {
+                    confirmButton: 'btn btn-danger me-2',
+                    cancelButton: 'btn btn-secondary',
+                },
+                buttonsStyling: false,
+            }).then(function (result) {
+                if (result.isConfirmed) {
+                    $wire.call('removeEventRowConfirmed');
+                }
+            });
+        });
+
+        // SweetAlert error for time conflicts
+        $wire.on('swal:error', function (params) {
+            let data = params[0];
+            Swal.fire({
+                title: data.title,
+                text: data.text,
+                icon: 'error',
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'btn btn-primary',
+                },
+                buttonsStyling: false,
+            });
+        });
     </script>
     @endscript
 </div>
