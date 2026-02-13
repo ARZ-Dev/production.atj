@@ -4,12 +4,15 @@ use App\Livewire\Auth\Login;
 use App\Livewire\Companies\CompanyCreate;
 use App\Livewire\Companies\CompanyIndex;
 use App\Livewire\DashboardView;
+use App\Livewire\Events\EventCreate;
+use App\Livewire\Events\EventIndex;
 use App\Livewire\EventTypes\EventTypeCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\Factories\FactoryCreate;
 use App\Livewire\Factories\FactoryIndex;
 use App\Livewire\MachineTypes\MachineTypeCreate;
 use App\Livewire\MachineTypes\MachineTypeIndex;
+use App\Livewire\Plans\PlanIndex;
 use App\Livewire\ProductionLines\ProductionLineCreate;
 use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RolesPermissions\PermissionView;
@@ -88,7 +91,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------
     // | Factories
     // |--------------------------------------------------------------------------
-    
+
     Route::group(['prefix' => 'factories'], function () {
         Route::get('/', FactoryIndex::class)->name('factories');
         Route::get('/create', FactoryCreate::class)->name('factories.create');
@@ -113,7 +116,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
     Route::group(['prefix' => 'shifts'], function () {
         Route::get('/', ShiftIndex::class)->name('shifts');
-     
+
     });
 
 
@@ -122,7 +125,26 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------  
     Route::group(['prefix' => 'event-types'], function () {
         Route::get('/', EventTypeIndex::class)->name('event-types');
-       
+
+    });
+
+    // |--------------------------------------------------------------------------  
+    // | Plans
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'plans'], function () {
+        Route::get('/', PlanIndex::class)->name('plans');
+
+    });
+
+
+    // |--------------------------------------------------------------------------
+    // | Events
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'events'], function () {
+        // Route::get('/', EventIndex::class)->name('events');
+        Route::get('{planId}/create', EventCreate::class)->name('events.create');
+        // Route::get('/edit/{id}', EventCreate::class)->name('events.edit');
+        // Route::get('/view/{id}', EventCreate::class)->name('events.view');
     });
 });
 

@@ -21,4 +21,9 @@ class Plan extends Model
     {
         return $this->belongsTo(ProductionLine::class);
     }
+
+    public function events()
+    {
+        return $this->hasMany(Event::class);
+    }
 }

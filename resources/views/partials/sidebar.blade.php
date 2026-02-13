@@ -131,7 +131,8 @@
                                         @can('shift-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('shifts') }}"
-                                                class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : ""
+                                                }}">
                                                 Shifts
                                             </a>
                                         </li>
@@ -139,16 +140,23 @@
                                         @can('eventType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('event-types') }}"
-                                                class="pe-nav-link {{ request()->is('admin/event-types*') ? " active" : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/event-types*') ? " active"
+                                                : "" }}">
                                                 Event Types
                                             </a>
                                         </li>
                                         @endcan
-                                   
+
                                     </ul>
                                 </li>
                                 @endcanany
-
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="{{ route('plans') }}"
+                                        class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? " active" : "" }}">
+                                        <i class="bi bi-card-checklist pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Production Plans</span>
+                                    </a>
+                                </li>
 
                             </ul>
                         </div>
