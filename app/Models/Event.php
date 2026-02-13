@@ -31,4 +31,9 @@ class Event extends Model
     {
         return $this->hasMany(Shift::class);
     }
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
+    }
 }

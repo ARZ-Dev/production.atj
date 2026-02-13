@@ -28,6 +28,12 @@
                                 <td>Production Line #{{ $plan->productionLine->id }}</td>
                                 <td>{{ \Carbon\Carbon::parse($plan->date)->format('d/m/Y') }}</td>
                                 <td>
+                                    <a href="{{ route('events.create', $plan->id) }}"
+                                        class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
+                                        data-bs-custom-class="tooltip-white" data-bs-placement="top"
+                                        data-bs-title="Events">
+                                        <i class="bi bi-calendar-event"></i>
+                                    </a>
                                     <button type="button" wire:click="edit({{ $plan->id }})"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
@@ -88,8 +94,8 @@
                             <div wire:ignore>
                                 <select wire:model="production_line_id" id="production_line_id"
                                     class="selectpicker w-100 production-line-select" title="Select Production Line"
-                                    data-style="btn-default" data-live-search="true" data-icon-base="ti"
-                                    data-size="5" data-tick-icon="ti-check text-white">
+                                    data-style="btn-default" data-live-search="true" data-icon-base="ti" data-size="5"
+                                    data-tick-icon="ti-check text-white">
                                     @foreach($productionLines as $productionLine)
                                     <option value="{{ $productionLine->id }}">
                                         {{ $productionLine->name }}

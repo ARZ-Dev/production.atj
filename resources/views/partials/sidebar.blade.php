@@ -152,7 +152,7 @@
                                 @endcanany
                                 <li class="pe-slide pe-has-sub">
                                     <a href="{{ route('plans') }}"
-                                        class="pe-nav-link {{ request()->is('admin/plans*') ? " active" : "" }}">
+                                        class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? " active" : "" }}">
                                         <i class="bi bi-card-checklist pe-nav-icon"></i>
                                         <span class="pe-nav-content">Production Plans</span>
                                     </a>

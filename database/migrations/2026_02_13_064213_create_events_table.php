@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -14,13 +13,16 @@ return new class extends Migration
         Schema::create('events', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained()->onDelete('cascade');
+            $table->foreignId('plan_id')->constrained()->onDelete('cascade');
             $table->foreignId('shift_id')->nullable()->constrained()->onDelete('cascade');
             $table->foreignId('event_type_id')->constrained()->onDelete('cascade');
             $table->foreignId('recipe_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('name');
+            $table->time('from_time');
+            $table->time('to_time')->nullable();
             $table->string('planned_duration')->nullable();
             $table->string('calculated_duration')->nullable();
-            $table->string('status')->default('started');
+            $table->string('status')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
