@@ -76,7 +76,26 @@ class PermissionSeeder extends Seeder
             'machineType-view',
             'machineType-delete',
 
+            // Machines Page
+            'machine-list',
+            'machine-create',
+            'machine-edit',
+            'machine-view',
+            'machine-delete',
 
+            // Shifts Page
+            'shift-list',
+            'shift-create',
+            'shift-edit',
+            'shift-view',
+            'shift-delete',
+
+            // Event Types Page
+            'eventType-list',
+            'eventType-create',
+            'eventType-edit',
+            'eventType-view',
+            'eventType-delete',
 
         ];
         

@@ -3,10 +3,10 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Production List</h5>
+                    <h5 class="card-title mb-0">Production Line List</h5>
                     @can('productionLine-create')
                     <a href="{{ route('production-lines.create', ['factoryId' => $factoryId]) }}" class="btn btn-primary">
-                        <i class="bi bi-plus-lg me-1"></i> Add New Production
+                        <i class="bi bi-plus-lg me-1"></i> Add New Production Line
                     </a>
                     @endcan
                 </div>

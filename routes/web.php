@@ -4,14 +4,22 @@ use App\Livewire\Auth\Login;
 use App\Livewire\Companies\CompanyCreate;
 use App\Livewire\Companies\CompanyIndex;
 use App\Livewire\DashboardView;
+use App\Livewire\Events\EventCreate;
+use App\Livewire\Events\EventIndex;
+use App\Livewire\EventTypes\EventTypeCreate;
+use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\Factories\FactoryCreate;
 use App\Livewire\Factories\FactoryIndex;
 use App\Livewire\MachineTypes\MachineTypeCreate;
 use App\Livewire\MachineTypes\MachineTypeIndex;
+use App\Livewire\Plans\PlanIndex;
+use App\Livewire\Plans\PlanView;
 use App\Livewire\ProductionLines\ProductionLineCreate;
 use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\RolesPermissions\RoleView;
+use App\Livewire\Shifts\ShiftCreate;
+use App\Livewire\Shifts\ShiftIndex;
 use App\Livewire\Users\UserCreate;
 use App\Livewire\Users\UserIndex;
 use App\Livewire\Warehouses\Warehouses\WarehouseCreate;
@@ -109,7 +117,43 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/{factoryId}/view/{id}', ProductionLineCreate::class)->name('production-lines.view');
     });
 
+    // |--------------------------------------------------------------------------
+    // | Shift
+    // |--------------------------------------------------------------------------
 
+    Route::group(['prefix' => 'shifts'], function () {
+        Route::get('/', ShiftIndex::class)->name('shifts');
+
+    });
+
+
+    // |--------------------------------------------------------------------------
+    // | Event Types
+    // |--------------------------------------------------------------------------  
+    Route::group(['prefix' => 'event-types'], function () {
+        Route::get('/', EventTypeIndex::class)->name('event-types');
+
+    });
+
+    // |--------------------------------------------------------------------------  
+    // | Plans
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'plans'], function () {
+        Route::get('/', PlanIndex::class)->name('plans');
+        Route::get('/view/{id}/{status}', PlanView::class)->name('plans.view');
+
+    });
+
+
+    // |--------------------------------------------------------------------------
+    // | Events
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'events'], function () {
+        // Route::get('/', EventIndex::class)->name('events');
+        Route::get('{planId}/create', EventCreate::class)->name('events.create');
+        // Route::get('/edit/{id}', EventCreate::class)->name('events.edit');
+        // Route::get('/view/{id}', EventCreate::class)->name('events.view');
+    });
 });
 
 // Route::get('{any}',[DashboardController::class, 'index'])->where('any', '.*'); // Catch-all route for the dashboard.

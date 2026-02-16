@@ -1,0 +1,27 @@
+name: Deploy (git pull)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: SSH and git pull
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+          PASS: ${{ secrets.SERVER_PASSWORD }}
+          APP_PATH: ${{ secrets.SERVER_PATH }}
+        run: |
+          sshpass -p "$PASS" ssh \
+            -p 65002 \
+            -o StrictHostKeyChecking=no \
+            "$USER@$HOST" \
+            "cd $APP_PATH && git pull origin main"

@@ -6,25 +6,25 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Company extends Model
+class Event extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
 
-    public function users()
+    public function company()
     {
-        return $this->hasMany(User::class);
+        return $this->belongsTo(Company::class);
     }
 
-    public function warehouseTypes()
+    public function eventType()
     {
-        return $this->hasMany(WarehouseType::class);
+        return $this->belongsTo(EventType::class);
     }
 
-    public function warehouses()
+    public function recipe()
     {
-        return $this->hasMany(Warehouse::class);
+        return $this->belongsTo(Recipe::class);
     }
 
     public function shifts()
@@ -32,9 +32,8 @@ class Company extends Model
         return $this->hasMany(Shift::class);
     }
 
-    public function eventTypes()
+    public function plan()
     {
-        return $this->hasMany(EventType::class);
+        return $this->belongsTo(Plan::class);
     }
-    
 }

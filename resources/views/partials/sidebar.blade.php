@@ -114,6 +114,51 @@
                                     </ul>
                                 </li>
                                 @endhasAnyPermission
+                                
+                                @canany(['shift-list', 'eventType-list'])
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="#collapseShifts"
+                                        class="pe-nav-link {{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'true' : 'false' }}"
+                                        aria-controls="collapseShifts">
+                                        <i class="bi bi-calendar-event pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Scheduling & Events</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
+                                    </a>
+
+                                    <ul class="pe-slide-menu collapse" id="collapseShifts">
+
+                                        @can('shift-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('shifts') }}"
+                                                class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : ""
+                                                }}">
+                                                Shifts
+                                            </a>
+                                        </li>
+                                        @endcan
+                                        @can('eventType-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('event-types') }}"
+                                                class="pe-nav-link {{ request()->is('admin/event-types*') ? " active"
+                                                : "" }}">
+                                                Event Types
+                                            </a>
+                                        </li>
+                                        @endcan
+
+                                    </ul>
+                                </li>
+                                @endcanany
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="{{ route('plans') }}"
+                                        class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? " active" : "" }}">
+                                        <i class="bi bi-card-checklist pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Production Plans</span>
+                                    </a>
+                                </li>
+
                             </ul>
                         </div>
                     </div>

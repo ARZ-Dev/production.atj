@@ -50,7 +50,7 @@
                                     <a href="{{ route('production-lines', $factory->id) }}"
                                         class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
-                                        data-bs-title="Productions">
+                                        data-bs-title="Production Lines">
                                         <i class="bi bi-gear"></i>
                                     </a>
                                     @endcan

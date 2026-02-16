@@ -128,7 +128,7 @@ class FactoryCreate extends Component
             'company_id' => 'required|exists:companies,id',
             'address' => 'nullable|string',
             'warehouses' => 'required|array|min:1',
-            'warehouses.*.warehouse_type_id' => 'required|exists:warehouse_types,id|distinct',
+            'warehouses.*.warehouse_type_id' => 'required|exists:warehouse_types,id',
             'warehouses.*.warehouse_name' => 'required|string|max:255',
         ];
 

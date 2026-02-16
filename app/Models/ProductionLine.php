@@ -40,4 +40,9 @@ class ProductionLine extends Model
     {
         return $this->hasMany(Warehouse::class);
     }
+
+    public function plans()
+    {
+        return $this->hasMany(Plan::class);
+    }
 }
