@@ -7,7 +7,16 @@ if (!function_exists('authUser')) {
      */
     function authUser(): ?\App\Models\AuthUser
     {
-        return request()->attributes->get('auth_user');
+        $authUser = request()->attributes->get('auth_user');
+        if (!$authUser) {
+            // check if the auth user is stored in the session (for web requests)
+            $authUser = session('auth_user');
+            // cast to AuthUser if it's an array
+            if (is_array($authUser)) {
+                $authUser = new \App\Models\AuthUser($authUser, $authUser['accessToken'] ?? '');
+            }
+        }
+        return $authUser;
     }
 }
 

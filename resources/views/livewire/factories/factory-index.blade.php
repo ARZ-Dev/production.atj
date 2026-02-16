@@ -4,11 +4,11 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Factory List</h5>
-                    @can('factory-create')
+                    @hasPermission('production.factory-create')
                     <a href="{{ route('factories.create') }}" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add New Factory
                     </a>
-                    @endcan
+                    @endhasPermission
                 </div>
 
                 <div class="card-body">
@@ -28,32 +28,32 @@
                                 <td>{{ $factory->company->name }}</td>
                                 <td>{{ $factory->name }}</td>
                                 <td>
-                                    @can('factory-edit')
+                                    @hasPermission('production.factory-edit')
                                     <a href="{{ route('factories.edit', $factory->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    @endcan
+                                    @endhasPermission
 
-                                    @can('factory-delete')
+                                    @hasPermission('production.factory-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $factory->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    @endcan
+                                    @endhasPermission
 
-                                    @can('productionLine-list')
+                                    @hasPermission('production.productionLine-list')
                                     <a href="{{ route('production-lines', $factory->id) }}"
                                         class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Production Lines">
                                         <i class="bi bi-gear"></i>
                                     </a>
-                                    @endcan
+                                    @endhasPermission
                                 </td>
                             </tr>
                             @endforeach

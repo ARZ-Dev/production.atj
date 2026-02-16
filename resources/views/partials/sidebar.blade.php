@@ -114,8 +114,8 @@
                                     </ul>
                                 </li>
                                 @endhasAnyPermission
-                                
-                                @canany(['shift-list', 'eventType-list'])
+
+                                @hasAnyPermission(['production.shift-list', 'production.eventType-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseShifts"
                                         class="pe-nav-link {{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'active' : '' }}"
@@ -129,7 +129,7 @@
 
                                     <ul class="pe-slide-menu collapse" id="collapseShifts">
 
-                                        @can('shift-list')
+                                        @hasPermission('production.shift-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('shifts') }}"
                                                 class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : ""
@@ -137,8 +137,8 @@
                                                 Shifts
                                             </a>
                                         </li>
-                                        @endcan
-                                        @can('eventType-list')
+                                        @endhasPermission
+                                        @hasPermission('production.eventType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('event-types') }}"
                                                 class="pe-nav-link {{ request()->is('admin/event-types*') ? " active"
@@ -146,11 +146,11 @@
                                                 Event Types
                                             </a>
                                         </li>
-                                        @endcan
+                                        @endhasPermission
 
                                     </ul>
                                 </li>
-                                @endcanany
+                                @endhasAnyPermission
                                 <li class="pe-slide pe-has-sub">
                                     <a href="{{ route('plans') }}"
                                         class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? " active" : "" }}">

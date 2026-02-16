@@ -4,11 +4,11 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Warehouse List</h5>
-                    @can('warehouseType-create')
+                    @hasPermission('production.warehouseType-create')
                     <a href="{{ route('warehouses.create') }}" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add New Warehouse
                     </a>
-                    @endcan
+                    @endhasPermission
                 </div>
 
                 <div class="card-body">
@@ -32,23 +32,23 @@
                                 <td>{{ $warehouse->warehouseType->name }}</td>
                                 <td>{{ $warehouse->name }}</td>
                                 <td>
-                                    @can('warehouse-edit')
+                                    @hasPermission('production.warehouse-edit')
                                     <a href="{{ route('warehouses.edit', $warehouse->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    @endcan
+                                    @endhasPermission
 
-                                    @can('warehouse-delete')
+                                    @hasPermission('production.warehouse-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $warehouse->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    @endcan
+                                    @endhasPermission
                                 </td>
                             </tr>
                             @endforeach
