@@ -14,7 +14,7 @@ class MachineTypeIndex extends Component
 
     public function mount()
     {
-        $this->authorize('machineType-list');
+        authorizeRequest('production.machineType-list');
 
         if (authUser()->hasRole('Super Admin')) {
             $this->machineTypes = MachineType::with('company')->get();
@@ -29,7 +29,7 @@ class MachineTypeIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('machineType-delete');
+        authorizeRequest('production.machineType-delete');
 
         $machineType = MachineType::findOrFail($id);
         if ($machineType->machines()->count() > 0) {

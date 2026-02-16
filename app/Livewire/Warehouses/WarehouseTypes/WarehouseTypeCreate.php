@@ -22,7 +22,7 @@ class WarehouseTypeCreate extends Component
 
     public function mount($id = 0)
     {
-        $this->authorize('warehouseType-create');
+        authorizeRequest('production.warehouseType-create');
         if(authUser()->hasRole('Super Admin')){
             $this->companies = Company::all();
         }else{
@@ -49,7 +49,7 @@ class WarehouseTypeCreate extends Component
 
     public function submit()
     {
-        $this->authorize('warehouseType-create');
+        authorizeRequest('production.warehouseType-create');
 
         $this->validate();
 

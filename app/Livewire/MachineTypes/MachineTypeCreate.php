@@ -21,7 +21,7 @@ class MachineTypeCreate extends Component
 
     public function mount($id = 0)
     {
-        $this->authorize('machineType-create');
+        authorizeRequest('production.machineType-create');
         if (authUser()->hasRole('Super Admin')) {
             $this->companies = Company::all();
         } else {
@@ -48,7 +48,7 @@ class MachineTypeCreate extends Component
 
     public function submit()
     {
-        $this->authorize('machineType-create');
+        authorizeRequest('production.machineType-create');
 
         $this->validate();
 

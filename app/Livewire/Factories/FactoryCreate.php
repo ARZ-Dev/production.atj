@@ -30,9 +30,9 @@ class FactoryCreate extends Component
         $this->editing = !is_null($id);
 
         if ($this->editing) {
-            $this->authorize('factory-edit');
+            authorizeRequest('production.factory-edit');
         } else {
-            $this->authorize('factory-create');
+            authorizeRequest('production.factory-create');
         }
 
         if (authUser()->hasRole('Super Admin')) {

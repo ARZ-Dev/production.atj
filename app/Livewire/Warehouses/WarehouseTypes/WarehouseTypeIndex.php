@@ -16,7 +16,7 @@ class WarehouseTypeIndex extends Component
 
     public function mount()
     {
-        $this->authorize('warehouseType-list');
+        authorizeRequest('production.warehouseType-list');
 
         if(authUser()->hasRole('Super Admin')){
             $this->warehouseTypes = WarehouseType::with('company')->get();
@@ -31,7 +31,7 @@ class WarehouseTypeIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('warehouseType-delete');
+        authorizeRequest('production.warehouseType-delete');
 
         $warehouseType = WarehouseType::findOrFail($id);
         if ($warehouseType->warehouses()->count() > 0) {

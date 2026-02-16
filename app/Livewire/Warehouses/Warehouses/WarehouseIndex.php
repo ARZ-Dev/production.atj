@@ -16,7 +16,7 @@ class WarehouseIndex extends Component
 
     public function mount()
     {
-        $this->authorize('warehouse-list');
+        authorizeRequest('production.warehouse-list');
 
         if(authUser()->hasRole('Super Admin'))
         {
@@ -31,7 +31,7 @@ class WarehouseIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('warehouse-delete');
+        authorizeRequest('production.warehouse-delete');
         $warehouse = Warehouse::findOrFail($id);
         $warehouse->delete();
 

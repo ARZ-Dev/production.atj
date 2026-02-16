@@ -15,7 +15,7 @@ class CompanyIndex extends Component
 
     public function mount()
     {
-        $this->authorize('company-list');
+        authorizeRequest('production.company-list');
 
         if(authUser()->hasRole('Super Admin'))
         {
@@ -28,7 +28,7 @@ class CompanyIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('company-delete');
+        authorizeRequest('production.company-delete');
 
         $company = Company::findOrFail($id);
         $company->delete();

@@ -27,7 +27,7 @@ class WarehouseCreate extends Component
 
     public function mount($id = 0)
     {
-        $this->authorize('warehouse-create');
+        authorizeRequest('production.warehouse-create');
 
         if(authUser()->hasRole('Super Admin'))
         {
@@ -67,7 +67,7 @@ class WarehouseCreate extends Component
 
     public function submit()
     {
-        $this->authorize('warehouse-create');
+        authorizeRequest('production.warehouse-create');
 
         $this->validate();
 

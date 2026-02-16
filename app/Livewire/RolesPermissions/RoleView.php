@@ -35,7 +35,7 @@ class RoleView extends Component
 
     public function mount()
     {
-        $this->authorize('role-list');
+        authorizeRequest('production.role-list');
         $this->permissions = Permission::all();
         $this->companies = Company::all();
         foreach ($this->permissions as $permission) {
@@ -104,7 +104,7 @@ class RoleView extends Component
         $this->validate();
 
         if ($this->role) {
-            $this->authorize('role-edit');
+            authorizeRequest('production.role-edit');
 
             $this->role->update([
                 'company_id' => $this->company_id ?? authUser()->company_id,
@@ -112,7 +112,7 @@ class RoleView extends Component
             ]);
 
         } else {
-            $this->authorize('role-create');
+            authorizeRequest('production.role-create');
 
             $this->role = Role::create([
                 'company_id' => $this->company_id ?? authUser()->company_id,
@@ -134,7 +134,7 @@ class RoleView extends Component
 
     public function delete($id)
     {
-        $this->authorize('role-delete');
+        authorizeRequest('production.role-delete');
         // check if role has users before deleting
         $role = Role::findById($id);
         if (count($role->users)) {

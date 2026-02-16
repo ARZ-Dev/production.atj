@@ -25,7 +25,7 @@ class UserIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('user-delete');
+        authorizeRequest('production.user-delete');
 
         $user = User::findOrFail($id);
         $user->delete();

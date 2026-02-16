@@ -97,7 +97,7 @@ class ProductionLineCreate extends Component
             $factory = Factory::findOrFail($this->factoryId);
 
             if ($this->editing) {
-                $this->authorize('productionLine-edit');
+                authorizeRequest('production.productionLine-edit');
 
                 $productionLine = ProductionLine::findOrFail($this->id);
                 $productionLine->update([
