@@ -28,8 +28,14 @@
                                 <td>Production Line #{{ $plan->productionLine->id }}</td>
                                 <td>{{ \Carbon\Carbon::parse($plan->date)->format('d/m/Y') }}</td>
                                 <td>
-                                    <a href="{{ route('events.create', $plan->id) }}"
+                                    <a href="{{ route('plans.view', [$plan->id, 1]) }}"
                                         class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
+                                        data-bs-custom-class="tooltip-white" data-bs-placement="top"
+                                        data-bs-title="View">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ route('events.create', $plan->id) }}"
+                                        class="btn btn-light-warning icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Events">
                                         <i class="bi bi-calendar-event"></i>

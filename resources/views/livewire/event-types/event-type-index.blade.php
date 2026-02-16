@@ -30,7 +30,11 @@
                                 <td>{{ $eventType->company->name }}</td>
                                 <td>{{ $eventType->name }}</td>
                                 <td>{{ $eventType->has_recipe ? 'Yes' : 'No' }}</td>
+                                @if($eventType->has_recipe)
+                                <td>{{ $eventType->recipe->duration }} Minute</td>
+                                @else
                                 <td>{{ $eventType->duration }} Minute</td>
+                                @endif
                                 <td>
                                     @can('eventType-edit')
                                     <button type="button" wire:click="edit({{ $eventType->id }})"

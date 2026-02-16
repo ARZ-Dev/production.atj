@@ -20,6 +20,7 @@ return new class extends Migration {
             $table->string('name');
             $table->time('from_time');
             $table->time('to_time')->nullable();
+            $table->string('batch_count')->nullable();
             $table->string('planned_duration')->nullable();
             $table->string('calculated_duration')->nullable();
             $table->string('status')->nullable();
