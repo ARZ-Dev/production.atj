@@ -279,27 +279,7 @@
             setOptions($('.event-type-select'), eventTypes);
         });
 
-        // SweetAlert confirmation for removing existing events
-        $wire.on('swal:confirm', function (params) {
-            let data = params[0];
-            Swal.fire({
-                title: data.title,
-                text: data.text,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: data.confirmButtonText,
-                cancelButtonText: data.cancelButtonText,
-                customClass: {
-                    confirmButton: 'btn btn-danger me-2',
-                    cancelButton: 'btn btn-secondary',
-                },
-                buttonsStyling: false,
-            }).then(function (result) {
-                if (result.isConfirmed) {
-                    $wire.call('removeEventRowConfirmed');
-                }
-            });
-        });
+      
 
         // SweetAlert error for time conflicts
         $wire.on('swal:error', function (params) {

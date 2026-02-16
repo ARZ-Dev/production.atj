@@ -14,8 +14,10 @@ class WarehouseTypeSeeder extends Seeder
     public function run(): void
     {
         $warehouseTypes = [
-            ['company_id' => 1, 'name' => 'Main Raw Warehouse'],
-            ['company_id' => 1, 'name' => 'Line Raw Warehouse'],
+            ['company_id' => 1, 'name' => 'Main Raw Materials Warehouse'],
+            ['company_id' => 1, 'name' => 'Line Raw Materials Warehouse'],
+            ['company_id' => 1, 'name' => 'Spare Parts Warehouse'],
+            ['company_id' => 1, 'name' => 'Semi Finished Goods Warehouse'],
             ['company_id' => 1, 'name' => 'Finished Goods Warehouse'],
         ];
 

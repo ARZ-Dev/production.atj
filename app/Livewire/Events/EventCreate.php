@@ -141,48 +141,21 @@ class EventCreate extends Component
         ];
     }
 
-    public function removeEventRow($index)
-    {
-        $event = $this->events[$index] ?? null;
+   public function removeEventRow($index)
+{
+    $event = $this->events[$index] ?? null;
 
-        if (!$event) {
-            return;
-        }
-
-        // Existing DB record — store index and ask for confirmation
-        if (!empty($event['id'])) {
-            $this->pendingRemoveIndex = $index;
-            $this->dispatch('swal:confirm', [
-                'title'             => 'Confirm Removal',
-                'text'              => 'Are you sure you want to remove this event? This will permanently delete it on save.',
-                'confirmButtonText' => 'Yes, remove it',
-                'cancelButtonText'  => 'Cancel',
-            ]);
-            return;
-        }
-
-        // New row — remove immediately
-        unset($this->events[$index]);
-        $this->events = array_values($this->events);
+    if (!$event) {
+        return;
     }
 
-    public function removeEventRowConfirmed()
-    {
-        if (is_null($this->pendingRemoveIndex)) {
-            return;
-        }
-
-        $index = $this->pendingRemoveIndex;
-        $event = $this->events[$index] ?? null;
-
-        if ($event && !empty($event['id'])) {
-            $this->removedEventIds[] = $event['id'];
-        }
-
-        unset($this->events[$index]);
-        $this->events = array_values($this->events);
-        $this->pendingRemoveIndex = null;
+    if (!empty($event['id'])) {
+        $this->removedEventIds[] = $event['id'];
     }
+
+    unset($this->events[$index]);
+    $this->events = array_values($this->events);
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -383,6 +356,7 @@ class EventCreate extends Component
                     'recipe_id'           => $event['recipe_id'] ?? null,
                     'name'                => $event['name'],
                     'planned_duration'    => $event['duration'],
+                    'batch_count'         => $event['batch_count'] ?? null,
                     'calculated_duration' => $event['total_duration'],
                     'from_time'           => $event['from_time'] ?: null,
                     'to_time'             => $event['to_time'] ?: null,

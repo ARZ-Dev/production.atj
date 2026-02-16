@@ -13,6 +13,7 @@ use App\Livewire\Factories\FactoryIndex;
 use App\Livewire\MachineTypes\MachineTypeCreate;
 use App\Livewire\MachineTypes\MachineTypeIndex;
 use App\Livewire\Plans\PlanIndex;
+use App\Livewire\Plans\PlanView;
 use App\Livewire\ProductionLines\ProductionLineCreate;
 use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RolesPermissions\PermissionView;
@@ -133,6 +134,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------
     Route::group(['prefix' => 'plans'], function () {
         Route::get('/', PlanIndex::class)->name('plans');
+        Route::get('/view/{id}/{status}', PlanView::class)->name('plans.view');
 
     });
 

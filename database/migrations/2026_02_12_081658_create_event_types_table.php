@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('recipe_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->boolean('has_recipe')->default(false);
-            $table->integer('duration')->default(0);
+            $table->integer('duration')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
