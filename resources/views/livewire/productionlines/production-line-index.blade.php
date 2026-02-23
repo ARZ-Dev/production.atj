@@ -4,11 +4,11 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Production Line List</h5>
-                    @can('productionLine-create')
+                    @hasPermission('production.productionLine-create')
                     <a href="{{ route('production-lines.create', ['factoryId' => $factoryId]) }}" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add New Production Line
                     </a>
-                    @endcan
+                    @endhasPermission
                 </div>
 
                 <div class="card-body">
@@ -30,23 +30,23 @@
                                 <td>{{ $production->warehouses->pluck('name')->join(', ') ?: 'N/A' }}</td>
                                 <td>{{ $production->machines->pluck('name')->join(', ') ?: 'N/A' }}</td>
                                 <td>
-                                    @can('productionLine-edit')
+                                    @hasPermission('production.productionLine-edit')
                                     <a href="{{ route('production-lines.edit', ['id' => $production->id, 'factoryId' => $factoryId]) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    @endcan
+                                    @endhasPermission
 
-                                    @can('productionLine-delete')
+                                    @hasPermission('production.productionLine-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $production->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    @endcan
+                                    @endhasPermission
 
 
                                 </td>

@@ -4,11 +4,11 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Companies List</h5>
-                    @can('company-create')
+                    @hasPermission('production.company-create')
                     <a href="{{ route('companies.create') }}" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add New Company
                     </a>
-                    @endcan
+                    @endhasPermission
                 </div>
 
                 <div class="card-body">
@@ -33,23 +33,23 @@
                                 <td>{{ $company->address }}</td>
                                 <td>
                                     @if($company->id != 1)
-                                    @can('company-edit')
+                                    @hasPermission('production.company-edit')
                                     <a href="{{ route('companies.edit', $company->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    @endcan
+                                    @endhasPermission
 
-                                    @can('company-delete')
+                                    @hasPermission('production.company-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $company->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    @endcan
+                                    @endhasPermission
                                     @endif
                                 </td>
                             </tr>

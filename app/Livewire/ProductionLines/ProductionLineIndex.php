@@ -16,9 +16,9 @@ class ProductionLineIndex extends Component
 
     public function mount($factoryId)
     {
-        $this->authorize('productionLine-list');
+        authorizeRequest('production.productionLine-list');
 
-        $this->factoryId = $factoryId; 
+        $this->factoryId = $factoryId;
 
         $this->productions = ProductionLine::with(['warehouses', 'machines'])->where('factory_id', $factoryId)->get();
     }
@@ -26,7 +26,7 @@ class ProductionLineIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('productionLine-delete');
+        authorizeRequest('production.productionLine-delete');
 
         $productionLine = ProductionLine::findOrFail($id);
         $productionLine->delete();

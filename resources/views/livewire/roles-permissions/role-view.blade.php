@@ -4,12 +4,12 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Role List</h5>
-                    @can('role-create')
+                    @hasPermission('production.role-create')
                     <button wire:click="clearData" data-bs-target="#saveRoleModal" data-bs-toggle="modal"
                         class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add New Role
                     </button>
-                    @endcan
+                    @endhasPermission
                 </div>
                 <div class="card-body" wire:ignore>
                     <table id="buttons-datatables" class="table table-nowrap table-striped table-bordered w-100">
@@ -45,22 +45,22 @@
                                 </td>
                                 <td>
                                     @if($role->id != \App\Utils\Constants::SUPER_ADMIN_ROLE_ID)
-                                    @can('role-edit')
+                                    @hasPermission('production.role-edit')
                                     <a wire:click="edit({{ $role->id }})" href="#" data-bs-toggle="modal"
                                         data-bs-target="#saveRoleModal" class="btn btn-light-primary icon-btn-sm"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    @endcan
-                                    @can('role-delete')
+                                    @endhasPermission
+                                    @hasPermission('production.role-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $role->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    @endcan
+                                    @endhasPermission
                                     @endif
                                 </td>
                             </tr>
@@ -84,7 +84,7 @@
                     </div>
                     <!-- Add role form -->
                     <form wire:submit.prevent="store" id="addRoleForm" class="row g-3">
-                        @if (auth()->user()->hasRole('Super Admin'))
+                        @if (authUser()->hasRole('Super Admin'))
                         <div class="col-12" wire:ignore>
                             <label class="form-label" for="company_id">Company <span
                                     class="text-danger">*</span></label>
@@ -188,7 +188,7 @@
                 </div>
                 <div class="modal-body">
                     <form wire:submit.prevent="store" id="addRoleForm" class="row g-3">
-                        @if(auth()->user()->hasRole('Super Admin'))
+                        @if(authUser()->hasRole('Super Admin'))
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="company_id">Company</label>
                             <div wire:ignore>
@@ -298,7 +298,7 @@
             let role = params[0];
             $('#company_id').selectpicker('val', role.company_id.toString());
         })
-        
+
     </script>
     @endscript
 </div>

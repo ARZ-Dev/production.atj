@@ -15,17 +15,17 @@ class UserIndex extends Component
 
     public function mount()
     {
-        if(auth()->user()->hasRole('Super Admin')) {
+        if(authUser()->hasRole('Super Admin')) {
             $this->users = User::all();
         } else {
-            $this->users = User::where('company_id', auth()->user()->company_id)->get();
+            $this->users = User::where('company_id', authUser()->company_id)->get();
         }
     }
 
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('user-delete');
+        authorizeRequest('production.user-delete');
 
         $user = User::findOrFail($id);
         $user->delete();

@@ -21,7 +21,7 @@ class CompanyCreate extends Component
     public function mount($id = null)
     {
         if ($id) {
-            $this->authorize('company-edit');
+            authorizeRequest('production.company-edit');
 
             $this->editing = true;
             $this->company = \App\Models\Company::findOrFail($id);
@@ -30,7 +30,7 @@ class CompanyCreate extends Component
             $this->description = $this->company->description;
             $this->address = $this->company->address;
         } else {
-            $this->authorize('company-create');
+            authorizeRequest('production.company-create');
         }
     }
 

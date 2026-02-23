@@ -4,11 +4,11 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Machine Types List</h5>
-                    @can('machineType-create')
+                    @hasPermission('production.machineType-create')
                     <a href="{{ route('machine-types.create') }}" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add New Machine Type
                     </a>
-                    @endcan
+                    @endhasPermission
                 </div>
 
                 <div class="card-body">
@@ -28,23 +28,23 @@
                                 <td>{{ $machineType->company->name }}</td>
                                 <td>{{ $machineType->name }}</td>
                                 <td>
-                                    @can('machineType-edit')
+                                    @hasPermission('production.machineType-edit')
                                     <a href="{{ route('machine-types.edit', $machineType->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    @endcan
+                                    @endhasPermission
 
-                                    @can('machineType-delete')
+                                    @hasPermission('production.machineType-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $machineType->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    @endcan
+                                    @endhasPermission
                                 </td>
                             </tr>
                             @endforeach

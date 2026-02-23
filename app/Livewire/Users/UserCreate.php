@@ -39,7 +39,7 @@ class UserCreate extends Component
 
     public function mount($id = 0, $status = 0)
     {
-        $this->authorize('user-list');
+        authorizeRequest('production.user-list');
         $this->status = $status;
         $this->users = User::all();
         $this->companies = Company::all();
@@ -93,11 +93,11 @@ class UserCreate extends Component
 
     public function store()
     {
-        $this->authorize('user-create');
+        authorizeRequest('production.user-create');
         $this->validate();
 
         $user = User::create([
-            'company_id' => $this->company_id ?? auth()->user()->company_id,
+            'company_id' => $this->company_id ?? authUser()->company_id,
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
             'username' => $this->username,
@@ -116,7 +116,7 @@ class UserCreate extends Component
     {
 
 
-        $this->authorize('user-edit');
+        authorizeRequest('production.user-edit');
 
         $this->validate([
             'first_name' => ['required', 'string'],

@@ -30,15 +30,15 @@ class FactoryCreate extends Component
         $this->editing = !is_null($id);
 
         if ($this->editing) {
-            $this->authorize('factory-edit');
+            authorizeRequest('production.factory-edit');
         } else {
-            $this->authorize('factory-create');
+            authorizeRequest('production.factory-create');
         }
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->companies = Company::all();
         }else{
-            $this->company_id = auth()->user()->company_id;
+            $this->company_id = authUser()->company_id;
             $this->warehouseTypes = WarehouseType::where('company_id', $this->company_id)->get();
         }
 

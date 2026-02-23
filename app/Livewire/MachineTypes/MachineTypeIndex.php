@@ -14,13 +14,13 @@ class MachineTypeIndex extends Component
 
     public function mount()
     {
-        $this->authorize('machineType-list');
+        authorizeRequest('production.machineType-list');
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->machineTypes = MachineType::with('company')->get();
         } else {
             $this->machineTypes = MachineType::with('company')
-                ->where('company_id', auth()->user()->company_id)
+                ->where('company_id', authUser()->company_id)
                 ->get();
         }
 
@@ -29,7 +29,7 @@ class MachineTypeIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('machineType-delete');
+        authorizeRequest('production.machineType-delete');
 
         $machineType = MachineType::findOrFail($id);
         if ($machineType->machines()->count() > 0) {

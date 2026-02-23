@@ -26,17 +26,23 @@ use App\Livewire\Warehouses\Warehouses\WarehouseCreate;
 use App\Livewire\Warehouses\Warehouses\WarehouseIndex;
 use App\Livewire\Warehouses\WarehouseTypes\WarehouseTypeCreate;
 use App\Livewire\Warehouses\WarehouseTypes\WarehouseTypeIndex;
+use App\Http\Controllers\Auth\AuthCallbackController;
 use Illuminate\Support\Facades\Route;
 
 
-// Route::get('/', function () {
-//     return view('index');
-// });
+// ─── Public routes (no auth) ──────────────────────────
+Route::get('/auth/token-login', [AuthCallbackController::class, 'tokenLogin'])
+    ->name('auth.token-login');
 
+Route::get('/', function () {
+    return redirect()->route('dashboard');
+});
 
-Route::get('/', Login::class)->name('login');
+Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
-Route::middleware(['auth'])->prefix('admin')->group(function () {
+    Route::post('/auth/logout', [AuthCallbackController::class, 'logout'])
+        ->name('auth.logout');
+
 
     Route::get('/dashboard', DashboardView::class)->name('dashboard');
     Route::get('/permissions', PermissionView::class)->name('permissions');

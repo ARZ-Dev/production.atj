@@ -15,19 +15,19 @@ class FactoryIndex extends Component
 
     public function mount()
     {
-        $this->authorize('factory-list');
+        authorizeRequest('production.factory-list');
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->factories = Factory::all();
         } else {
-            $this->factories = Factory::where('company_id', auth()->user()->company_id)->get();
+            $this->factories = Factory::where('company_id', authUser()->company_id)->get();
         }
     }
 
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('factory-delete');
+        authorizeRequest('production.factory-delete');
 
         $factory = Factory::findOrFail($id);
         // if ($factory->warehouses()->count() > 0) {

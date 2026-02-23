@@ -25,7 +25,7 @@
                                         <span class="pe-nav-content">Dashboard</span>
                                     </a>
                                 </li>
-                                @canany(['company-list' , 'role-list', 'permission-list', 'user-list'])
+                                @hasAnyPermission(['production.company-list' , 'production.role-list', 'production.permission-list', 'production.user-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseDashboards"
                                         class="pe-nav-link {{ request()->is('admin/companies*') || request()->is('admin/roles*') || request()->is('admin/users*') ? 'active' : '' }}"
@@ -38,7 +38,7 @@
                                     </a>
 
                                     <ul class="pe-slide-menu collapse" id="collapseDashboards">
-                                        @can('company-list')
+                                        @hasPermission('production.company-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('companies') }}"
                                                 class="pe-nav-link {{ request()->is('admin/companies*') ? " active" : ""
@@ -46,8 +46,8 @@
                                                 Companies
                                             </a>
                                         </li>
-                                        @endcan
-                                        @can('role-list')
+                                        @endhasPermission
+                                        @hasPermission('production.role-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('roles') }}"
                                                 class="pe-nav-link {{ request()->is('admin/roles*') ? " active" : ""
@@ -55,8 +55,8 @@
                                                 Roles
                                             </a>
                                         </li>
-                                        @endcan
-                                        @can('user-list')
+                                        @endhasPermission
+                                        @hasPermission('production.user-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('users') }}"
                                                 class="pe-nav-link {{ request()->is('admin/users*') ? " active" : ""
@@ -64,15 +64,15 @@
                                                 Users
                                             </a>
                                         </li>
-                                        @endcan
+                                        @endhasPermission
                                     </ul>
                                 </li>
-                                @endcanany
+                                @endhasAnyPermission
 
-                                @canany(['warehouseType-list', 'machineType-list', 'factory-list'])
+                                @hasAnyPermission(['production.warehouseType-list', 'production.machineType-list', 'production.factory-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseWarehouses"
-                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'active' : '' }}"
+                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'collapsed active' : '' }}"
                                         data-bs-toggle="collapse"
                                         aria-expanded="{{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'true' : 'false' }}"
                                         aria-controls="collapseWarehouses">
@@ -81,27 +81,26 @@
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse" id="collapseWarehouses">
+                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'show' : '' }}" id="collapseWarehouses">
 
-                                        @can('warehouseType-list')
+                                        @hasPermission('production.warehouseType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('warehouse-types') }}"
-                                                class="pe-nav-link {{ request()->is('admin/warehouse-types*') ? "
-                                                active" : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/warehouse-types*') ? "active" : "" }}">
                                                 Warehouse Types
                                             </a>
                                         </li>
-                                        @endcan
-                                        @can('machineType-list')
+                                        @endhasPermission
+                                        @hasPermission('production.machineType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('machine-types') }}"
-                                                class="pe-nav-link {{ request()->is('admin/machine-types*') ? " active"
+                                                class="pe-nav-link {{ request()->is('admin/machine-types*') ? "active"
                                                 : "" }}">
                                                 Machine Types
                                             </a>
                                         </li>
-                                        @endcan
-                                        @can('factory-list')
+                                        @endhasPermission
+                                        @hasPermission('production.factory-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('factories') }}"
                                                 class="pe-nav-link {{ request()->is('admin/factories*') ? " active" : ""
@@ -109,12 +108,13 @@
                                                 Factories
                                             </a>
                                         </li>
-                                        @endcan
+                                        @endhasPermission
 
                                     </ul>
                                 </li>
-                                @endcanany
-                                @canany(['shift-list', 'eventType-list'])
+                                @endhasAnyPermission
+
+                                @hasAnyPermission(['production.shift-list', 'production.eventType-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseShifts"
                                         class="pe-nav-link {{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'active' : '' }}"
@@ -128,7 +128,7 @@
 
                                     <ul class="pe-slide-menu collapse" id="collapseShifts">
 
-                                        @can('shift-list')
+                                        @hasPermission('production.shift-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('shifts') }}"
                                                 class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : ""
@@ -136,8 +136,8 @@
                                                 Shifts
                                             </a>
                                         </li>
-                                        @endcan
-                                        @can('eventType-list')
+                                        @endhasPermission
+                                        @hasPermission('production.eventType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('event-types') }}"
                                                 class="pe-nav-link {{ request()->is('admin/event-types*') ? " active"
@@ -145,11 +145,11 @@
                                                 Event Types
                                             </a>
                                         </li>
-                                        @endcan
+                                        @endhasPermission
 
                                     </ul>
                                 </li>
-                                @endcanany
+                                @endhasAnyPermission
                                 <li class="pe-slide pe-has-sub">
                                     <a href="{{ route('plans') }}"
                                         class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? " active" : "" }}">
