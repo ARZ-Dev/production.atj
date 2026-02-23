@@ -72,7 +72,7 @@
                                 @hasAnyPermission(['production.warehouseType-list', 'production.machineType-list', 'production.factory-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseWarehouses"
-                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'active' : '' }}"
+                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'collapsed active' : '' }}"
                                         data-bs-toggle="collapse"
                                         aria-expanded="{{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'true' : 'false' }}"
                                         aria-controls="collapseWarehouses">
@@ -81,13 +81,12 @@
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse" id="collapseWarehouses">
+                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'show' : '' }}" id="collapseWarehouses">
 
                                         @hasPermission('production.warehouseType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('warehouse-types') }}"
-                                                class="pe-nav-link {{ request()->is('admin/warehouse-types*') ? "
-                                                active" : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/warehouse-types*') ? "active" : "" }}">
                                                 Warehouse Types
                                             </a>
                                         </li>
@@ -95,7 +94,7 @@
                                         @hasPermission('production.machineType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('machine-types') }}"
-                                                class="pe-nav-link {{ request()->is('admin/machine-types*') ? " active"
+                                                class="pe-nav-link {{ request()->is('admin/machine-types*') ? "active"
                                                 : "" }}">
                                                 Machine Types
                                             </a>
