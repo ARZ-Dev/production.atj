@@ -16,7 +16,6 @@ class AuthUser implements Authenticatable
     public array $permissions;
     public array $accessibleModules;
     public string $accessToken;
-    public int $company_id;
 
     public function __construct(array $data, string $accessToken)
     {
@@ -28,7 +27,6 @@ class AuthUser implements Authenticatable
         $this->roles = collect($data['roles'] ?? [])->toArray();
         $this->permissions = collect($data['permissions'] ?? [])->toArray();
         $this->accessibleModules = $data['accessible_modules'] ?? [];
-        $this->company_id = $data['company_id'] ?? null;
         $this->accessToken = $accessToken;
     }
 
