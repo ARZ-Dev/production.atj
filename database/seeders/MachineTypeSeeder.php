@@ -14,14 +14,14 @@ class MachineTypeSeeder extends Seeder
     public function run(): void
     {
         $machineTypes =[
-            ['company_id' => 1, 'name' => 'Preparation'],
-            ['company_id' => 1, 'name' => 'Assembly'],
-            ['company_id' => 1, 'name' => 'Finishing'],
-            ['company_id' => 1, 'name' => 'Inspection'],
+            ['name' => 'Preparation'],
+            ['name' => 'Assembly'],
+            ['name' => 'Finishing'],
+            ['name' => 'Inspection'],
         ];
 
         foreach ($machineTypes as $type) {
-           MachineType::updateOrCreate(['name' => $type['name'], 'company_id' => $type['company_id']], $type);
+           MachineType::updateOrCreate(['name' => $type['name']], $type);
         }
     }
 }

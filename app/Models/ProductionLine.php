@@ -12,10 +12,6 @@ class ProductionLine extends Model
 
     protected $guarded = [];
 
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
-    }
 
     public function factory()
     {
@@ -26,19 +22,10 @@ class ProductionLine extends Model
     {
         return $this->belongsTo(MachineType::class);
     }
-    public function warehouseType()
-    {
-        return $this->belongsTo(WarehouseType::class, 'warehouse_type_id');
-    }
 
     public function machines()
     {
         return $this->hasMany(Machine::class);
-    }
-
-    public function warehouses()
-    {
-        return $this->hasMany(Warehouse::class);
     }
 
     public function plans()

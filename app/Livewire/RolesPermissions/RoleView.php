@@ -14,20 +14,18 @@ class RoleView extends Component
 {
     use AuthorizesRequests;
 
+    public $roles = [];
     public $role;
 
     public $permissions;
     public $filteredPermissions;
     public $selectedPermissions = [];
-    public $company_id;
-    public $companies = [];
     public bool $editing = false;
     public bool $isAllPermissionsSelected = false;
     public bool $allowPermissionEditing = true;
 
     public $name = "";
 
-    public array $primaryRolesIds;
 
     protected $listeners = [
         'delete',
@@ -36,8 +34,8 @@ class RoleView extends Component
     public function mount()
     {
         authorizeRequest('production.role-list');
+
         $this->permissions = Permission::all();
-        $this->companies = Company::all();
         foreach ($this->permissions as $permission) {
             $prefix = explode('-', $permission->name)[0];
             if (count(explode('-', $permission->name)) > 1) {
@@ -48,8 +46,7 @@ class RoleView extends Component
             }
         }
 
-
-        $this->primaryRolesIds = [Constants::SUPER_ADMIN_ROLE_ID, Constants::PROCUREMENT_MANAGER_ROLE_ID, Constants::SALES_ROLE_ID];
+        $this->roles = Role::all();
     }
 
     public function clearData()
@@ -86,7 +83,6 @@ class RoleView extends Component
         $this->allowPermissionEditing = $id != Constants::SUPER_ADMIN_ROLE_ID;
         $this->role = Role::findById($id);
         $this->name = $this->role->name;
-        $this->company_id = $this->role->company_id;
         $this->selectedPermissions = $this->role->permissions()->pluck('name')->toArray();
         $this->isAllPermissionsSelected = count($this->selectedPermissions) == count($this->permissions);
         $this->dispatch('setData', $this->role);
@@ -107,7 +103,6 @@ class RoleView extends Component
             authorizeRequest('production.role-edit');
 
             $this->role->update([
-                'company_id' => $this->company_id ?? authUser()->company_id,
                 'name' => $this->name,
             ]);
 
@@ -115,7 +110,6 @@ class RoleView extends Component
             authorizeRequest('production.role-create');
 
             $this->role = Role::create([
-                'company_id' => $this->company_id ?? authUser()->company_id,
                 'name' => $this->name,
             ]);
         }
@@ -158,11 +152,6 @@ class RoleView extends Component
     public function render()
     {
         $data = [];
-        $data['roles'] = Role::withCount('users')->get();
-
-
-
-        $this->dispatch('initializeDatatable');
 
         return view('livewire.roles-permissions.role-view', $data);
     }

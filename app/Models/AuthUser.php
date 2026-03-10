@@ -35,7 +35,7 @@ class AuthUser implements Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
-        if (in_array('super-admin', $this->roles)) {
+        if (in_array('Super Admin', $this->roles)) {
             return true;
         }
         return in_array($permission, $this->permissions);
@@ -46,7 +46,7 @@ class AuthUser implements Authenticatable
      */
     public function hasAnyPermission(array $permissions): bool
     {
-        if (in_array('super-admin', $this->roles)) {
+        if (in_array('Super Admin', $this->roles)) {
             return true;
         }
         return !empty(array_intersect($this->permissions, $permissions));

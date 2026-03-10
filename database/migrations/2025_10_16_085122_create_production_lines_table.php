@@ -12,8 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('production_lines', function (Blueprint $table) {
-            $table->id(); 
-            $table->foreignId('company_id')->constrained()->cascadeOnDelete();
+            $table->id();
             $table->foreignId('factory_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
             $table->softDeletes();

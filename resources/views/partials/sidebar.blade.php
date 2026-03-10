@@ -25,49 +25,40 @@
                                         <span class="pe-nav-content">Dashboard</span>
                                     </a>
                                 </li>
-{{--                                @hasAnyPermission(['production.company-list' , 'production.role-list', 'production.permission-list', 'production.user-list'])--}}
-{{--                                <li class="pe-slide pe-has-sub">--}}
-{{--                                    <a href="#collapseDashboards"--}}
-{{--                                        class="pe-nav-link {{ request()->is('admin/companies*') || request()->is('admin/roles*') || request()->is('admin/users*') ? 'active' : '' }}"--}}
-{{--                                        data-bs-toggle="collapse"--}}
-{{--                                        aria-expanded="{{ request()->is('admin/companies*') || request()->is('admin/roles*') || request()->is('admin/users*') ? 'true' : 'false' }}"--}}
-{{--                                        aria-controls="collapseDashboards">--}}
-{{--                                        <i class="bi bi-gear pe-nav-icon"></i>--}}
-{{--                                        <span class="pe-nav-content">Settings</span>--}}
-{{--                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>--}}
-{{--                                    </a>--}}
+                                @hasAnyPermission(['production.role-list', 'production.permission-list', 'production.user-list'])
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="#collapseSettings"
+                                        class="pe-nav-link {{ request()->is('admin/roles*') || request()->is('admin/users*') ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ request()->is('admin/roles*') || request()->is('admin/users*') ? 'true' : 'false' }}"
+                                        aria-controls="collapseSettings">
+                                        <i class="bi bi-gear pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Settings</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
+                                    </a>
 
-{{--                                    <ul class="pe-slide-menu collapse" id="collapseDashboards">--}}
-{{--                                        @hasPermission('production.company-list')--}}
-{{--                                        <li class="pe-slide-item">--}}
-{{--                                            <a href="{{ route('companies') }}"--}}
-{{--                                                class="pe-nav-link {{ request()->is('admin/companies*') ? " active" : ""--}}
-{{--                                                }}">--}}
-{{--                                                Companies--}}
-{{--                                            </a>--}}
-{{--                                        </li>--}}
-{{--                                        @endhasPermission--}}
-{{--                                        @hasPermission('production.role-list')--}}
-{{--                                        <li class="pe-slide-item">--}}
-{{--                                            <a href="{{ route('roles') }}"--}}
-{{--                                                class="pe-nav-link {{ request()->is('admin/roles*') ? " active" : ""--}}
-{{--                                                }}">--}}
-{{--                                                Roles--}}
-{{--                                            </a>--}}
-{{--                                        </li>--}}
-{{--                                        @endhasPermission--}}
-{{--                                        @hasPermission('production.user-list')--}}
-{{--                                        <li class="pe-slide-item">--}}
-{{--                                            <a href="{{ route('users') }}"--}}
-{{--                                                class="pe-nav-link {{ request()->is('admin/users*') ? " active" : ""--}}
-{{--                                                }}">--}}
-{{--                                                Users--}}
-{{--                                            </a>--}}
-{{--                                        </li>--}}
-{{--                                        @endhasPermission--}}
-{{--                                    </ul>--}}
-{{--                                </li>--}}
-{{--                                @endhasAnyPermission--}}
+                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/roles*') || request()->is('admin/users*') ? 'show' : '' }}" id="collapseSettings">
+                                        @hasPermission('production.role-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('roles') }}"
+                                                class="pe-nav-link {{ request()->is('admin/roles*') ? " active" : ""
+                                                }}">
+                                                Roles
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+                                        @hasPermission('production.user-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('users') }}"
+                                                class="pe-nav-link {{ request()->is('admin/users*') ? " active" : ""
+                                                }}">
+                                                Users
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+                                    </ul>
+                                </li>
+                                @endhasAnyPermission
 
                                 @hasAnyPermission(['production.warehouseType-list', 'production.machineType-list', 'production.factory-list'])
                                 <li class="pe-slide pe-has-sub">

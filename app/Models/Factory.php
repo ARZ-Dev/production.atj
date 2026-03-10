@@ -11,14 +11,4 @@ class Factory extends Model
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
-
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
-    }
-
-    public function warehouses()
-    {
-        return $this->hasMany(Warehouse::class);
-    }
 }

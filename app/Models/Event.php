@@ -12,11 +12,6 @@ class Event extends Model
 
     protected $guarded = [];
 
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
-    }
-
     public function eventType()
     {
         return $this->belongsTo(EventType::class);

@@ -13,10 +13,10 @@ class EventTypeSeeder extends Seeder
     public function run(): void
     {
         $eventTypes = [
-            ['name' => 'Preparation', 'company_id' => 1],
-            ['name' => 'Production', 'company_id' => 1],
-            ['name' => 'Maintenance', 'company_id' => 1],
-            ['name' => 'Cleaning', 'company_id' => 1],
+            ['name' => 'Preparation'],
+            ['name' => 'Production'],
+            ['name' => 'Maintenance'],
+            ['name' => 'Cleaning'],
         ];
 
         foreach ($eventTypes as $eventType) {
