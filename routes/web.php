@@ -46,7 +46,8 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     Route::get('/dashboard', DashboardView::class)->name('dashboard');
     Route::get('/permissions', PermissionView::class)->name('permissions');
-    Route::get('/roles', RoleView::class)->name('roles');
+
+    Route::resource('/roles', \App\Http\Controllers\RoleController::class);
 
 
 
@@ -129,13 +130,13 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     // |--------------------------------------------------------------------------
     // | Event Types
-    // |--------------------------------------------------------------------------  
+    // |--------------------------------------------------------------------------
     Route::group(['prefix' => 'event-types'], function () {
         Route::get('/', EventTypeIndex::class)->name('event-types');
 
     });
 
-    // |--------------------------------------------------------------------------  
+    // |--------------------------------------------------------------------------
     // | Plans
     // |--------------------------------------------------------------------------
     Route::group(['prefix' => 'plans'], function () {
