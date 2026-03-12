@@ -3,10 +3,9 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">Role List</h5>
             @hasPermission('production.role-create')
-            <button wire:click="clearData" data-bs-target="#saveRoleModal" data-bs-toggle="modal"
-                    class="btn btn-primary">
+            <a href="{{ route('roles.create') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg me-1"></i> Add New Role
-            </button>
+            </a>
             @endhasPermission
         </div>
         <div class="card-body">
@@ -14,7 +13,8 @@
                 <table id="buttons-datatables" class="table table-nowrap table-striped table-bordered w-100">
                     <thead>
                     <tr>
-                        <th>Role Name</th>
+                        <th>#</th>
+                        <th>Role</th>
                         <th>Users</th>
                         <th>Created</th>
                         <th class="text-center" style="width: 100px;">Actions</th>
@@ -23,6 +23,7 @@
                     <tbody>
                     @foreach($roles as $role)
                         <tr>
+                            <td>{{ $loop->iteration }}</td>
                             <td>{{ $role['name'] }}</td>
                             <td>{{ $role['users_count'] }}</td>
                             <td>{{ $role['created_at'] }}</td>

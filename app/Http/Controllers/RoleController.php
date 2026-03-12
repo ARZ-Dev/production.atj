@@ -29,8 +29,9 @@ class RoleController extends Controller
     {
         $result = $this->apiService->get('/v1/permissions', ['module' => 'production']);
         $permissions = $result['data']['grouped'] ?? [];
+        $route = route('roles.store');
 
-        return view('roles.create', compact('permissions'));
+        return view('roles.create', compact('permissions', 'route'));
     }
 
     /**
@@ -44,9 +45,10 @@ class RoleController extends Controller
             'permissions.*' => 'string',
         ]);
 
-        $result = $this->apiService->createRole([
+        $result = $this->apiService->post('/v1/roles', [
             'name'        => $request->name,
             'permissions' => $request->permissions ?? [],
+            'module'      => 'production',
         ]);
 
         if (!($result['success'] ?? false)) {
@@ -55,8 +57,7 @@ class RoleController extends Controller
             );
         }
 
-        return redirect()->route('roles.index')
-            ->with('success', 'Role created successfully.');
+        return redirect()->route('roles.index')->with('success', 'Role created successfully.');
     }
 
     /**
@@ -81,7 +82,9 @@ class RoleController extends Controller
         $allowPermissionEditing = !in_array('Super Admin', $role['permissions'] ?? []);
         $selectedPermissions = $role['permissions'] ?? [];
 
-        return view('roles.edit', compact('role', 'permissions', 'isAllPermissionsSelected', 'allowPermissionEditing', 'selectedPermissions'));
+        $route = route('roles.update', $id);
+
+        return view('roles.create', compact('role', 'permissions', 'isAllPermissionsSelected', 'allowPermissionEditing', 'selectedPermissions', 'route'));
     }
 
     /**
@@ -95,9 +98,10 @@ class RoleController extends Controller
             'permissions.*' => 'string',
         ]);
 
-        $result = $this->apiService->updateRole($id, [
+        $result = $this->apiService->post("/v1/roles/{$id}", [
             'name'        => $request->name,
             'permissions' => $request->permissions ?? [],
+            'module'      => 'production',
         ]);
 
         if (!($result['success'] ?? false)) {
@@ -115,7 +119,7 @@ class RoleController extends Controller
      */
     public function destroy(int $id)
     {
-        $result = $this->apiService->deleteRole($id);
+        $result = $this->apiService->delete("/v1/roles/{$id}", ['module' => 'production']);
 
         if (!($result['success'] ?? false)) {
             return back()->with('error', $result['message'] ?? 'Failed to delete role.');

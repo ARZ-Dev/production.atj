@@ -47,7 +47,8 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::get('/dashboard', DashboardView::class)->name('dashboard');
     Route::get('/permissions', PermissionView::class)->name('permissions');
 
-    Route::resource('/roles', \App\Http\Controllers\RoleController::class);
+    Route::resource('/roles', \App\Http\Controllers\RoleController::class)->except(['show', 'update']);
+    Route::post('/roles/{id}', [\App\Http\Controllers\RoleController::class, 'update'])->name('roles.update');
 
 
 
