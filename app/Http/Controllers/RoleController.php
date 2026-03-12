@@ -18,7 +18,6 @@ class RoleController extends Controller
     {
         $data = [];
         $data['roles'] = $this->apiService->get('/v1/roles')['data'] ?? [];
-        dd($data);
 
         return view('roles.index', $data);
     }
@@ -65,19 +64,24 @@ class RoleController extends Controller
      */
     public function edit(int $id)
     {
-        $roleResult = $this->apiService->getRole($id);
+        $roleResult = $this->apiService->get("/v1/roles/{$id}", ['module' => 'production']);;
 
         if (!($roleResult['success'] ?? false)) {
             return redirect()->route('roles.index')
                 ->with('error', $roleResult['message'] ?? 'Role not found.');
         }
 
-        $permResult = $this->apiService->getPermissions();
+        $permResult = $this->apiService->get('/v1/permissions', ['module' => 'production']);
 
         $role = $roleResult['data'];
+        $allPermissions = $permResult['data']['all'] ?? [];
         $permissions = $permResult['data']['grouped'] ?? [];
 
-        return view('roles.edit', compact('role', 'permissions'));
+        $isAllPermissionsSelected = count($allPermissions) == count($role['permissions'] ?? []);
+        $allowPermissionEditing = !in_array('Super Admin', $role['permissions'] ?? []);
+        $selectedPermissions = $role['permissions'] ?? [];
+
+        return view('roles.edit', compact('role', 'permissions', 'isAllPermissionsSelected', 'allowPermissionEditing', 'selectedPermissions'));
     }
 
     /**

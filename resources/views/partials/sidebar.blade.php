@@ -40,7 +40,7 @@
                                     <ul class="pe-slide-menu collapse {{ request()->is('admin/roles*') || request()->is('admin/users*') ? 'show' : '' }}" id="collapseSettings">
                                         @hasPermission('production.role-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('roles') }}"
+                                            <a href="{{ route('roles.index') }}"
                                                 class="pe-nav-link {{ request()->is('admin/roles*') ? " active" : ""
                                                 }}">
                                                 Roles
