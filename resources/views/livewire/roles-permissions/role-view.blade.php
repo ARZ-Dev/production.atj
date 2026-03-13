@@ -16,7 +16,6 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Company</th>
                                 <th>Name</th>
                                 <th>Action</th>
                             </tr>
@@ -25,21 +24,12 @@
                             @foreach($roles as $key => $role)
                             <tr>
                                 <td>{{ $key + 1 }}</td>
-                                @php
-                                $companyId = $role->company_id;
-                                $company = \App\Models\Company::find($companyId);
-                                @endphp
-                                <td>{{ $company->name ?? 'N/A' }}</td>
                                 <td>
                                     <span class='d-flex align-items-center'>
-                                        @if(isset(\App\Utils\Constants::ROLE_SETTINGS[$role->id]))
-                                        <?php echo \App\Utils\Constants::ROLE_SETTINGS[$role->id]['badge']; ?>
-                                        @else
                                         <span
                                             class="badge badge-center rounded-pill bg-label-info me-3 w-px-30 h-px-30">
                                             <i class="ti ti-user ti-sm"></i>
                                         </span>
-                                        @endif
                                         {{ $role->name }}
                                     </span>
                                 </td>
@@ -72,109 +62,6 @@
         </div>
     </div>
 
-    <!-- Add Role Modal -->
-    {{-- <div wire:ignore.self class="modal fade" id="saveRoleModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-centered modal-add-new-role">
-            <div class="modal-content p-3 p-md-5">
-                <button type="button" class="btn-close btn-pinned" data-bs-dismiss="modal" aria-label="Close"></button>
-                <div class="modal-body">
-                    <div class="text-center mb-4">
-                        <h3 class="role-title mb-2">{{ $editing ? 'Edit' : 'Add' }} Role</h3>
-                        <p class="text-muted">Set Role Permissions</p>
-                    </div>
-                    <!-- Add role form -->
-                    <form wire:submit.prevent="store" id="addRoleForm" class="row g-3">
-                        @if (authUser()->hasRole('Super Admin'))
-                        <div class="col-12" wire:ignore>
-                            <label class="form-label" for="company_id">Company <span
-                                    class="text-danger">*</span></label>
-                            <select wire:model="company_id" id="company_id" class="form-select selectpicker w-100"
-                                aria-label="Default select example" title="Select Company" data-style="btn-default"
-                                data-live-search="true" data-icon-base="ti" data-tick-icon="ti-check text-white">
-                                @foreach($companies as $company)
-                                <option value="{{ $company->id }}" @selected($company->id == $company_id)>
-                                    {{ $company->name }}
-                                </option>
-                                @endforeach
-                            </select>
-
-                            @error('company_id') <div class="text-danger">{{ $message }}</div> @enderror
-                        </div>
-                        @endif
-                        <div class="col-12 mb-4">
-                            <label class="form-label" for="modalRoleName">Name <span
-                                    class="text-danger">*</span></label>
-                            <input wire:model.defer="name" type="text" id="modalRoleName" name="modalRoleName"
-                                class="form-control" placeholder="Enter a role name" tabindex="-1" />
-                            @error('name') <div class="text-danger">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-12">
-                            <h5>Role Permission</h5>
-                            <!-- Permission table -->
-                            <div class="table-responsive">
-                                <table class="table table-flush-spacing">
-                                    <tbody>
-                                        <tr>
-                                            <td class="text-nowrap fw-semibold">
-                                                Administrator Access
-                                                <i class="ti ti-info-circle" data-bs-toggle="tooltip"
-                                                    data-bs-placement="top"
-                                                    title="Allows a full access to the system"></i>
-                                            </td>
-                                            <td>
-                                                <div class="form-check">
-                                                    <input wire:click="selectAllPermissions" class="form-check-input" {{
-                                                        $isAllPermissionsSelected ? "checked" : "" }} type="checkbox"
-                                                        id="selectAll" {{ $allowPermissionEditing ? "" : "disabled"
-                                                        }} />
-                                                    <label class="form-check-label" for="selectAll">Select All</label>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        @foreach($filteredPermissions as $key => $permissions)
-                                        <tr class="{{ $loop->iteration % 2 == 0 ? 'bg-light' : '' }}">
-                                            <td class="text-nowrap fw-semibold text-center">{{ ucfirst($key) }}
-                                                Management</td>
-                                            <td>
-                                                <div class="d-flex">
-                                                    @foreach($permissions as $permission)
-                                                    <div class="form-check me-3 me-lg-5">
-                                                        <input
-                                                            wire:click="togglePermission('{{ $key . '-' . $permission['name'] }}')"
-                                                            class="form-check-input" type="checkbox"
-                                                            id="permission_{{ $permission['id'] }}"
-                                                            value="{{ $permission['id'] }}" {{ in_array($key . '-' .
-                                                            $permission['name'], $selectedPermissions) ? 'checked' : ''
-                                                            }} {{ $allowPermissionEditing ? '' : 'disabled' }} />
-                                                        <label class="form-check-label"
-                                                            for="permission_{{ $permission['id'] }}">
-                                                            {{ ucfirst($permission['name']) }}
-                                                        </label>
-                                                    </div>
-                                                    @endforeach
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                            <!-- Permission table -->
-                        </div>
-                        <div class="col-12 text-center mt-4">
-                            <button type="submit" class="btn btn-primary me-sm-3 me-1">Submit</button>
-                            <button type="reset" class="btn btn-label-secondary close-modal" data-bs-dismiss="modal"
-                                aria-label="Close">Cancel</button>
-                        </div>
-                    </form>
-                    <!--/ Add role form -->
-                </div>
-            </div>
-        </div>
-    </div> --}}
-    <!--/ Add Role Modal -->
-
-
     <!-- Start:: Static Modal -->
     <div wire:ignore.self class="modal fade" id="saveRoleModal" data-bs-backdrop="static" data-bs-keyboard="false"
         tabindex="-1" aria-labelledby="saveRoleModalLabel" aria-hidden="true">
@@ -188,22 +75,6 @@
                 </div>
                 <div class="modal-body">
                     <form wire:submit.prevent="store" id="addRoleForm" class="row g-3">
-                        @if(authUser()->hasRole('Super Admin'))
-                        <div class="col-12 col-md-6">
-                            <label class="form-label" for="company_id">Company</label>
-                            <div wire:ignore>
-                                <select wire:model="company_id" id="company_id" class="selectpicker w-100"
-                                    title="Select Company" data-style="btn-default" data-live-search="true"
-                                    data-icon-base="ti" data-size="5" data-tick-icon="ti-check text-white">
-                                    @foreach($companies as $company)
-                                    <option value="{{ $company->id }}" @selected($company->id == $company_id)>{{
-                                        $company->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @error('company_id') <div class="text-danger">{{ $message }}</div> @enderror
-                        </div>
-                        @endif
 
                         <div class="col-12 mb-4">
                             <label class="form-label" for="modalRoleName">Name <span

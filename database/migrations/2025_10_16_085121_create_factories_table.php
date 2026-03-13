@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('factories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('company_id')->constrained()->onDelete('cascade');
             $table->string('name');
             $table->text('address')->nullable();
             $table->timestamps();

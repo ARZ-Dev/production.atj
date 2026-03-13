@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('event_types', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('company_id')->constrained()->cascadeOnDelete();
             $table->foreignId('recipe_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->boolean('has_recipe')->default(false);

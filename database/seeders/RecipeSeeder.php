@@ -13,14 +13,14 @@ class RecipeSeeder extends Seeder
     public function run(): void
     {
         $recipes = [
-            ['company_id' => 1, 'name' => 'Recipe A', 'duration' => 60],
-            ['company_id' => 1, 'name' => 'Recipe B', 'duration' => 90],
-            ['company_id' => 1, 'name' => 'Recipe C', 'duration' => 120],
+            ['name' => 'Recipe A', 'duration' => 60],
+            ['name' => 'Recipe B', 'duration' => 90],
+            ['name' => 'Recipe C', 'duration' => 120],
         ];
 
         foreach ($recipes as $recipe) {
             \App\Models\Recipe::updateOrCreate(
-                ['name' => $recipe['name'], 'company_id' => $recipe['company_id']],
+                ['name' => $recipe['name']],
                 ['duration' => $recipe['duration']]
             );
         }
