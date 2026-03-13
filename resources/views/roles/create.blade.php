@@ -15,7 +15,7 @@
                     <div class="col-12 mb-4">
                         <label class="form-label" for="name">Name <span
                                 class="text-danger">*</span></label>
-                        <input name="name" type="text" id="name" class="form-control" placeholder="Enter a role name" value="{{ $role['name'] ?? "" }}" />
+                        <input name="name" type="text" id="name" class="form-control" placeholder="Enter a role name" value="{{ $role['name'] ?? "" }}" required />
                         @error('name') <div class="text-danger">{{ $message }}</div> @enderror
                     </div>
 

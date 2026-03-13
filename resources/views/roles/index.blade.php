@@ -28,14 +28,19 @@
                             <td>{{ $role['users_count'] }}</td>
                             <td>{{ $role['created_at'] }}</td>
                             <td class="text-center">
+                                @if($role['name'] !== 'Super Admin')
+
                                 <a href="{{ route('roles.edit', $role['id']) }}" class="btn btn-sm btn-warning" title="Edit Role">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
-                                <button type="button" class="btn btn-sm btn-danger" title="Delete Role"
-                                        data-bs-toggle="modal" data-bs-target="#deleteModal"
-                                        data-role-id="{{ $role['id'] }}" data-role-name="{{ $role['name'] }}">
+                                <button type="button"
+                                        class="btn btn-sm btn-danger delete-role"
+                                        title="Delete Role"
+                                        data-id="{{ $role['id'] }}"
+                                        data-name="{{ $role['name'] }}">
                                     <i class="bi bi-trash"></i>
                                 </button>
+                                @endif
                             </td>
                         </tr>
                     @endforeach
@@ -45,34 +50,30 @@
         </div>
     </div>
 
-    {{-- Delete Confirmation Modal --}}
-    <div class="modal fade" id="deleteModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">
-                        <i class="bi bi-exclamation-triangle"></i> Delete Role
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete the role <strong id="deleteRoleName"></strong>?</p>
-                    <p class="text-danger mb-0">
-                        <small>This action cannot be undone.</small>
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <form id="deleteForm" method="POST">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash"></i> Delete
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+
 </x-layouts.app>
+
+<script>
+
+    $(document).on('click', '.delete-role', function () {
+
+        let roleId = $(this).data('id');
+        let roleName = $(this).data('name');
+
+        Swal.fire({
+            title: 'Delete Role?',
+            text: "You are about to delete \"" + roleName + "\"",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = "{{ route('roles.destroy', '%roleId%') }}".replace('%roleId%', roleId);
+            }
+        });
+    });
+
+</script>
 
