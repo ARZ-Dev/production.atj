@@ -51,30 +51,10 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::post('/roles/{id}', [\App\Http\Controllers\RoleController::class, 'update'])->name('roles.update');
     Route::get('/roles/delete/{id}', [\App\Http\Controllers\RoleController::class, 'destroy'])->name('roles.destroy');
 
+    Route::resource('/users', \App\Http\Controllers\UserController::class)->except(['show', 'update', 'destroy']);
+    Route::post('/users/{id}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
+    Route::get('/users/delete/{id}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
 
-
-    // |--------------------------------------------------------------------------
-    // |Companies
-    // |--------------------------------------------------------------------------
-
-    Route::group(['prefix' => 'companies'], function () {
-        Route::get('/', CompanyIndex::class)->name('companies');
-        Route::get('/create', CompanyCreate::class)->name('companies.create');
-        Route::get('/edit/{id}', CompanyCreate::class)->name('companies.edit');
-        Route::get('/view/{id}', CompanyCreate::class)->name('companies.view');
-    });
-
-
-    // |--------------------------------------------------------------------------
-    // | Users
-    // |--------------------------------------------------------------------------
-
-    Route::group(['prefix' => 'users'], function () {
-        Route::get('/', UserIndex::class)->name('users');
-        Route::get('/create', UserCreate::class)->name('users.create');
-        Route::get('/edit/{id}', UserCreate::class)->name('users.edit');
-        Route::get('/view/{id}', UserCreate::class)->name('users.view');
-    });
 
     // |--------------------------------------------------------------------------
     // | Warehouses Types
