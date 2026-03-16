@@ -49,7 +49,7 @@
                                         @endhasPermission
                                         @hasPermission('production.user-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('users') }}"
+                                            <a href="{{ route('users.index') }}"
                                                 class="pe-nav-link {{ request()->is('admin/users*') ? " active" : ""
                                                 }}">
                                                 Users
