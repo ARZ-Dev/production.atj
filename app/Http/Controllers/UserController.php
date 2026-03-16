@@ -31,6 +31,7 @@ class UserController extends Controller
         $rolesResult = $this->api->get('/v1/users/available-roles', ['module' => 'production']);
         $data['roles'] = $rolesResult['data'] ?? [];
         $data['route'] = route('users.store');
+        $data['editing'] = false;
 
         return view('users.create', $data);
     }
