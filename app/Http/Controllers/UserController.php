@@ -41,7 +41,7 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'            => 'required|string|max:255',
+            'name'                  => 'required|string|max:255',
             'username'              => 'required|string|max:255',
             'email'                 => 'required|email|max:255',
             'phone'                 => 'required|string|max:20',
@@ -88,8 +88,9 @@ class UserController extends Controller
         $data['user'] = $userResult['data'];
         $data['roles'] = $rolesResult['data'] ?? [];
         $data['route'] = route('users.update', $id);
+        $data['editing'] = true;
 
-        return view('users.edit', $data);
+        return view('users.create', $data);
     }
 
     /**

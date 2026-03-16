@@ -6,7 +6,7 @@
 
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Add User</h6>
+                    <h6 class="mb-0">{{ $editing ? "Edit" : "Create" }} User</h6>
                     <a href="{{ route('users.index') }}" class="btn btn-light-light text-muted">
                         <i class="bi bi-arrow-left me-1"></i>Back
                     </a>
@@ -35,7 +35,7 @@
                                    class="form-control @error('name') is-invalid @enderror"
                                    name="name"
                                    id="name"
-                                   value="{{ old('name') }}"
+                                   value="{{ $user['name'] ?? old('name') }}"
                                    placeholder="Enter Name"
                                    required>
                             @error('name')
@@ -52,7 +52,7 @@
                                    class="form-control @error('username') is-invalid @enderror"
                                    name="username"
                                    id="username"
-                                   value="{{ old('username') }}"
+                                   value="{{ $user['username'] ?? old('username') }}"
                                    placeholder="Enter Username"
                                    required>
                             @error('username')
@@ -69,7 +69,7 @@
                                    class="form-control @error('email') is-invalid @enderror"
                                    name="email"
                                    id="email"
-                                   value="{{ old('email') }}"
+                                   value="{{ $user['email'] ?? old('email') }}"
                                    placeholder="Enter Email"
                                    required>
                             @error('email')
@@ -89,7 +89,7 @@
                                 <option value="">Select Role</option>
                                 @foreach($roles as $role)
                                     <option value="{{ $role['name'] }}"
-                                        {{ old('role_name') == $role['name'] ? 'selected' : '' }}>
+                                        @selected(($user['role'] ?? old('role_name')) == $role['name'])>
                                         {{ $role['name'] }}
                                     </option>
                                 @endforeach
@@ -108,7 +108,7 @@
                                    class="form-control @error('phone') is-invalid @enderror"
                                    name="phone"
                                    id="phone"
-                                   value="{{ old('phone') }}"
+                                   value="{{ $user['phone'] ?? old('phone') }}"
                                    placeholder="Enter Phone Number"
                                    required>
                             @error('phone')
@@ -132,7 +132,8 @@
                                    name="password"
                                    id="password"
                                    placeholder="&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;"
-                                   required>
+                                   @if(!$editing) required @endif
+                            >
                             @error('password')
                             <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -149,7 +150,8 @@
                                    name="password_confirmation"
                                    id="password_confirmation"
                                    placeholder="&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;"
-                                   required>
+                                   @if(!$editing) required @endif
+                            >
                         </div>
                     </div>
                 </div>
