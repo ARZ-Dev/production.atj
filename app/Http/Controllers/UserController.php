@@ -31,7 +31,7 @@ class UserController extends Controller
         $rolesResult = $this->api->get('/v1/users/available-roles', ['module' => 'production']);
         $data['roles'] = $rolesResult['data'] ?? [];
 
-        $departmentsResult = $this->api->get('/v1/departments', ['filter' => 'productions']);
+        $departmentsResult = $this->api->get('/v1/departments', ['filter' => 'production']);
         $data['departments'] = $departmentsResult['data'] ?? [];
 
         $data['route'] = route('users.store');
