@@ -99,6 +99,25 @@
                             @enderror
                         </div>
 
+                        {{-- Departments --}}
+                        <div class="col-md-6">
+                            <label for="department_ids" class="form-label">Departments</label>
+                            <select class="form-select @error('department_ids') is-invalid @enderror"
+                                    name="department_ids[]"
+                                    id="department_ids"
+                                    multiple>
+                                @foreach($departments as $department)
+                                    <option value="{{ $department['id'] }}"
+                                        @selected(in_array($department['id'], $user['department_ids'] ?? old('department_ids', [])))>
+                                        {{ $department['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('department_ids')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                         {{-- Phone --}}
                         <div class="col-md-6">
                             <label for="phone" class="form-label">
