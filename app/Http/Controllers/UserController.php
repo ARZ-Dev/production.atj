@@ -30,8 +30,13 @@ class UserController extends Controller
         $data = [];
         $rolesResult = $this->api->get('/v1/users/available-roles', ['module' => 'production']);
         $data['roles'] = $rolesResult['data'] ?? [];
+
+        $departmentsResult = $this->api->get('/v1/departments', ['filter' => 'productions']);
+        $data['departments'] = $departmentsResult['data'] ?? [];
+
         $data['route'] = route('users.store');
         $data['editing'] = false;
+        $data['user'] = null;
 
         return view('users.create', $data);
     }
@@ -48,6 +53,8 @@ class UserController extends Controller
             'phone'                 => 'required|string|max:20',
             'role_name'             => 'required|string',
             'password'              => 'required|string|min:8|confirmed',
+            'department_ids'        => 'nullable|array',
+            'department_ids.*'      => 'integer',
         ]);
 
         $result = $this->api->post('/v1/users', [
@@ -59,6 +66,7 @@ class UserController extends Controller
             'role_name'             => $request->role_name,
             'password'              => $request->password,
             'password_confirmation' => $request->password_confirmation,
+            'department_ids'        => $request->input('department_ids', []),
         ]);
 
         if (!($result['success'] ?? false)) {
@@ -86,8 +94,11 @@ class UserController extends Controller
 
         $rolesResult = $this->api->get('/v1/users/available-roles', ['module' => 'production']);
 
+        $departmentsResult = $this->api->get('/v1/departments', ['filter' => 'productions']);
+
         $data['user'] = $userResult['data'];
         $data['roles'] = $rolesResult['data'] ?? [];
+        $data['departments'] = $departmentsResult['data'] ?? [];
         $data['route'] = route('users.update', $id);
         $data['editing'] = true;
 
@@ -100,11 +111,13 @@ class UserController extends Controller
     public function update(Request $request, int $id)
     {
         $rules = [
-            'name'       => 'required|string|max:255',
-            'username'   => 'required|string|max:255',
-            'email'      => 'required|email|max:255',
-            'phone'      => 'required|string|max:20',
-            'role_name'  => 'required|string',
+            'name'              => 'required|string|max:255',
+            'username'          => 'required|string|max:255',
+            'email'             => 'required|email|max:255',
+            'phone'             => 'required|string|max:20',
+            'role_name'         => 'required|string',
+            'department_ids'    => 'nullable|array',
+            'department_ids.*'  => 'integer',
         ];
 
         // Password optional on update
@@ -115,12 +128,13 @@ class UserController extends Controller
         $request->validate($rules);
 
         $data = [
-            'name'       => $request->name,
-            'username'   => $request->username,
-            'email'      => $request->email,
-            'phone'      => $request->phone,
-            'role_name'  => $request->role_name,
-            'module'     => 'production',
+            'name'           => $request->name,
+            'username'       => $request->username,
+            'email'          => $request->email,
+            'phone'          => $request->phone,
+            'role_name'      => $request->role_name,
+            'module'         => 'production',
+            'department_ids' => $request->input('department_ids', []),
         ];
 
         if ($request->filled('password')) {
