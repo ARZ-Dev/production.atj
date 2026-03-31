@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\ApiService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
@@ -55,6 +56,12 @@ class UserController extends Controller
             'password'              => 'required|string|min:8|confirmed',
             'department_ids'        => 'nullable|array',
             'department_ids.*'      => 'integer',
+            'warehouse_ids'         => 'nullable|array',
+            'warehouse_ids.*'       => 'integer',
+            'item_type_ids'         => 'nullable|array',
+            'item_type_ids.*'       => 'integer',
+            'supervisor_ids'        => 'nullable|array',
+            'supervisor_ids.*'      => 'integer',
         ]);
 
         $result = $this->api->post('/v1/users', [
@@ -67,6 +74,9 @@ class UserController extends Controller
             'password'              => $request->password,
             'password_confirmation' => $request->password_confirmation,
             'department_ids'        => $request->input('department_ids', []),
+            'warehouse_ids'         => $request->input('warehouse_ids', []),
+            'item_type_ids'         => $request->input('item_type_ids', []),
+            'supervisor_ids'        => $request->input('supervisor_ids', []),
         ]);
 
         if (!($result['success'] ?? false)) {
@@ -102,6 +112,33 @@ class UserController extends Controller
         $data['route'] = route('users.update', $id);
         $data['editing'] = true;
 
+        // Pre-load warehouses and supervisors for existing department selection
+        $data['warehouses']  = [];
+        $data['itemTypes']   = [];
+        $data['supervisors'] = [];
+        $firstDeptId = $data['user']['department_ids'][0] ?? null;
+        if ($firstDeptId) {
+            $warehousesResult  = $this->api->get('/warehouses', ['department_id' => $firstDeptId]);
+            $data['warehouses'] = $warehousesResult['data'] ?? [];
+
+            $supervisorsResult  = $this->api->get("/v1/departments/{$firstDeptId}/users");
+            $data['supervisors'] = $supervisorsResult['data'] ?? [];
+        }
+        // Pre-load item types for all selected warehouses
+        $warehouseIds = $data['user']['warehouse_ids'] ?? [];
+        $itemTypes = [];
+        $seen = [];
+        foreach ($warehouseIds as $wId) {
+            $result = $this->api->get("/warehouses/{$wId}/item-types");
+            foreach ($result['data'] ?? [] as $itemType) {
+                if (!isset($seen[$itemType['id']])) {
+                    $seen[$itemType['id']] = true;
+                    $itemTypes[] = $itemType;
+                }
+            }
+        }
+        $data['itemTypes'] = $itemTypes;
+
         return view('users.create', $data);
     }
 
@@ -118,6 +155,12 @@ class UserController extends Controller
             'role_name'         => 'required|string',
             'department_ids'    => 'nullable|array',
             'department_ids.*'  => 'integer',
+            'warehouse_ids'     => 'nullable|array',
+            'warehouse_ids.*'   => 'integer',
+            'item_type_ids'     => 'nullable|array',
+            'item_type_ids.*'   => 'integer',
+            'supervisor_ids'    => 'nullable|array',
+            'supervisor_ids.*'  => 'integer',
         ];
 
         // Password optional on update
@@ -135,6 +178,9 @@ class UserController extends Controller
             'role_name'      => $request->role_name,
             'module'         => 'production',
             'department_ids' => $request->input('department_ids', []),
+            'warehouse_ids'  => $request->input('warehouse_ids', []),
+            'item_type_ids'  => $request->input('item_type_ids', []),
+            'supervisor_ids' => $request->input('supervisor_ids', []),
         ];
 
         if ($request->filled('password')) {
@@ -152,6 +198,33 @@ class UserController extends Controller
 
         return redirect()->route('users.index')
             ->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Return warehouses filtered by department_id (AJAX).
+     */
+    public function getWarehouses(Request $request): JsonResponse
+    {
+        $result = $this->api->get('/warehouses', ['department_id' => $request->department_id]);
+        return response()->json($result['data'] ?? []);
+    }
+
+    /**
+     * Return item types for a given warehouse (AJAX).
+     */
+    public function getItemTypes(int $id): JsonResponse
+    {
+        $result = $this->api->get("/warehouses/{$id}/item-types");
+        return response()->json($result['data'] ?? []);
+    }
+
+    /**
+     * Return users (supervisors) for a given department (AJAX).
+     */
+    public function getDepartmentUsers(int $id): JsonResponse
+    {
+        $result = $this->api->get("/v1/departments/{$id}/users");
+        return response()->json($result['data'] ?? []);
     }
 
     /**
