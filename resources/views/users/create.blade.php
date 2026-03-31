@@ -118,6 +118,63 @@
                             @enderror
                         </div>
 
+                        {{-- Warehouses --}}
+                        <div class="col-md-6">
+                            <label for="warehouse_ids" class="form-label">Warehouses</label>
+                            <select class="form-select @error('warehouse_ids') is-invalid @enderror"
+                                    name="warehouse_ids[]"
+                                    id="warehouse_ids"
+                                    multiple>
+                                @foreach($warehouses ?? [] as $warehouse)
+                                    <option value="{{ $warehouse['id'] }}"
+                                        @selected(in_array($warehouse['id'], $user['warehouse_ids'] ?? old('warehouse_ids', [])))>
+                                        {{ $warehouse['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('warehouse_ids')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        {{-- Item Types --}}
+                        <div class="col-md-6">
+                            <label for="item_type_ids" class="form-label">Item Types</label>
+                            <select class="form-select @error('item_type_ids') is-invalid @enderror"
+                                    name="item_type_ids[]"
+                                    id="item_type_ids"
+                                    multiple>
+                                @foreach($itemTypes ?? [] as $itemType)
+                                    <option value="{{ $itemType['id'] }}"
+                                        @selected(in_array($itemType['id'], $user['item_type_ids'] ?? old('item_type_ids', [])))>
+                                        {{ $itemType['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('item_type_ids')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        {{-- Supervisors --}}
+                        <div class="col-md-6">
+                            <label for="supervisor_ids" class="form-label">Supervisors</label>
+                            <select class="form-select @error('supervisor_ids') is-invalid @enderror"
+                                    name="supervisor_ids[]"
+                                    id="supervisor_ids"
+                                    multiple>
+                                @foreach($supervisors ?? [] as $supervisor)
+                                    <option value="{{ $supervisor['id'] }}"
+                                        @selected(in_array($supervisor['id'], $user['supervisor_ids'] ?? old('supervisor_ids', [])))>
+                                        {{ $supervisor['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('supervisor_ids')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                         {{-- Phone --}}
                         <div class="col-md-6">
                             <label for="phone" class="form-label">
@@ -186,5 +243,88 @@
         </form>
     </div>
 
+<script>
+    const warehousesUrl    = '{{ route('users.warehouses') }}';
+    const itemTypesBaseUrl = '{{ url('/admin/users/warehouses') }}';
+    const deptUsersBaseUrl = '{{ url('/admin/users/departments') }}';
+
+    function loadWarehouses(departmentId, selectedIds) {
+        $('#warehouse_ids').html('');
+        $('#item_type_ids').html('');
+
+        if (!departmentId) return;
+
+        $.get(warehousesUrl, { department_id: departmentId }, function (data) {
+            data.forEach(function (w) {
+                const sel = selectedIds && selectedIds.includes(w.id) ? 'selected' : '';
+                $('#warehouse_ids').append(`<option value="${w.id}" ${sel}>${w.name}</option>`);
+            });
+            if (selectedIds && selectedIds.length) {
+                loadItemTypes(selectedIds, @json($user['item_type_ids'] ?? []));
+            }
+        });
+    }
+
+    function loadItemTypes(warehouseIds, selectedIds) {
+        const $itemTypes = $('#item_type_ids');
+        $itemTypes.html('');
+
+        if (!warehouseIds || !warehouseIds.length) return;
+
+        const seen = {};
+        let pending = warehouseIds.length;
+
+        warehouseIds.forEach(function (wId) {
+            $.get(`${itemTypesBaseUrl}/${wId}/item-types`, function (data) {
+                data.forEach(function (t) {
+                    if (!seen[t.id]) {
+                        seen[t.id] = true;
+                        const sel = selectedIds && selectedIds.includes(t.id) ? 'selected' : '';
+                        $itemTypes.append(`<option value="${t.id}" ${sel}>${t.name}</option>`);
+                    }
+                });
+                pending--;
+            });
+        });
+    }
+
+    function loadSupervisors(departmentId, selectedIds) {
+        $('#supervisor_ids').html('');
+
+        if (!departmentId) return;
+
+        $.get(`${deptUsersBaseUrl}/${departmentId}/users`, function (data) {
+            data.forEach(function (u) {
+                const name = u.name ?? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+                const sel  = selectedIds && selectedIds.includes(u.id) ? 'selected' : '';
+                $('#supervisor_ids').append(`<option value="${u.id}" ${sel}>${name}</option>`);
+            });
+        });
+    }
+
+    $(document).ready(function () {
+        $('#department_ids').on('change', function () {
+            const deptIds   = $(this).val() ?? [];
+            const firstDept = deptIds[0] ?? null;
+            loadWarehouses(firstDept, []);
+            loadSupervisors(firstDept, []);
+        });
+
+        $('#warehouse_ids').on('change', function () {
+            loadItemTypes($(this).val() ?? [], []);
+        });
+
+        @if($editing && !empty($user['department_ids']))
+        loadWarehouses(
+            {{ $user['department_ids'][0] }},
+            @json($user['warehouse_ids'] ?? [])
+        );
+        loadSupervisors(
+            {{ $user['department_ids'][0] }},
+            @json($user['supervisor_ids'] ?? [])
+        );
+        @endif
+    });
+</script>
 </x-layouts.app>
 
