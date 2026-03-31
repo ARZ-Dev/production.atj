@@ -37,6 +37,7 @@
 
     @yield('js')
     @include('partials.vendor-scripts')
+    @stack('scripts')
     @livewireScripts
     <script>
         window.addEventListener('swal:confirm', event => {
