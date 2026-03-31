@@ -118,7 +118,7 @@ class UserController extends Controller
         $data['supervisors'] = [];
         $firstDeptId = $data['user']['department_ids'][0] ?? null;
         if ($firstDeptId) {
-            $warehousesResult  = $this->api->get('/warehouses', ['department_id' => $firstDeptId]);
+            $warehousesResult  = $this->api->get("/departments/{$firstDeptId}/warehouses");
             $data['warehouses'] = $warehousesResult['data'] ?? [];
 
             $supervisorsResult  = $this->api->get("/v1/departments/{$firstDeptId}/users");
@@ -203,9 +203,9 @@ class UserController extends Controller
     /**
      * Return warehouses filtered by department_id (AJAX).
      */
-    public function getWarehouses(Request $request): JsonResponse
+    public function getWarehouses(int $id): JsonResponse
     {
-        $result = $this->api->get('/warehouses', ['department_id' => $request->department_id]);
+        $result = $this->api->get("/departments/{$id}/warehouses");
         return response()->json($result['data'] ?? []);
     }
 

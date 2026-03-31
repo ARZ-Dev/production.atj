@@ -54,7 +54,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::resource('/users', \App\Http\Controllers\UserController::class)->except(['show', 'update', 'destroy']);
     Route::post('/users/{id}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
     Route::get('/users/delete/{id}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
-    Route::get('/users/warehouses', [\App\Http\Controllers\UserController::class, 'getWarehouses'])->name('users.warehouses');
+    Route::get('/users/departments/{id}/warehouses', [\App\Http\Controllers\UserController::class, 'getWarehouses'])->name('users.warehouses');
     Route::get('/users/warehouses/{id}/item-types', [\App\Http\Controllers\UserController::class, 'getItemTypes'])->name('users.item-types');
     Route::get('/users/departments/{id}/users', [\App\Http\Controllers\UserController::class, 'getDepartmentUsers'])->name('users.department-users');
 

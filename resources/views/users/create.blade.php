@@ -245,9 +245,9 @@
 
 @push('scripts')
 <script>
-    const warehousesUrl    = '{{ route('users.warehouses') }}';
-    const itemTypesBaseUrl = '{{ url('/admin/users/warehouses') }}';
-    const deptUsersBaseUrl = '{{ url('/admin/users/departments') }}';
+    const warehousesBaseUrl = '{{ url('/admin/users/departments') }}';
+    const itemTypesBaseUrl  = '{{ url('/admin/users/warehouses') }}';
+    const deptUsersBaseUrl  = '{{ url('/admin/users/departments') }}';
 
     function loadWarehouses(departmentId, selectedIds) {
         $('#warehouse_ids').html('');
@@ -255,7 +255,7 @@
 
         if (!departmentId) return;
 
-        $.get(warehousesUrl, { department_id: departmentId }, function (data) {
+        $.get(`${warehousesBaseUrl}/${departmentId}/warehouses`, function (data) {
             data.forEach(function (w) {
                 const sel = selectedIds && selectedIds.includes(w.id) ? 'selected' : '';
                 $('#warehouse_ids').append(`<option value="${w.id}" ${sel}>${w.name}</option>`);
