@@ -243,6 +243,7 @@
         </form>
     </div>
 
+@push('scripts')
 <script>
     const warehousesUrl    = '{{ route('users.warehouses') }}';
     const itemTypesBaseUrl = '{{ url('/admin/users/warehouses') }}';
@@ -326,5 +327,6 @@
         @endif
     });
 </script>
+@endpush
 </x-layouts.app>
 
