@@ -118,7 +118,7 @@ class UserController extends Controller
         $data['supervisors'] = [];
         $firstDeptId = $data['user']['department_ids'][0] ?? null;
         if ($firstDeptId) {
-            $warehousesResult  = $this->api->get("/departments/{$firstDeptId}/warehouses");
+            $warehousesResult  = $this->api->get("/v1/departments/{$firstDeptId}/warehouses");
             $data['warehouses'] = $warehousesResult['data'] ?? [];
 
             $supervisorsResult  = $this->api->get("/v1/departments/{$firstDeptId}/users");
@@ -205,7 +205,7 @@ class UserController extends Controller
      */
     public function getWarehouses(int $id): JsonResponse
     {
-        $result = $this->api->get("/departments/{$id}/warehouses");
+        $result = $this->api->get("/v1/departments/{$id}/warehouses");
         return response()->json($result['data'] ?? []);
     }
 
@@ -214,7 +214,7 @@ class UserController extends Controller
      */
     public function getItemTypes(int $id): JsonResponse
     {
-        $result = $this->api->get("/warehouses/{$id}/item-types");
+        $result = $this->api->get("/v1/warehouses/{$id}/item-types");
         return response()->json($result['data'] ?? []);
     }
 
