@@ -82,16 +82,11 @@
                             <label for="role_name" class="form-label">
                                 Role <span class="text-danger">*</span>
                             </label>
-                            <select class="selectpicker w-100 @error('role_name') is-invalid @enderror"
+                            <select class="form-select @error('role_name') is-invalid @enderror"
                                     name="role_name"
                                     id="role_name"
-                                    title="Select Role"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
                                     required>
+                                <option value="">Select Role</option>
                                 @foreach($roles as $role)
                                     <option value="{{ $role['name'] }}"
                                         @selected(($user['role'] ?? old('role_name')) == $role['name'])>
@@ -107,16 +102,9 @@
                         {{-- Departments --}}
                         <div class="col-md-6">
                             <label for="department_ids" class="form-label">Departments</label>
-                            <select class="selectpicker w-100 @error('department_ids') is-invalid @enderror"
+                            <select class="form-select @error('department_ids') is-invalid @enderror"
                                     name="department_ids[]"
                                     id="department_ids"
-                                    title="Select Departments"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                    data-actions-box="true"
                                     multiple>
                                 @foreach($departments as $department)
                                     <option value="{{ $department['id'] }}"
@@ -133,16 +121,9 @@
                         {{-- Warehouses --}}
                         <div class="col-md-6">
                             <label for="warehouse_ids" class="form-label">Warehouses</label>
-                            <select class="selectpicker w-100 @error('warehouse_ids') is-invalid @enderror"
+                            <select class="form-select @error('warehouse_ids') is-invalid @enderror"
                                     name="warehouse_ids[]"
                                     id="warehouse_ids"
-                                    title="Select Warehouses"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                    data-actions-box="true"
                                     multiple>
                                 @foreach($warehouses ?? [] as $warehouse)
                                     <option value="{{ $warehouse['id'] }}"
@@ -159,16 +140,9 @@
                         {{-- Item Types --}}
                         <div class="col-md-6">
                             <label for="item_type_ids" class="form-label">Item Types</label>
-                            <select class="selectpicker w-100 @error('item_type_ids') is-invalid @enderror"
+                            <select class="form-select @error('item_type_ids') is-invalid @enderror"
                                     name="item_type_ids[]"
                                     id="item_type_ids"
-                                    title="Select Item Types"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                    data-actions-box="true"
                                     multiple>
                                 @foreach($itemTypes ?? [] as $itemType)
                                     <option value="{{ $itemType['id'] }}"
@@ -185,16 +159,9 @@
                         {{-- Supervisors --}}
                         <div class="col-md-6">
                             <label for="supervisor_ids" class="form-label">Supervisors</label>
-                            <select class="selectpicker w-100 @error('supervisor_ids') is-invalid @enderror"
+                            <select class="form-select @error('supervisor_ids') is-invalid @enderror"
                                     name="supervisor_ids[]"
                                     id="supervisor_ids"
-                                    title="Select Supervisors"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                    data-actions-box="true"
                                     multiple>
                                 @foreach($supervisors ?? [] as $supervisor)
                                     <option value="{{ $supervisor['id'] }}"
@@ -285,8 +252,6 @@
     function loadWarehouses(departmentId, selectedIds) {
         $('#warehouse_ids').html('');
         $('#item_type_ids').html('');
-        $('#warehouse_ids').selectpicker('refresh');
-        $('#item_type_ids').selectpicker('refresh');
 
         if (!departmentId) return;
 
@@ -295,7 +260,6 @@
                 const sel = selectedIds && selectedIds.includes(w.id) ? 'selected' : '';
                 $('#warehouse_ids').append(`<option value="${w.id}" ${sel}>${w.name}</option>`);
             });
-            $('#warehouse_ids').selectpicker('refresh');
             if (selectedIds && selectedIds.length) {
                 loadItemTypes(selectedIds, @json($user['item_type_ids'] ?? []));
             }
@@ -305,7 +269,6 @@
     function loadItemTypes(warehouseIds, selectedIds) {
         const $itemTypes = $('#item_type_ids');
         $itemTypes.html('');
-        $itemTypes.selectpicker('refresh');
 
         if (!warehouseIds || !warehouseIds.length) return;
 
@@ -322,16 +285,12 @@
                     }
                 });
                 pending--;
-                if (pending === 0) {
-                    $itemTypes.selectpicker('refresh');
-                }
             });
         });
     }
 
     function loadSupervisors(departmentId, selectedIds) {
         $('#supervisor_ids').html('');
-        $('#supervisor_ids').selectpicker('refresh');
 
         if (!departmentId) return;
 
@@ -341,12 +300,10 @@
                 const sel  = selectedIds && selectedIds.includes(u.id) ? 'selected' : '';
                 $('#supervisor_ids').append(`<option value="${u.id}" ${sel}>${name}</option>`);
             });
-            $('#supervisor_ids').selectpicker('refresh');
         });
     }
 
     $(document).ready(function () {
-        $('.selectpicker').selectpicker();
 
         $('#department_ids').on('change', function () {
             const deptIds   = $(this).val() ?? [];
