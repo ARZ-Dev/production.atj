@@ -60,12 +60,9 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Warehouses Types
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'warehouse-types'], function () {
-        Route::get('/', WarehouseTypeIndex::class)->name('warehouse-types');
-        Route::get('/create', WarehouseTypeCreate::class)->name('warehouse-types.create');
-        Route::get('/edit/{id}', WarehouseTypeCreate::class)->name('warehouse-types.edit');
-        Route::get('/view/{id}', WarehouseTypeCreate::class)->name('warehouse-types.view');
-    });
+    Route::resource('/warehouse-types', \App\Http\Controllers\WarehouseTypeController::class)->except(['show', 'update', 'destroy']);
+    Route::post('/warehouse-types/{id}', [\App\Http\Controllers\WarehouseTypeController::class, 'update'])->name('warehouse-types.update');
+    Route::get('/warehouse-types/delete/{id}', [\App\Http\Controllers\WarehouseTypeController::class, 'destroy'])->name('warehouse-types.destroy');
 
     // |--------------------------------------------------------------------------
     // | Machine Types

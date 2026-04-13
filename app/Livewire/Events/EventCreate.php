@@ -30,11 +30,11 @@ class EventCreate extends Component
     {
         $this->planId = $planId;
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->companies = Company::orderBy('name')->get();
         } else {
-            $this->company_id = auth()->user()->company_id;
-            $this->eventTypes = EventType::where('company_id', auth()->user()->company_id)->get();
+            $this->company_id = authUser()->company_id;
+            $this->eventTypes = EventType::where('company_id', authUser()->company_id)->get();
         }
 
         $this->loadExistingEvents();
@@ -56,7 +56,7 @@ class EventCreate extends Component
         }
 
         // Super Admin: set company from existing events
-        if (auth()->user()->hasRole('Super Admin') && $existingEvents->first()) {
+        if (authUser()->hasRole('Super Admin') && $existingEvents->first()) {
             $this->company_id = $existingEvents->first()->company_id;
             $this->eventTypes = EventType::where('company_id', $this->company_id)->get();
         }
@@ -244,7 +244,7 @@ class EventCreate extends Component
     {
         $rules = [];
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $rules['company_id'] = 'required|exists:companies,id';
         }
 
@@ -333,9 +333,9 @@ class EventCreate extends Component
         $this->validate();
         $this->validateTimeConflicts();
 
-        $companyId = auth()->user()->hasRole('Super Admin')
+        $companyId = authUser()->hasRole('Super Admin')
             ? $this->company_id
-            : auth()->user()->company_id;
+            : authUser()->company_id;
 
         try {
             \DB::beginTransaction();

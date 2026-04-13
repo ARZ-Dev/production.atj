@@ -26,21 +26,21 @@ class PlanIndex extends Component
     {
         $this->loadPlans();
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->companies = Company::all();
         } else {
-            $this->company_id = auth()->user()->company_id;
-            $this->companies = Company::where('id', auth()->user()->company_id)->get();
-            $this->productionLines = ProductionLine::where('company_id', auth()->user()->company_id)->get();
+            $this->company_id = authUser()->company_id;
+            $this->companies = Company::where('id', authUser()->company_id)->get();
+            $this->productionLines = ProductionLine::where('company_id', authUser()->company_id)->get();
         }
     }
 
     public function loadPlans()
     {
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->plans = Plan::all();
         } else {
-            $this->plans = Plan::where('company_id', auth()->user()->company_id)->get();
+            $this->plans = Plan::where('company_id', authUser()->company_id)->get();
         }
     }
 
@@ -50,8 +50,8 @@ class PlanIndex extends Component
         $this->production_line_id = '';
         $this->date = '';
         $this->editing = false;
-        if (!auth()->user()->hasRole('Super Admin')) {
-            $this->company_id = auth()->user()->company_id;
+        if (!authUser()->hasRole('Super Admin')) {
+            $this->company_id = authUser()->company_id;
         } else {
             $this->company_id = '';
             $this->productionLines = [];
