@@ -13,7 +13,7 @@
                     </div>
 
                     {{-- Company Selection (Super Admin Only) --}}
-                    @if(auth()->user()->hasRole('Super Admin'))
+                    @if(authUser()->hasRole('Super Admin'))
                     <div class="card-body">
                         <div class="row g-4">
                             <div class="col-12 col-md-6">
@@ -279,7 +279,7 @@
             setOptions($('.event-type-select'), eventTypes);
         });
 
-      
+
 
         // SweetAlert error for time conflicts
         $wire.on('swal:error', function (params) {

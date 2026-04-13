@@ -26,20 +26,20 @@ class ShiftIndex extends Component
         $this->authorize('shift-list');
         $this->loadShifts();
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->companies = Company::all();
         } else {
-            $this->companies = Company::where('id', auth()->user()->company_id)->get();
-            $this->company_id = auth()->user()->company_id;
+            $this->companies = Company::where('id', authUser()->company_id)->get();
+            $this->company_id = authUser()->company_id;
         }
     }
 
     public function loadShifts()
     {
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->shifts = Shift::all();
         } else {
-            $this->shifts = Shift::where('company_id', auth()->user()->company_id)->get();
+            $this->shifts = Shift::where('company_id', authUser()->company_id)->get();
         }
     }
 
@@ -50,8 +50,8 @@ class ShiftIndex extends Component
         $this->from_time = '';
         $this->to_time = '';
         $this->editing = false;
-        if (!auth()->user()->hasRole('Super Admin')) {
-            $this->company_id = auth()->user()->company_id;
+        if (!authUser()->hasRole('Super Admin')) {
+            $this->company_id = authUser()->company_id;
         } else {
             $this->company_id = '';
         }
@@ -105,7 +105,7 @@ class ShiftIndex extends Component
                 'to_time' => $this->to_time,
             ]);
 
-       
+
         } else {
             $this->authorize('shift-create');
             Shift::create([

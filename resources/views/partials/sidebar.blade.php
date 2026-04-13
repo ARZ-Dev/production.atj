@@ -60,43 +60,25 @@
                                 </li>
                                 @endhasAnyPermission
 
-                                @hasAnyPermission(['production.warehouseType-list', 'production.machineType-list', 'production.factory-list'])
+                                @hasAnyPermission(['production.warehouseType-list', 'production.warehouse-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseWarehouses"
-                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'collapsed active' : '' }}"
+                                        class="pe-nav-link {{ request()->is('admin/warehouse-types*') || request()->is('admin/warehouses*') ? 'collapsed active' : '' }}"
                                         data-bs-toggle="collapse"
-                                        aria-expanded="{{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'true' : 'false' }}"
+                                        aria-expanded="{{ request()->is('admin/warehouse-types*') || request()->is('admin/warehouses*') ? 'true' : 'false' }}"
                                         aria-controls="collapseWarehouses">
                                         <i class="bi bi-house pe-nav-icon"></i>
-                                        <span class="pe-nav-content">Facilities</span>
+                                        <span class="pe-nav-content">Warehouses</span>
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/warehouse-types*') || request()->is('admin/machine-types*') || request()->is('admin/factories*') || request()->is('admin/production-lines*') ? 'show' : '' }}" id="collapseWarehouses">
+                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/warehouse-types*') || request()->is('admin/warehouses*') ? 'show' : '' }}" id="collapseWarehouses">
 
                                         @hasPermission('production.warehouseType-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('warehouse-types') }}"
+                                            <a href="{{ route('warehouse-types.index') }}"
                                                 class="pe-nav-link {{ request()->is('admin/warehouse-types*') ? "active" : "" }}">
                                                 Warehouse Types
-                                            </a>
-                                        </li>
-                                        @endhasPermission
-                                        @hasPermission('production.machineType-list')
-                                        <li class="pe-slide-item">
-                                            <a href="{{ route('machine-types') }}"
-                                                class="pe-nav-link {{ request()->is('admin/machine-types*') ? "active"
-                                                : "" }}">
-                                                Machine Types
-                                            </a>
-                                        </li>
-                                        @endhasPermission
-                                        @hasPermission('production.factory-list')
-                                        <li class="pe-slide-item">
-                                            <a href="{{ route('factories') }}"
-                                                class="pe-nav-link {{ request()->is('admin/factories*') ? " active" : ""
-                                                }}">
-                                                Factories
                                             </a>
                                         </li>
                                         @endhasPermission

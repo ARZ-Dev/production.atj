@@ -29,21 +29,21 @@ class EventTypeIndex extends Component
         $this->authorize('eventType-list');
         $this->loadEventTypes();
 
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->companies = Company::all();
         } else {
-            $this->company_id = auth()->user()->company_id;
-            $this->companies = Company::where('id', auth()->user()->company_id)->get();
-            $this->recipes = Recipe::where('company_id', auth()->user()->company_id)->get();
+            $this->company_id = authUser()->company_id;
+            $this->companies = Company::where('id', authUser()->company_id)->get();
+            $this->recipes = Recipe::where('company_id', authUser()->company_id)->get();
         }
     }
 
     public function loadEventTypes()
     {
-        if (auth()->user()->hasRole('Super Admin')) {
+        if (authUser()->hasRole('Super Admin')) {
             $this->eventTypes = EventType::all();
         } else {
-            $this->eventTypes = EventType::where('company_id', auth()->user()->company_id)->get();
+            $this->eventTypes = EventType::where('company_id', authUser()->company_id)->get();
         }
     }
 
@@ -55,8 +55,8 @@ class EventTypeIndex extends Component
         $this->duration = '';
         $this->recipe_id = '';
         $this->editing = false;
-        if (!auth()->user()->hasRole('Super Admin')) {
-            $this->company_id = auth()->user()->company_id;
+        if (!authUser()->hasRole('Super Admin')) {
+            $this->company_id = authUser()->company_id;
         } else {
             $this->company_id = '';
         }
@@ -147,7 +147,7 @@ class EventTypeIndex extends Component
             $this->authorize('eventType-edit');
             $eventType->update($data);
 
-        
+
         } else {
             $this->authorize('eventType-create');
             EventType::create($data);

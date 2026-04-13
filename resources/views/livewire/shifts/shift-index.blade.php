@@ -70,7 +70,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-4">
-                        @if(auth()->user()->hasRole('Super Admin'))
+                        @if(authUser()->hasRole('Super Admin'))
                         <div class="col-12">
                             <label class="form-label" for="company_id">Company</label>
                             <div wire:ignore>
