@@ -83,6 +83,15 @@
                                         </li>
                                         @endhasPermission
 
+                                        @hasPermission('production.warehouse-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('warehouses.index') }}"
+                                                class="pe-nav-link {{ request()->is('admin/warehouses*') ? "active" : "" }}">
+                                                Warehouses
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
                                     </ul>
                                 </li>
                                 @endhasAnyPermission

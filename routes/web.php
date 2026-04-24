@@ -67,6 +67,16 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::post('/warehouse-types/{id}', [\App\Http\Controllers\WarehouseTypeController::class, 'update'])->name('warehouse-types.update');
     Route::get('/warehouse-types/delete/{id}', [\App\Http\Controllers\WarehouseTypeController::class, 'destroy'])->name('warehouse-types.destroy');
 
+
+    // |--------------------------------------------------------------------------
+    // | Warehouses
+    // --------------------------------------------------------------------------
+
+    Route::resource('/warehouses', \App\Http\Controllers\WarehouseController::class)->except(['show', 'update', 'destroy']);
+    Route::post('/warehouses/{id}', [\App\Http\Controllers\WarehouseController::class, 'update'])->name('warehouses.update');
+    Route::get('/warehouses/delete/{id}', [\App\Http\Controllers\WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+
+
     // |--------------------------------------------------------------------------
     // | Machine Types
     // |--------------------------------------------------------------------------
