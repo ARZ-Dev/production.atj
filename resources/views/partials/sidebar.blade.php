@@ -25,7 +25,8 @@
                                         <span class="pe-nav-content">Dashboard</span>
                                     </a>
                                 </li>
-                                @hasAnyPermission(['production.role-list', 'production.permission-list', 'production.user-list'])
+                                @hasAnyPermission(['production.role-list', 'production.permission-list',
+                                'production.user-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseSettings"
                                         class="pe-nav-link {{ request()->is('admin/roles*') || request()->is('admin/users*') ? 'active' : '' }}"
@@ -37,7 +38,8 @@
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/roles*') || request()->is('admin/users*') ? 'show' : '' }}" id="collapseSettings">
+                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/roles*') || request()->is('admin/users*') ? 'show' : '' }}"
+                                        id="collapseSettings">
                                         @hasPermission('production.role-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('roles.index') }}"
@@ -72,12 +74,14 @@
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/warehouse-types*') || request()->is('admin/warehouses*') ? 'show' : '' }}" id="collapseWarehouses">
+                                    <ul class="pe-slide-menu collapse {{ request()->is('admin/warehouse-types*') || request()->is('admin/warehouses*') ? 'show' : '' }}"
+                                        id="collapseWarehouses">
 
                                         @hasPermission('production.warehouseType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('warehouse-types.index') }}"
-                                                class="pe-nav-link {{ request()->is('admin/warehouse-types*') ? "active" : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/warehouse-types*') ? "
+                                                active" : "" }}">
                                                 Warehouse Types
                                             </a>
                                         </li>
@@ -86,7 +90,8 @@
                                         @hasPermission('production.warehouse-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('warehouses.index') }}"
-                                                class="pe-nav-link {{ request()->is('admin/warehouses*') ? "active" : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/warehouses*') ? " active"
+                                                : "" }}">
                                                 Warehouses
                                             </a>
                                         </li>
@@ -95,6 +100,34 @@
                                     </ul>
                                 </li>
                                 @endhasAnyPermission
+
+                                @hasAnyPermission(['production.suppliers-list'])
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="#collapseSuppliers"
+                                        class="pe-nav-link {{ request()->is('admin/suppliers*') ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ request()->is('admin/suppliers*') ? 'true' : 'false' }}"
+                                        aria-controls="collapseSuppliers">
+                                        <i class="bi bi-people pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Suppliers</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
+                                    </a>
+
+                                    <ul class="pe-slide-menu collapse" id="collapseSuppliers">
+                                        @hasPermission('production.suppliers-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('suppliers.index') }}"
+                                                class="pe-nav-link {{ request()->is('admin/suppliers*') ? " active" : ""
+                                                }}">
+                                                Supplier List
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+                                    </ul>
+                                </li>
+                                
+                                @endhasAnyPermission
+
 
                                 @hasAnyPermission(['production.shift-list', 'production.eventType-list'])
                                 <li class="pe-slide pe-has-sub">
@@ -134,7 +167,8 @@
                                 @endhasAnyPermission
                                 <li class="pe-slide pe-has-sub">
                                     <a href="{{ route('plans') }}"
-                                        class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? " active" : "" }}">
+                                        class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? "
+                                        active" : "" }}">
                                         <i class="bi bi-card-checklist pe-nav-icon"></i>
                                         <span class="pe-nav-content">Production Plans</span>
                                     </a>

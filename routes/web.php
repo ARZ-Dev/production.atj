@@ -76,6 +76,14 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::post('/warehouses/{id}', [\App\Http\Controllers\WarehouseController::class, 'update'])->name('warehouses.update');
     Route::get('/warehouses/delete/{id}', [\App\Http\Controllers\WarehouseController::class, 'destroy'])->name('warehouses.destroy');
 
+    // |--------------------------------------------------------------------------
+    // | Suppliers
+    // |--------------------------------------------------------------------------
+
+    Route::resource('/suppliers', \App\Http\Controllers\SupplierController::class)->except(['show', 'update', 'destroy']);
+    Route::post('/suppliers/{id}', [\App\Http\Controllers\SupplierController::class, 'update'])->name('suppliers.update');
+    Route::get('/suppliers/delete/{id}', [\App\Http\Controllers\SupplierController::class, 'destroy'])->name('suppliers.destroy');
+
 
     // |--------------------------------------------------------------------------
     // | Machine Types
