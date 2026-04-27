@@ -36,7 +36,6 @@ class WarehouseController extends Controller
         $data['warehouse_types']   = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
         $data['departments']       = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
         $data['item_types']        = $this->api->get('/v1/item-types', ['module' => 'production'])['data'] ?? [];
-        $data['client_categories'] = $this->api->get('/v1/client-categories', ['module' => 'production'])['data'] ?? [];
 
         return view('warehouses.create', $data);
     }
@@ -51,10 +50,9 @@ class WarehouseController extends Controller
             'name'               => 'required|string|max:255',
             'shortname'          => 'required|string|max:50',
             'type_id'            => 'required|integer',
-            'department_id'      => 'required|integer',
+            'department_id'      => 'nullable|integer',
             'items_type_id'      => 'nullable|array',
             'items_type_id.*'    => 'integer',
-            'client_category_id' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
@@ -68,8 +66,7 @@ class WarehouseController extends Controller
             'shortname'          => $request->input('shortname'),
             'type_id'            => $request->input('type_id'),
             'department_id'      => $request->input('department_id'),
-            'items_type_id'      => json_encode($request->input('items_type_id', [])),
-            'client_category_id' => $request->input('client_category_id'),
+            'items_type_id'      => $request->input('items_type_id', []),
         ];
 
         $response = $this->api->post('/v1/warehouses', $payload);
@@ -123,7 +120,6 @@ class WarehouseController extends Controller
         $data['warehouse_types']            = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
         $data['departments']                = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
         $data['item_types']                 = $this->api->get('/v1/item-types', ['module' => 'production'])['data'] ?? [];
-        $data['client_categories']          = $this->api->get('/v1/client-categories', ['module' => 'production'])['data'] ?? [];
 
         return view('warehouses.create', $data);
     }
@@ -141,7 +137,6 @@ class WarehouseController extends Controller
             'department_id'      => 'sometimes|required|integer',
             'items_type_id'      => 'nullable|array',
             'items_type_id.*'    => 'integer',
-            'client_category_id' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
@@ -150,16 +145,15 @@ class WarehouseController extends Controller
                 ->withInput();
         }
 
-        $payload = [
+        $data = [
             'name'               => $request->input('name'),
             'shortname'          => $request->input('shortname'),
             'type_id'            => $request->input('type_id'),
             'department_id'      => $request->input('department_id'),
             'items_type_id'      => json_encode($request->input('items_type_id', [])),
-            'client_category_id' => $request->input('client_category_id'),
         ];
 
-        $response = $this->api->put("/v1/warehouses/{$id}", $payload);
+        $response = $this->api->post("/v1/warehouses/{$id}", $data);
 
         if (!($response['success'] ?? false)) {
             return redirect()->back()
@@ -177,7 +171,7 @@ class WarehouseController extends Controller
      */
     public function destroy(int $id)
     {
-        $response = $this->api->delete("/v1/warehouses/{$id}");
+        $response = $this->api->get("/v1/warehouses/delete/{$id}", ['module' => 'production']);
 
         if (!($response['success'] ?? false)) {
             return redirect()->back()

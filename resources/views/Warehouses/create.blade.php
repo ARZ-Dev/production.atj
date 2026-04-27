@@ -119,7 +119,7 @@
                             </div>
 
                             {{-- Department --}}
-                            <div class="col-md-6">
+                            {{-- <div class="col-md-6">
                                 <label for="department_id" class="form-label fw-medium">
                                     Department <span class="text-danger">*</span>
                                 </label>
@@ -144,37 +144,9 @@
                                 @error('department_id')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                                 @enderror
-                            </div>
+                            </div> --}}
 
-                            {{-- Client Category --}}
-                            <div class="col-md-6">
-                                <label for="client_category_id" class="form-label fw-medium">
-                                    Client Category
-                                    <span class="badge bg-secondary bg-opacity-10 text-secondary fw-normal ms-1">Optional</span>
-                                </label>
-                                <select
-                                    id="client_category_id"
-                                    name="client_category_id"
-                                    class="selectpicker form-control @error('client_category_id') is-invalid @enderror"
-                                    title="Select client category…"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                >
-                                    @foreach($client_categories as $category)
-                                        <option
-                                            value="{{ $category['id'] }}"
-                                            {{ old('client_category_id', $warehouse['client_category_id'] ?? '') == $category['id'] ? 'selected' : '' }}
-                                        >{{ $category['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                @error('client_category_id')
-                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                @enderror
-                            </div>
-
+                           
                         </div>
                     </div>
 
