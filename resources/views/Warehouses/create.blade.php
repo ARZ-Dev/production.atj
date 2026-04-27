@@ -3,10 +3,7 @@
     <div class="row">
         <form action="{{ $route }}" method="POST" id="warehouseForm">
             @csrf
-            @if($editing)
-                @method('PUT')
-            @endif
-
+          
             <div class="card shadow-sm border-0">
 
                 {{-- Card Header --}}
@@ -214,30 +211,5 @@
     $(document).ready(function () {
         $('.selectpicker').selectpicker();
 
-        // When department changes, fetch matching item types
-        $('#department_id').on('change', function () {
-            let departmentId = $(this).val();
-            if (!departmentId) return;
-
-            $.get(`/warehouses/department/${departmentId}`, function (response) {
-                let itemTypes = response.data ?? [];
-                let $select = $('.item-type-select');
-                let selected = $select.val() ?? [];
-
-                $select.empty();
-                $.each(itemTypes, function (i, item) {
-                    let isSelected = selected.includes(String(item.id));
-                    $select.append(
-                        $('<option>', {
-                            value: item.id,
-                            text: item.name,
-                            selected: isSelected,
-                        })
-                    );
-                });
-
-                $select.selectpicker('destroy').selectpicker();
-            });
-        });
     });
 </script>

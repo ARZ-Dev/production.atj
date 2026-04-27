@@ -131,10 +131,10 @@ class WarehouseController extends Controller
     public function update(Request $request, int $id)
     {
         $validator = Validator::make($request->all(), [
-            'name'               => 'sometimes|required|string|max:255',
-            'shortname'          => 'sometimes|required|string|max:50',
-            'type_id'            => 'sometimes|required|integer',
-            'department_id'      => 'sometimes|required|integer',
+            'name'               => 'required|string|max:255',
+            'shortname'          => 'required|string|max:50',
+            'type_id'            => 'required|integer',
+            'department_id'      => 'nullable|integer',
             'items_type_id'      => 'nullable|array',
             'items_type_id.*'    => 'integer',
         ]);
@@ -149,7 +149,7 @@ class WarehouseController extends Controller
             'name'               => $request->input('name'),
             'shortname'          => $request->input('shortname'),
             'type_id'            => $request->input('type_id'),
-            'department_id'      => $request->input('department_id'),
+            // 'department_id'      => $request->input('department_id'),
             'items_type_id'      => json_encode($request->input('items_type_id', [])),
         ];
 
