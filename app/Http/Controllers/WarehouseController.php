@@ -20,7 +20,7 @@ class WarehouseController extends Controller
     {
         $data = [];
         $data['warehouses'] = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
-
+        
         return view('warehouses.index', $data);
     }
 
@@ -150,7 +150,7 @@ class WarehouseController extends Controller
             'shortname'          => $request->input('shortname'),
             'type_id'            => $request->input('type_id'),
             // 'department_id'      => $request->input('department_id'),
-            'items_type_id'      => json_encode($request->input('items_type_id', [])),
+            'items_type_id'      => $request->input('items_type_id', []),
         ];
 
         $response = $this->api->post("/v1/warehouses/{$id}", $data);
