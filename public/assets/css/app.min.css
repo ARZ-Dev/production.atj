@@ -7878,3 +7878,13 @@ code[class*=language-] {
     border-radius: var(--pe-border-radius);
 }
 
+
+.bootstrap-select ,dropdown-toggle {
+    border: var(--pe-border-width) solid var(--pe-border-color) !important;
+    border-radius: var(--pe-border-radius);
+}
+
+.dropdown-menu .selected {
+    background-color: var(--pe-primary) !important;
+    color: #fff !important;
+}
