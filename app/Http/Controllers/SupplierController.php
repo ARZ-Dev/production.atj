@@ -126,10 +126,7 @@ class SupplierController extends Controller
             ->values()
             ->toArray();
         $data['countries'] = $this->api->get('/v1/countries')['data'] ?? [];
-<<<<<<< HEAD
         $data['provinces'] = $supplier['country_id'] ? ($this->api->get("/v1/locations/provinces/{$supplier['country_id']}")['data'] ?? []) : [];
-=======
->>>>>>> db9b552ad4a46df1d1426525cf2cbcddd3fbe100
 
         return view('suppliers.create', $data);
     }
@@ -200,8 +197,4 @@ class SupplierController extends Controller
         return redirect()->route('suppliers.index')
             ->with('success', 'Supplier deleted successfully.');
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> db9b552ad4a46df1d1426525cf2cbcddd3fbe100
