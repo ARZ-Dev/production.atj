@@ -77,6 +77,26 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/edit/{id}', MachineTypeCreate::class)->name('machine-types.edit');
         Route::get('/view/{id}', MachineTypeCreate::class)->name('machine-types.view');
     });
+    
+    Route::resource('/suppliers', \App\Http\Controllers\SupplierController::class)->except(['show', 'update', 'destroy']);
+    Route::post('/suppliers/{id}', [\App\Http\Controllers\SupplierController::class, 'update'])->name('suppliers.update');
+    Route::get('/suppliers/delete/{id}', [\App\Http\Controllers\SupplierController::class, 'destroy'])->name('suppliers.destroy');
+
+    // |--------------------------------------------------------------------------
+    // | Locations
+    // |--------------------------------------------------------------------------
+    Route::get('/provinces/{countryId}', [\App\Http\Controllers\SupplierController::class, 'getProvinces'])->name('get-provinces');
+
+
+    // |--------------------------------------------------------------------------
+    // | Units
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'units'], function () {
+        Route::get('/', UnitIndex::class)->name('units');
+        Route::get('/create', UnitCreate::class)->name('units.create');
+        Route::get('/edit/{id}', UnitCreate::class)->name('units.edit');
+    });
 
     // |--------------------------------------------------------------------------
     // | Factories
