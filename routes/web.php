@@ -1,32 +1,15 @@
 <?php
 
-use App\Livewire\Auth\Login;
-use App\Livewire\Companies\CompanyCreate;
-use App\Livewire\Companies\CompanyIndex;
 use App\Livewire\DashboardView;
 use App\Livewire\Events\EventCreate;
-use App\Livewire\Events\EventIndex;
-use App\Livewire\EventTypes\EventTypeCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
-use App\Livewire\Factories\FactoryCreate;
-use App\Livewire\Factories\FactoryIndex;
-use App\Livewire\MachineTypes\MachineTypeCreate;
-use App\Livewire\MachineTypes\MachineTypeIndex;
 use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Plans\PlanView;
-use App\Livewire\ProductionLines\ProductionLineCreate;
-use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RolesPermissions\PermissionView;
-use App\Livewire\RolesPermissions\RoleView;
-use App\Livewire\Shifts\ShiftCreate;
 use App\Livewire\Shifts\ShiftIndex;
-use App\Livewire\Users\UserCreate;
-use App\Livewire\Users\UserIndex;
-use App\Livewire\Warehouses\Warehouses\WarehouseCreate;
-use App\Livewire\Warehouses\Warehouses\WarehouseIndex;
-use App\Livewire\Warehouses\WarehouseTypes\WarehouseTypeCreate;
-use App\Livewire\Warehouses\WarehouseTypes\WarehouseTypeIndex;
 use App\Http\Controllers\Auth\AuthCallbackController;
+use App\Livewire\Units\UnitCreate;
+use App\Livewire\Units\UnitIndex;
 use Illuminate\Support\Facades\Route;
 
 
@@ -86,37 +69,16 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
 
     // |--------------------------------------------------------------------------
-    // | Machine Types
+    // | Units
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'machine-types'], function () {
-        Route::get('/', MachineTypeIndex::class)->name('machine-types');
-        Route::get('/create', MachineTypeCreate::class)->name('machine-types.create');
-        Route::get('/edit/{id}', MachineTypeCreate::class)->name('machine-types.edit');
-        Route::get('/view/{id}', MachineTypeCreate::class)->name('machine-types.view');
+    Route::group(['prefix' => 'units'], function () {
+        Route::get('/', UnitIndex::class)->name('units');
+        Route::get('/create', UnitCreate::class)->name('units.create');
+        Route::get('/edit/{id}', UnitCreate::class)->name('units.edit');
     });
 
-    // |--------------------------------------------------------------------------
-    // | Factories
-    // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'factories'], function () {
-        Route::get('/', FactoryIndex::class)->name('factories');
-        Route::get('/create', FactoryCreate::class)->name('factories.create');
-        Route::get('/edit/{id}', FactoryCreate::class)->name('factories.edit');
-        Route::get('/view/{id}', FactoryCreate::class)->name('factories.view');
-    });
-
-    // |--------------------------------------------------------------------------
-    // | Production Lines
-    // |--------------------------------------------------------------------------
-
-    Route::group(['prefix' => 'production-lines'], function () {
-        Route::get('/{factoryId}', ProductionLineIndex::class)->name('production-lines');
-        Route::get('/{factoryId}/create', ProductionLineCreate::class)->name('production-lines.create');
-        Route::get('/{factoryId}/edit/{id}', ProductionLineCreate::class)->name('production-lines.edit');
-        Route::get('/{factoryId}/view/{id}', ProductionLineCreate::class)->name('production-lines.view');
-    });
 
     // |--------------------------------------------------------------------------
     // | Shift
