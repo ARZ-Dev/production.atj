@@ -10,7 +10,8 @@ class WarehouseController extends Controller
 {
     public function __construct(
         private ApiService $api
-    ) {}
+    ) {
+    }
 
     /**
      * GET /warehouses
@@ -20,7 +21,7 @@ class WarehouseController extends Controller
     {
         $data = [];
         $data['warehouses'] = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
-        
+
         return view('warehouses.index', $data);
     }
 
@@ -31,12 +32,15 @@ class WarehouseController extends Controller
     public function create()
     {
         $data = [];
-        $data['route']             = route('warehouses.store');
-        $data['editing']           = false;
-        $data['warehouse_types']   = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
-        $data['departments']       = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
-        $data['item_types']        = $this->api->get('/v1/item-types', ['module' => 'production'])['data'] ?? [];
-
+        $data['route'] = route('warehouses.store');
+        $data['editing'] = false;
+        $data['warehouse_types'] = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
+        $data['departments'] = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+        $data['departments'] = collect($data['departments'])
+            ->where('related_to_production', true)
+            ->values()
+            ->toArray();
+        $data['item_types'] = $this->api->get('/v1/item-types', ['module' => 'production'])['data'] ?? [];
         return view('warehouses.create', $data);
     }
 
@@ -47,12 +51,12 @@ class WarehouseController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name'               => 'required|string|max:255',
-            'shortname'          => 'required|string|max:50',
-            'type_id'            => 'required|integer',
-            'department_id'      => 'nullable|integer',
-            'items_type_id'      => 'nullable|array',
-            'items_type_id.*'    => 'integer',
+            'name' => 'required|string|max:255',
+            'shortname' => 'required|string|max:50',
+            'type_id' => 'required|integer',
+            'department_id' => 'nullable|integer',
+            'items_type_id' => 'nullable|array',
+            'items_type_id.*' => 'integer',
         ]);
 
         if ($validator->fails()) {
@@ -62,11 +66,11 @@ class WarehouseController extends Controller
         }
 
         $payload = [
-            'name'               => $request->input('name'),
-            'shortname'          => $request->input('shortname'),
-            'type_id'            => $request->input('type_id'),
-            'department_id'      => $request->input('department_id'),
-            'items_type_id'      => $request->input('items_type_id', []),
+            'name' => $request->input('name'),
+            'shortname' => $request->input('shortname'),
+            'type_id' => $request->input('type_id'),
+            'department_id' => $request->input('department_id'),
+            'items_type_id' => $request->input('items_type_id', []),
         ];
 
         $response = $this->api->post('/v1/warehouses', $payload);
@@ -113,13 +117,17 @@ class WarehouseController extends Controller
         }
 
         $data = [];
-        $data['warehouse']                  = $response['data'];
+        $data['warehouse'] = $response['data'];
         $data['warehouse']['items_type_id'] = json_decode($data['warehouse']['items_type_id'], true) ?? [];
-        $data['route']                      = route('warehouses.update', $id);
-        $data['editing']                    = true;
-        $data['warehouse_types']            = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
-        $data['departments']                = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
-        $data['item_types']                 = $this->api->get('/v1/item-types', ['module' => 'production'])['data'] ?? [];
+        $data['route'] = route('warehouses.update', $id);
+        $data['editing'] = true;
+        $data['warehouse_types'] = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
+        $data['departments'] = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+        $data['departments'] = collect($data['departments'])
+            ->where('related_to_production', true)
+            ->values()
+            ->toArray();
+        $data['item_types'] = $this->api->get('/v1/item-types', ['module' => 'production'])['data'] ?? [];
 
         return view('warehouses.create', $data);
     }
@@ -131,12 +139,12 @@ class WarehouseController extends Controller
     public function update(Request $request, int $id)
     {
         $validator = Validator::make($request->all(), [
-            'name'               => 'required|string|max:255',
-            'shortname'          => 'required|string|max:50',
-            'type_id'            => 'required|integer',
-            'department_id'      => 'nullable|integer',
-            'items_type_id'      => 'nullable|array',
-            'items_type_id.*'    => 'integer',
+            'name' => 'required|string|max:255',
+            'shortname' => 'required|string|max:50',
+            'type_id' => 'required|integer',
+            'department_id' => 'nullable|integer',
+            'items_type_id' => 'nullable|array',
+            'items_type_id.*' => 'integer',
         ]);
 
         if ($validator->fails()) {
@@ -146,11 +154,11 @@ class WarehouseController extends Controller
         }
 
         $data = [
-            'name'               => $request->input('name'),
-            'shortname'          => $request->input('shortname'),
-            'type_id'            => $request->input('type_id'),
-            // 'department_id'      => $request->input('department_id'),
-            'items_type_id'      => $request->input('items_type_id', []),
+            'name' => $request->input('name'),
+            'shortname' => $request->input('shortname'),
+            'type_id' => $request->input('type_id'),
+            'department_id'      => $request->input('department_id'),
+            'items_type_id' => $request->input('items_type_id', []),
         ];
 
         $response = $this->api->post("/v1/warehouses/{$id}", $data);
