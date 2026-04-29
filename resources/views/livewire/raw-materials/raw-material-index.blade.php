@@ -21,7 +21,6 @@
                                 <th>Type</th>
                                 <th>Base Unit</th>
                                 <th>Purchase Unit</th>
-                                <th>Min. Stock</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
@@ -35,7 +34,6 @@
                                 <td>{{ ucfirst($rawMaterial->type) }}</td>
                                 <td>{{ $rawMaterial->baseUnit->name }} ({{ $rawMaterial->baseUnit->symbol }})</td>
                                 <td>{{ $rawMaterial->purchaseUnit?->name ?? 'N/A' }}</td>
-                                <td>{{ $rawMaterial->minimum_stock }}</td>
                                 <td>
                                     @if($rawMaterial->is_active)
                                         <span class="badge bg-success">Active</span>

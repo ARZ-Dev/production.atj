@@ -85,14 +85,6 @@
                                 @error('density') <div class="text-danger">{{ $message }}</div> @enderror
                             </div>
 
-                            {{-- Minimum Stock --}}
-                            <div class="col-12 col-md-6">
-                                <label for="minimum_stock" class="form-label">Minimum Stock <span class="text-danger">*</span></label>
-                                <input type="number" step="any" class="form-control" id="minimum_stock"
-                                    wire:model="minimum_stock" placeholder="e.g. 100">
-                                @error('minimum_stock') <div class="text-danger">{{ $message }}</div> @enderror
-                            </div>
-
                             {{-- Reorder Point --}}
                             <div class="col-12 col-md-6">
                                 <label for="reorder_point" class="form-label">Reorder Point</label>

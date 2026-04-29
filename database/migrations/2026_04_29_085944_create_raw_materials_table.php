@@ -38,7 +38,6 @@ return new class extends Migration {
             $table->decimal('density', 20, 8)->nullable();
             // example: oil = 0.92 kg/L
 
-            $table->decimal('minimum_stock', 20, 6)->default(0);
             $table->decimal('reorder_point', 20, 6)->nullable();
 
             $table->boolean('is_active')->default(true);
