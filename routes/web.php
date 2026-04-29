@@ -5,6 +5,8 @@ use App\Livewire\Events\EventCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Plans\PlanView;
+use App\Livewire\RawMaterials\RawMaterialCreate;
+use App\Livewire\RawMaterials\RawMaterialIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\Shifts\ShiftIndex;
 use App\Http\Controllers\Auth\AuthCallbackController;
@@ -76,6 +78,16 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/', UnitIndex::class)->name('units');
         Route::get('/create', UnitCreate::class)->name('units.create');
         Route::get('/edit/{id}', UnitCreate::class)->name('units.edit');
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Raw Materials
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'raw-materials'], function () {
+        Route::get('/', RawMaterialIndex::class)->name('raw-materials');
+        Route::get('/create', RawMaterialCreate::class)->name('raw-materials.create');
+        Route::get('/edit/{id}', RawMaterialCreate::class)->name('raw-materials.edit');
     });
 
     Route::resource('/suppliers', \App\Http\Controllers\SupplierController::class)->except(['show', 'update', 'destroy']);
