@@ -128,15 +128,15 @@
                                 
                                 @endhasAnyPermission
 
-                                @hasAnyPermission(['production.unit-list'])
+                                @hasAnyPermission(['production.unit-list', 'production.rawMaterial-list'])
                                   <li class="pe-slide pe-has-sub">
                                     <a href="#collapseUnits"
-                                        class="pe-nav-link {{ request()->is('admin/units*') ? 'active' : '' }}"
+                                        class="pe-nav-link {{ request()->is('admin/units*') || request()->is('admin/raw-materials*') ? 'active' : '' }}"
                                         data-bs-toggle="collapse"
-                                        aria-expanded="{{ request()->is('admin/units*') ? 'true' : 'false' }}"
+                                        aria-expanded="{{ request()->is('admin/units*') || request()->is('admin/raw-materials*') ? 'true' : 'false' }}"
                                         aria-controls="collapseUnits">
                                         <i class="bi bi-rulers pe-nav-icon"></i>
-                                        <span class="pe-nav-content">Units</span>
+                                        <span class="pe-nav-content">Inventory Setup</span>
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
@@ -147,6 +147,14 @@
                                                 class="pe-nav-link {{ request()->is('admin/units*') ? " active" : ""
                                                 }}">
                                                 Unit List
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+                                        @hasPermission('production.rawMaterial-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('raw-materials') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-materials*') ? " active" : "" }}">
+                                                Raw Material List
                                             </a>
                                         </li>
                                         @endhasPermission
