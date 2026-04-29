@@ -16,7 +16,7 @@ class UnitIndex extends Component
 
     public function mount()
     {
-        $this->authorize('unit-list');
+
 
         $this->units = Unit::with('baseUnit')->get();
     }
@@ -24,7 +24,6 @@ class UnitIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        $this->authorize('unit-delete');
 
         $unit = Unit::findOrFail($id);
         $unit->delete();

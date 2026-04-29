@@ -20,7 +20,7 @@ return new class extends Migration {
                 'weight',
                 'volume',
                 'count',
-            ])->default('weight');
+            ]);
 
             // Example:
             // Gram has base_unit_id = Kilogram
@@ -36,6 +36,7 @@ return new class extends Migration {
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['symbol', 'type']);
         });
