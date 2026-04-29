@@ -86,7 +86,8 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Locations
     // |--------------------------------------------------------------------------
     Route::get('/provinces/{countryId}', [\App\Http\Controllers\SupplierController::class, 'getProvinces'])->name('get-provinces');
-
+    Route::get('/municipalities/{provinceId}', [\App\Http\Controllers\SupplierController::class, 'getMunicipalities'])->name('get-municipalities');
+    Route::get('/neighborhoods/{municipalityId}', [\App\Http\Controllers\SupplierController::class, 'getNeighborhoods'])->name('get-neighborhoods');
 
     // |--------------------------------------------------------------------------
     // | Units

@@ -349,5 +349,49 @@
             }
         })
 
+        $(document).on('change', '#province_id', function() {
+            let provinceId = $(this).val();
+            let municipalitySelector = $('#municipality_id');
+            let neighborhoodSelector = $('#neighborhood_id');
+
+            neighborhoodSelector.html('<option value="">Select neighborhood…</option>').selectpicker('refresh');
+
+            if (provinceId) {
+                $.ajax({
+                    url: "{{ route('get-municipalities', '%provinceId%') }}".replace('%provinceId%', provinceId),
+                    type: 'GET',
+                    success: function (data) {
+                        setOptions(municipalitySelector, data.municipalities);
+                    },
+                    error: function () {
+                        municipalitySelector.html('<option value="">Error loading municipalities</option>').selectpicker('refresh');
+                    }
+                });
+            } else {
+                municipalitySelector.html('<option value="">Select municipality…</option>').selectpicker('refresh');
+                neighborhoodSelector.html('<option value="">Select neighborhood…</option>').selectpicker('refresh');
+            }
+        })
+
+
+        $(document).on('change', '#municipality_id', function() {
+            let municipalityId = $(this).val();
+            let neighborhoodSelector = $('#neighborhood_id');
+
+            if (municipalityId) {
+                $.ajax({
+                    url: "{{ route('get-neighborhoods', '%municipalityId%') }}".replace('%municipalityId%', municipalityId),
+                    type: 'GET',
+                    success: function (data) {
+                        setOptions(neighborhoodSelector, data.neighborhoods);
+                    },
+                    error: function () {
+                        neighborhoodSelector.html('<option value="">Error loading neighborhoods</option>').selectpicker('refresh');
+                    }
+                });
+            } else {
+                neighborhoodSelector.html('<option value="">Select neighborhood…</option>').selectpicker('refresh');
+            }
+        })
     });
 </script>

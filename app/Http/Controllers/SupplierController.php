@@ -53,6 +53,41 @@ class SupplierController extends Controller
         ]);
     }
 
+    public function getMunicipalities($provinceId)
+    {
+        $response = $this->api->get("/v1/locations/municipalities/{$provinceId}");
+
+        if (!($response['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $response['message'] ?? 'Failed to fetch municipalities.'
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'municipalities' => $response['data'] ?? []
+        ]);
+    }
+
+
+    public function getNeighborhoods($municipalityId)
+    {
+        $response = $this->api->get("/v1/locations/neighborhoods/{$municipalityId}");
+
+        if (!($response['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $response['message'] ?? 'Failed to fetch neighborhoods.'
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'neighborhoods' => $response['data'] ?? []
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
