@@ -3,10 +3,10 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Production Line List</h5>
-                    @hasPermission('production.productionLine-create')
-                    <a href="{{ route('production-lines.create', ['factoryId' => $factoryId]) }}" class="btn btn-primary">
-                        <i class="bi bi-plus-lg me-1"></i> Add New Production Line
+                    <h5 class="card-title mb-0">Unit List</h5>
+                    @hasPermission('unit-create')
+                    <a href="{{ route('units.create') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i> Add New Unit
                     </a>
                     @endhasPermission
                 </div>
@@ -16,22 +16,24 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Factory</th>
-                                <th>Warehouses Name</th>
-                                <th>Machines Name</th>
+                                <th>Name</th>
+                                <th>Symbol</th>
+                                <th>Base Unit</th>
+                                <th>Conversion Factor</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($productions as $production)
+                            @foreach($units as $unit)
                             <tr>
-                                <td>{{ $production->id }}</td>
-                                <td>{{ $production->factory->name }}</td>
-                                <td>{{ $production->warehouses->pluck('name')->join(', ') ?: 'N/A' }}</td>
-                                <td>{{ $production->machines->pluck('name')->join(', ') ?: 'N/A' }}</td>
+                                <td>{{ $unit->id }}</td>
+                                <td>{{ $unit->name }}</td>
+                                <td>{{ $unit->symbol ?? 'N/A' }}</td>
+                                <td>{{ $unit->baseUnit?->name ?? 'N/A' }}</td>
+                                <td>{{ number_format($unit->conversion_factor_to_base, 3) ?? 'N/A' }}</td>
                                 <td>
-                                    @hasPermission('production.productionLine-edit')
-                                    <a href="{{ route('production-lines.edit', ['id' => $production->id, 'factoryId' => $factoryId]) }}"
+                                    @hasPermission('unit-edit')
+                                    <a href="{{ route('units.edit', $unit->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Edit">
@@ -39,16 +41,14 @@
                                     </a>
                                     @endhasPermission
 
-                                    @hasPermission('production.productionLine-delete')
+                                    @hasPermission('unit-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
-                                        data-id="{{ $production->id }}" data-bs-toggle="tooltip"
+                                        data-id="{{ $unit->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     @endhasPermission
-
-
                                 </td>
                             </tr>
                             @endforeach

@@ -116,7 +116,7 @@
                             </div>
 
                             {{-- Department --}}
-                            {{-- <div class="col-md-6">
+                            <div class="col-md-6">
                                 <label for="department_id" class="form-label fw-medium">
                                     Department <span class="text-danger">*</span>
                                 </label>
@@ -141,7 +141,7 @@
                                 @error('department_id')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                                 @enderror
-                            </div> --}}
+                            </div>
 
                            
                         </div>

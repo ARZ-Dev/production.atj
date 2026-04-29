@@ -128,6 +128,32 @@
                                 
                                 @endhasAnyPermission
 
+                                @hasAnyPermission(['production.unit-list'])
+                                  <li class="pe-slide pe-has-sub">
+                                    <a href="#collapseUnits"
+                                        class="pe-nav-link {{ request()->is('admin/units*') ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ request()->is('admin/units*') ? 'true' : 'false' }}"
+                                        aria-controls="collapseUnits">
+                                        <i class="bi bi-rulers pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Units</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
+                                    </a>
+
+                                    <ul class="pe-slide-menu collapse" id="collapseUnits">
+                                        @hasPermission('production.unit-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('units') }}"
+                                                class="pe-nav-link {{ request()->is('admin/units*') ? " active" : ""
+                                                }}">
+                                                Unit List
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+                                    </ul>
+                                </li>
+                                @endhasAnyPermission
+
 
                                 @hasAnyPermission(['production.shift-list', 'production.eventType-list'])
                                 <li class="pe-slide pe-has-sub">
