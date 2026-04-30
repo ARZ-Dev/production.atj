@@ -89,7 +89,7 @@ class UnitSeeder extends Seeder
             [
                 'name' => 'Bag 100kg',
                 'base_unit_id' => $kg->id,
-                'conversion_factor_to_base' => 50,
+                'conversion_factor_to_base' => 100,
                 'is_base' => false,
                 'is_active' => true,
             ]
