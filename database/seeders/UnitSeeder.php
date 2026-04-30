@@ -16,7 +16,7 @@ class UnitSeeder extends Seeder
         $liter = Unit::updateOrCreate(
             ['symbol' => 'L', 'type' => 'volume'],
             [
-                'name' => 'Liter',
+                'name' => 'Litter',
                 'base_unit_id' => null,
                 'conversion_factor_to_base' => 1,
                 'is_base' => true,
@@ -25,9 +25,9 @@ class UnitSeeder extends Seeder
         );
 
         Unit::updateOrCreate(
-            ['symbol' => 'mL', 'type' => 'volume'],
+            ['symbol' => 'ML', 'type' => 'volume'],
             [
-                'name' => 'Milliliter',
+                'name' => 'Millilitter',
                 'base_unit_id' => $liter->id,
                 'conversion_factor_to_base' => 0.001,
                 'is_base' => false,
@@ -36,7 +36,7 @@ class UnitSeeder extends Seeder
         );
 
         Unit::updateOrCreate(
-            ['symbol' => 'gal', 'type' => 'volume'],
+            ['symbol' => 'Gallon', 'type' => 'volume'],
             [
                 'name' => 'Gallon',
                 'base_unit_id' => $liter->id,
@@ -74,11 +74,22 @@ class UnitSeeder extends Seeder
         );
 
         Unit::updateOrCreate(
-            ['symbol' => 'ton', 'type' => 'weight'],
+            ['symbol' => 'Bag 50kg', 'type' => 'weight'],
             [
-                'name' => 'Ton',
+                'name' => 'Bag 50kg',
                 'base_unit_id' => $kg->id,
-                'conversion_factor_to_base' => 1000,
+                'conversion_factor_to_base' => 50,
+                'is_base' => false,
+                'is_active' => true,
+            ]
+        );
+
+        Unit::updateOrCreate(
+            ['symbol' => 'Bag 100kg', 'type' => 'weight'],
+            [
+                'name' => 'Bag 100kg',
+                'base_unit_id' => $kg->id,
+                'conversion_factor_to_base' => 50,
                 'is_base' => false,
                 'is_active' => true,
             ]
