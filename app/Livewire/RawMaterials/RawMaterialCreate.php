@@ -18,7 +18,6 @@ class RawMaterialCreate extends Component
     public $purchase_unit_id;
     public $type = 'solid';
     public $density;
-    public $minimum_stock = 0;
     public $reorder_point;
     public $is_active = true;
 
@@ -34,7 +33,6 @@ class RawMaterialCreate extends Component
             $this->purchase_unit_id  = $rawMaterial->purchase_unit_id;
             $this->type              = $rawMaterial->type;
             $this->density           = $rawMaterial->density;
-            $this->minimum_stock     = $rawMaterial->minimum_stock;
             $this->reorder_point     = $rawMaterial->reorder_point;
             $this->is_active         = $rawMaterial->is_active;
         }
@@ -49,7 +47,6 @@ class RawMaterialCreate extends Component
             'purchase_unit_id' => 'nullable|exists:units,id',
             'type'             => 'required|in:solid,liquid,countable,other',
             'density'          => 'nullable|numeric|min:0',
-            'minimum_stock'    => 'required|numeric|min:0',
             'reorder_point'    => 'nullable|numeric|min:0',
             'is_active'        => 'boolean',
         ]);
@@ -62,7 +59,6 @@ class RawMaterialCreate extends Component
         $rawMaterial->purchase_unit_id = $this->purchase_unit_id;
         $rawMaterial->type             = $this->type;
         $rawMaterial->density          = $this->density;
-        $rawMaterial->minimum_stock    = $this->minimum_stock;
         $rawMaterial->reorder_point    = $this->reorder_point;
         $rawMaterial->is_active        = $this->is_active;
         $rawMaterial->save();
