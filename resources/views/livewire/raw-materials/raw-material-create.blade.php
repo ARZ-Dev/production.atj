@@ -32,12 +32,12 @@
                             <div class="col-12 col-md-6">
                                 <label for="type" class="form-label">Type <span class="text-danger">*</span></label>
                                 <div wire:ignore>
-                                    <select wire:model="type" id="type" class="selectpicker w-100"
-                                        title="Select Type" data-style="btn-default" data-live-search="true">
-                                        <option value="solid"     @selected($type == 'solid')>Solid</option>
-                                        <option value="liquid"    @selected($type == 'liquid')>Liquid</option>
-                                        <option value="countable" @selected($type == 'countable')>Countable</option>
-                                        <option value="other"     @selected($type == 'other')>Other</option>
+                                    <select wire:model="type" id="type" class="selectpicker w-100" title="Select Type"
+                                        data-style="btn-default" data-live-search="true">
+                                        <option value="solid" @selected($type=='solid' )>Solid</option>
+                                        <option value="liquid" @selected($type=='liquid' )>Liquid</option>
+                                        <option value="countable" @selected($type=='countable' )>Countable</option>
+                                        <option value="other" @selected($type=='other' )>Other</option>
                                     </select>
                                 </div>
                                 @error('type') <div class="text-danger">{{ $message }}</div> @enderror
@@ -45,7 +45,8 @@
 
                             {{-- Base Unit --}}
                             <div class="col-12 col-md-6">
-                                <label for="base_unit_id" class="form-label">Base Unit <span class="text-danger">*</span></label>
+                                <label for="base_unit_id" class="form-label">Base Unit <span
+                                        class="text-danger">*</span></label>
                                 <div wire:ignore>
                                     <select wire:model="base_unit_id" id="base_unit_id" class="selectpicker w-100"
                                         title="Select Base Unit" data-style="btn-default" data-live-search="true"
@@ -64,10 +65,11 @@
                             <div class="col-12 col-md-6">
                                 <label for="purchase_unit_id" class="form-label">Purchase Unit</label>
                                 <div wire:ignore>
-                                    <select wire:model="purchase_unit_id" id="purchase_unit_id" class="selectpicker w-100"
-                                        title="Select Purchase Unit" data-style="btn-default" data-live-search="true"
-                                        data-icon-base="ti" data-size="5" data-tick-icon="ti-check text-white">
-                                        @foreach($units as $unit)
+                                    <select wire:model="purchase_unit_id" id="purchase_unit_id"
+                                        class="selectpicker w-100" title="Select Purchase Unit" data-style="btn-default"
+                                        data-live-search="true" data-icon-base="ti" data-size="5"
+                                        data-tick-icon="ti-check text-white">
+                                        @foreach($purchaseUnits as $unit)
                                         <option value="{{ $unit->id }}" @selected($unit->id == $purchase_unit_id)>
                                             {{ $unit->name }} ({{ $unit->symbol }})
                                         </option>
@@ -79,9 +81,10 @@
 
                             {{-- Density --}}
                             <div class="col-12 col-md-6">
-                                <label for="density" class="form-label">Density <small class="text-muted">(for liquids, e.g. 0.92)</small></label>
-                                <input type="number" step="any" class="form-control" id="density"
-                                    wire:model="density" placeholder="e.g. 0.92">
+                                <label for="density" class="form-label">Density <small class="text-muted">(for liquids,
+                                        e.g. 0.92)</small></label>
+                                <input type="number" step="any" class="form-control" id="density" wire:model="density"
+                                    placeholder="e.g. 0.92">
                                 @error('density') <div class="text-danger">{{ $message }}</div> @enderror
                             </div>
 
@@ -119,6 +122,17 @@
 
         $(document).on('change', '.selectpicker', function () {
             $wire.set($(this).attr('wire:model'), $(this).val())
+        })
+
+        $(document).on('change', '#base_unit_id', function () {
+            $wire.dispatch('getPurchaseUnits', {
+                baseUnitId: $(this).val()
+            })
+        })
+
+        $wire.on('setPurchaseUnits', function (params) {
+            let purchaseUnits = params[0];
+            setOptions($('#purchase_unit_id'), purchaseUnits)
         })
     </script>
     @endscript

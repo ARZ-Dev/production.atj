@@ -48,6 +48,19 @@ class RawMaterialRequestCreate extends Component
         }
     }
 
+    public function updatedItems($value, $key): void
+    {
+        // When raw_material_id changes on any item, auto-set unit_id to its purchase unit
+        if (str_ends_with($key, '.raw_material_id') && $value) {
+            $index    = explode('.', $key)[0];
+            $material = RawMaterial::find($value);
+
+            if ($material && $material->purchase_unit_id) {
+                $this->items[$index]['unit_id'] = $material->purchase_unit_id;
+            }
+        }
+    }
+
     public function addRow(): void
     {
         $this->items[] = [
@@ -129,8 +142,7 @@ class RawMaterialRequestCreate extends Component
     public function render()
     {
         return view('livewire.raw-material-requests.raw-material-request-create', [
-            'materials' => RawMaterial::where('is_active', true)->get(),
-            'units'     => Unit::where('is_active', true)->get(),
+            'materials' => RawMaterial::where('is_active', true)->with('purchaseUnit')->get(),
         ]);
     }
 }
