@@ -31,11 +31,20 @@ class RawMaterialCreate extends Component
             ->get();
         if ($id) {
             $rawMaterial = RawMaterial::findOrFail($id);
+
             $this->id = $rawMaterial->id;
             $this->code = $rawMaterial->code;
             $this->name = $rawMaterial->name;
             $this->base_unit_id = $rawMaterial->base_unit_id;
-            $this->purchaseUnits = Unit::where('base_unit_id', $this->base_unit_id)->where('is_active', true)->get();
+
+            // Load purchase units including base unit
+            $this->purchaseUnits = Unit::where('is_active', true)
+                ->where(function ($query) use ($rawMaterial) {
+                    $query->where('base_unit_id', $rawMaterial->base_unit_id)
+                        ->orWhere('id', $rawMaterial->base_unit_id);
+                })
+                ->get();
+
             $this->purchase_unit_id = $rawMaterial->purchase_unit_id;
             $this->type = $rawMaterial->type;
             $this->density = $rawMaterial->density;
@@ -47,7 +56,10 @@ class RawMaterialCreate extends Component
     #[On('getPurchaseUnits')]
     public function getPurchaseUnits($baseUnitId)
     {
-        $this->purchaseUnits = Unit::where('base_unit_id', $baseUnitId)->where('is_active', true)->get();
+        $this->purchaseUnits = Unit::where(function ($query) use ($baseUnitId) {
+            $query->where('base_unit_id', $baseUnitId)
+                ->orWhere('id', $baseUnitId); // include the base unit itself
+        })->where('is_active', true)->get();
         $this->dispatch('setPurchaseUnits', $this->purchaseUnits);
     }
 
