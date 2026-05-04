@@ -126,7 +126,7 @@
                                         </td>
                                         <td>{{ $item->rawMaterial->name ?? 'N/A' }}</td>
                                         <td>{{ $item->unit->name ?? 'N/A' }}</td>
-                                        <td>{{ $item->quantity }}</td>
+                                        <td>{{ $item->transfer_id ? $item->received_quantity : $item->quantity }}</td>
                                         <td>{{ $item->stock_total }}</td>
                                         <td>{{ $item->created_at->format('Y-m-d') }}</td>
                                     </tr>
