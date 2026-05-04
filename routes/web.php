@@ -16,6 +16,8 @@ use App\Livewire\StockIn\StockInCreate;
 use App\Livewire\StockIn\StockInIndex;
 use App\Livewire\StockOut\StockOutCreate;
 use App\Livewire\StockOut\StockOutIndex;
+use App\Livewire\Transfer\TransferCreate;
+use App\Livewire\Transfer\TransferIndex;
 use App\Livewire\Units\UnitCreate;
 use App\Livewire\Units\UnitIndex;
 use App\Livewire\WarehouseInventory\WarehouseInventoryIndex;
@@ -176,6 +178,18 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/', WarehouseInventoryIndex::class)->name('warehouse-inventory');
     });
 
+    // |---------------------------------------------------------------------------
+    // | Transfers
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'transfers'], function () {
+        Route::get('/', TransferIndex::class)->name('transfers');
+        Route::get('/create', TransferCreate::class)->name('transfers.create');
+        Route::get('/edit/{id}', TransferCreate::class)->name('transfers.edit');
+        Route::get('/view/{id}/{viewStatus}', TransferCreate::class)->name('transfers.view');
+        Route::get('/approve-load/{id}', TransferCreate::class)->name('transfers.approve-load');
+        Route::get('/approve-receive/{id}', TransferCreate::class)->name('transfers.approve-receive');
+    });
 
     // |--------------------------------------------------------------------------
     // | Shift

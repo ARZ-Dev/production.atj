@@ -120,6 +120,8 @@
                                                 <span class="badge bg-danger">Stock Out</span>
                                             @elseif($item->waste_id)
                                                 <span class="badge bg-warning text-dark">Waste</span>
+                                            @elseif($item->transfer_id)
+                                                <span class="badge bg-info text-dark">Transfer</span>
                                             @endif
                                         </td>
                                         <td>{{ $item->rawMaterial->name ?? 'N/A' }}</td>

@@ -19,7 +19,9 @@ return new class extends Migration {
             $table->foreignId('stock_in_id')->nullable()->constrained('stock_ins')->onDelete('cascade');
             $table->foreignId('stock_out_id')->nullable()->constrained('stock_outs')->onDelete('cascade');
             $table->foreignId('waste_id')->nullable()->constrained('wastes')->onDelete('cascade');
+            $table->foreignId('transfer_id')->nullable()->constrained('transfers')->onDelete('cascade');
             $table->decimal('quantity', 15, 2);
+            $table->string('received_quantity')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

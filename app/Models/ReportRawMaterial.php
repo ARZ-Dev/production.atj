@@ -42,4 +42,8 @@ class ReportRawMaterial extends Model
     {
         return $this->belongsTo(Waste::class);
     }
+    public function transfer()
+    {
+        return $this->belongsTo(Transfer::class);
+    }
 }

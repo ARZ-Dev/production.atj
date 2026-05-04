@@ -53,7 +53,14 @@ class WarehouseInventoryIndex extends Component
                 ->orWhereHas('waste', function ($q) use ($warehouseId) {
                     $q->where('status', 'approved')
                         ->where('warehouse_id', $warehouseId);
-                });
+                })
+                ->orWhereHas('transfer', function ($q) use ($warehouseId) {
+                    $q->where('status', 'approved')
+                        ->where(function ($qq) use ($warehouseId) {
+                            $qq->where('warehouse_from_id', $warehouseId)
+                                ->orWhere('warehouse_to_id', $warehouseId);
+                        });
+                });                
             })
                 ->with(['rawMaterial', 'unit'])
                 ->get()
@@ -99,6 +106,13 @@ class WarehouseInventoryIndex extends Component
                 ->orWhereHas('waste', function ($q) use ($warehouseId) {
                     $q->where('status', 'approved')
                         ->where('warehouse_id', $warehouseId);
+                })
+                ->orWhereHas('transfer', function ($q) use ($warehouseId) {
+                    $q->where('status', 'approved')
+                        ->where(function ($qq) use ($warehouseId) {
+                            $qq->where('warehouse_from_id', $warehouseId)
+                                ->orWhere('warehouse_to_id', $warehouseId);
+                        });
                 });
             })
             ->orderBy('created_at', 'asc')
@@ -114,6 +128,14 @@ class WarehouseInventoryIndex extends Component
                 $runningStock -= $item->quantity ?? 0;
             } elseif ($item->waste_id) {
                 $runningStock -= $item->quantity ?? 0;
+            } elseif ($item->transfer_id) {
+                if ($item->transfer->warehouse_from_id == $warehouseId) {
+                    $qty = $item->received_quantity ?? 0;
+                    $runningStock -= $qty;
+                } elseif ($item->transfer->warehouse_to_id == $warehouseId) {
+                    $qty = $item->received_quantity ?? 0;
+                    $runningStock += $qty;
+                }
             }
 
             $item->stock_total = $runningStock;

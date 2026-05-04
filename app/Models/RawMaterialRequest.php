@@ -21,4 +21,9 @@ class RawMaterialRequest extends Model
     {
         return $this->hasMany(ReportRawMaterial::class, 'raw_material_request_id');
     }
+
+    public function transfer()
+    {
+        return $this->hasOne(Transfer::class, 'product_request_id');
+    }
 }
