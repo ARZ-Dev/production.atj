@@ -33,10 +33,10 @@ class RawMaterialTransferCreate extends Component
     {
         $routeName = request()->route()->getName();
 
-        if ($routeName === 'transfers.approve-load') {
+        if ($routeName === 'raw-material-transfers.approve-load') {
             $this->confirmStatus = 1;
             authorizeRequest('production.rawMaterialTransfer-approve');
-        } elseif ($routeName === 'transfers.approve-receive') {
+        } elseif ($routeName === 'raw-material-transfers.approve-receive') {
             $this->confirmStatus = 2;
             authorizeRequest('production.rawMaterialTransfer-approve');
         } else {
