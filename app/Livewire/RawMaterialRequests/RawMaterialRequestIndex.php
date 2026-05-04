@@ -19,7 +19,8 @@ class RawMaterialRequestIndex extends Component
     public function mount(ApiService $api)
     {
             authorizeRequest('production.raw-material-request-list');
-
+        $this->requests = RawMaterialRequest::all();
+        $warehouses = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
         $this->warehouseMap = collect($warehouses)->pluck('name', 'id')->toArray();
     }
 
