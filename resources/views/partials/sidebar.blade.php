@@ -242,15 +242,6 @@
 
                                     <ul class="pe-slide-menu collapse" id="collapseShifts">
 
-                                        @hasPermission('production.shift-list')
-                                        <li class="pe-slide-item">
-                                            <a href="{{ route('shifts') }}"
-                                                class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : ""
-                                                }}">
-                                                Shifts
-                                            </a>
-                                        </li>
-                                        @endhasPermission
                                         @hasPermission('production.eventType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('event-types') }}"
@@ -261,9 +252,20 @@
                                         </li>
                                         @endhasPermission
 
+                                        @hasPermission('production.shift-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('shifts') }}"
+                                                class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : ""
+                                                }}">
+                                                Shifts
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
                                     </ul>
                                 </li>
                                 @endhasAnyPermission
+                                
                                 <li class="pe-slide pe-has-sub">
                                     <a href="{{ route('plans') }}"
                                         class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? "

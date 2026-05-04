@@ -18,7 +18,6 @@
                                 <th>ID</th>
                                 <th>Company</th>
                                 <th>Name</th>
-                                <th>Has Recipe</th>
                                 <th>Duration</th>
                                 <th>Action</th>
                             </tr>
@@ -29,12 +28,7 @@
                                 <td>{{ $eventType->id }}</td>
                                 <td>{{ $eventType->company->name }}</td>
                                 <td>{{ $eventType->name }}</td>
-                                <td>{{ $eventType->has_recipe ? 'Yes' : 'No' }}</td>
-                                @if($eventType->has_recipe)
-                                <td>{{ $eventType->recipe->duration }} Minute</td>
-                                @else
                                 <td>{{ $eventType->duration }} Minute</td>
-                                @endif
                                 <td>
                                     @hasPermission('production.eventType-edit')
                                     <button type="button" wire:click="edit({{ $eventType->id }})"
@@ -76,24 +70,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-4">
-                        @if(authUser()->hasRole('Super Admin'))
-                        <div class="col-12">
-                            <label class="form-label" for="company_id">Company</label>
-                            <div wire:ignore>
-                                <select wire:model="company_id" id="company_id" class="selectpicker w-100"
-                                    title="Select Company" data-style="btn-default" data-live-search="true"
-                                    data-icon-base="ti" data-size="5" data-tick-icon="ti-check text-white">
-                                    @foreach($companies as $company)
-                                    <option value="{{ $company->id }}">
-                                        {{ $company->name }}
-                                    </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @error('company_id')<div class="text-danger">{{ $message }}</div>@enderror
-                        </div>
-                        @endif
-
+                        
                         <div class="col-12">
                             <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="name" wire:model="name"
@@ -101,40 +78,6 @@
                             @error('name')<div class="text-danger">{{ $message }}</div>@enderror
                         </div>
 
-                        <div class="col-12 d-flex align-items-center">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="has_recipe"
-                                    wire:model.live="has_recipe">
-                                <label class="form-check-label" for="has_recipe">Has Recipe</label>
-                            </div>
-                        </div>
-
-                        @if($has_recipe)
-                        <div class="col-12">
-                            <label class="form-label" for="recipe_id">Recipe <span
-                                    class="text-danger">*</span></label>
-                            <div wire:ignore>
-                                <select wire:model="recipe_id" id="recipe_id" class="selectpicker w-100"
-                                    title="Select Recipe" data-style="btn-default" data-live-search="true"
-                                    data-icon-base="ti" data-size="5" data-tick-icon="ti-check text-white">
-                                    @foreach($recipes as $recipe)
-                                    <option value="{{ $recipe->id }}">
-                                        {{ $recipe->name }}
-                                    </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @error('recipe_id')<div class="text-danger">{{ $message }}</div>@enderror
-                        </div>
-                        @else
-                        <div class="col-12">
-                            <label for="duration" class="form-label">Duration (minutes) <span
-                                    class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="duration" wire:model="duration"
-                                placeholder="Enter duration in minutes" min="1">
-                            @error('duration')<div class="text-danger">{{ $message }}</div>@enderror
-                        </div>
-                        @endif
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -151,26 +94,8 @@
     <script>
         const eventTypeModal = new bootstrap.Modal(document.getElementById('eventTypeModal'));
 
-        $wire.on('openModal', () => {
-            eventTypeModal.show();
-            setTimeout(() => {
-                let companyId = $wire.get('company_id');
-                let recipeId = $wire.get('recipe_id');
-                $('#company_id').selectpicker('val', companyId ? String(companyId) : '');
-                $('#recipe_id').selectpicker('val', recipeId ? String(recipeId) : '');
-            }, 300);
-        });
-
         $wire.on('closeModal', () => {
             eventTypeModal.hide();
-        });
-
-        $wire.on('refreshRecipePicker', () => {
-            setTimeout(() => {
-                let recipeId = $wire.get('recipe_id');
-                $('#recipe_id').selectpicker('destroy').selectpicker();
-                $('#recipe_id').selectpicker('val', recipeId ? String(recipeId) : '');
-            }, 300);
         });
 
         $('.selectpicker').selectpicker();

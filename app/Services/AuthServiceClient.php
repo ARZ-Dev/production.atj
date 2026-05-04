@@ -25,6 +25,7 @@ class AuthServiceClient
     public function exchangeOneTimeToken(string $token): ?array
     {
         try {
+
             $response = Http::timeout(10)
                 ->post("{$this->apiUrl}/auth/verify-token", [
                     'token' => $token,
