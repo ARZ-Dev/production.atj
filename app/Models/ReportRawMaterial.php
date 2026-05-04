@@ -31,19 +31,19 @@ class ReportRawMaterial extends Model
 
     public function stockIn()
     {
-        return $this->belongsTo(StockIn::class);
+        return $this->belongsTo(RawMaterialStockIn::class);
     }
 
     public function stockOut()
     {
-        return $this->belongsTo(StockOut::class);
+        return $this->belongsTo(RawMaterialStockOut::class);
     }
     public function waste()
     {
-        return $this->belongsTo(Waste::class);
+        return $this->belongsTo(RawMaterialWaste::class);
     }
     public function transfer()
     {
-        return $this->belongsTo(Transfer::class);
+        return $this->belongsTo(RawMaterialTransfer::class);
     }
 }
