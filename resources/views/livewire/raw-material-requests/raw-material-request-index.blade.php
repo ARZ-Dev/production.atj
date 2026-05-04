@@ -16,6 +16,7 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>Warehouse</th>
                                 <th>Code</th>
                                 <th>Status</th>
                                 <th>Items</th>
@@ -29,6 +30,11 @@
                             @foreach($requests as $request)
                             <tr>
                                 <td>{{ $request->id }}</td>
+
+                                <td>
+                                    {{ $warehouseMap[$request->warehouse_id] ?? 'Unknown' }}
+                                </td>
+
                                 <td>{{ $request->code }}</td>
                                 <td>
                                     @php

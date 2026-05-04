@@ -1,0 +1,171 @@
+<div>
+    <div class="card">
+        <div class="card-header">
+            <h4 class="card-title">Warehouse Inventory</h4>
+        </div>
+        <div class="card-body row g-3">
+            <div class="col-lg-3 col-sm-12">
+                <label class="form-label" for="warehouse_id">Warehouse <span class="text-danger">*</span></label>
+                <div wire:ignore>
+                    <select id="warehouse_id" class="selectpicker w-100"
+                        title="Select Warehouse" data-style="btn-default"
+                        data-live-search="true" data-icon-base="ti"
+                        data-tick-icon="ti-check text-white" required>
+                        @foreach($warehouses as $warehouse)
+                            <option value="{{ $warehouse['id'] }}" @selected($warehouse['id'] == $warehouse_id)>
+                                {{ $warehouse['name'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                @error('warehouse_id')
+                    <div class="text-danger">{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="card-title">
+                {{ $warehouse_id ? ($warehouseMap[$warehouse_id] ?? 'N/A') : 'N/A' }} Statement
+            </h5>
+        </div>
+        <div class="card-body">
+            <div wire:loading wire:target="getData">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div wire:loading.remove wire:target="getData" class="table-responsive">
+                <table class="table text-center text-nowrap table-bordered">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Raw Material</th>
+                            <th>Unit</th>
+                            <th>Total Quantity</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($warehouseUnits as $index => $unit)
+                        <tr>
+                            <td>{{ $index + 1 }}</td>
+                            <td>{{ $unit->rawMaterial ?? 'N/A' }}</td>
+                            <td>{{ $unit->unit ?? 'N/A' }}</td>
+                            <td>{{ $this->totalQuantity($unit->warehouse_id, $unit->raw_material_id, $unit->unit_id) }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info"
+                                    wire:click="viewUnitActivity({{ $unit->warehouse_id }}, {{ $unit->raw_material_id }}, {{ $unit->unit_id }})">
+                                    Check Activity
+                                </button>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="5" class="text-center">No items found for this warehouse</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warehouse Report Raw Materials Modal -->
+    <div wire:ignore.self class="modal fade" id="warehouseDetailsModal" tabindex="-1"
+        aria-labelledby="warehouseDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="warehouseDetailsModalLabel">
+                        {{ $selectedWarehouse ? $selectedWarehouse->name : 'Warehouse' }} - Raw Material Activity
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div wire:loading wire:target="viewUnitActivity">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div wire:loading.remove wire:target="viewUnitActivity">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Action</th>
+                                        <th>Raw Material</th>
+                                        <th>Unit</th>
+                                        <th>Quantity</th>
+                                        <th>Stock Total</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($inventoryItems as $index => $item)
+                                    <tr>
+                                        <td>{{ $index + 1 }}</td>
+                                        <td>
+                                            @if($item->stock_in_id)
+                                                <span class="badge bg-success">Stock In</span>
+                                            @elseif($item->stock_out_id)
+                                                <span class="badge bg-danger">Stock Out</span>
+                                            @elseif($item->waste_id)
+                                                <span class="badge bg-warning text-dark">Waste</span>
+                                            @endif
+                                        </td>
+                                        <td>{{ $item->rawMaterial->name ?? 'N/A' }}</td>
+                                        <td>{{ $item->unit->name ?? 'N/A' }}</td>
+                                        <td>{{ $item->quantity }}</td>
+                                        <td>{{ $item->stock_total }}</td>
+                                        <td>{{ $item->created_at->format('Y-m-d') }}</td>
+                                    </tr>
+                                    @empty
+                                    <tr>
+                                        <td colspan="7" class="text-center">No activity found for this raw material</td>
+                                    </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @script
+    <script>
+        $('.selectpicker').selectpicker();
+
+        Livewire.hook('morph.added', ({ el }) => {
+            $('.selectpicker').selectpicker();
+        });
+
+        $(document).on('change', '#warehouse_id', function () {
+            let warehouseId = $(this).val();
+            $wire.set('warehouse_id', warehouseId);
+            $wire.call('getData');
+        });
+
+        $wire.on('openDetailsModal', function () {
+            $('#warehouseDetailsModal').modal('show');
+        });
+
+        $wire.on('closeDetailsModal', function () {
+            $('#warehouseDetailsModal').modal('hide');
+        });
+    </script>
+    @endscript
+</div>
