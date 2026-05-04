@@ -143,19 +143,19 @@
                                     {{ request()->is('admin/units*') 
                                     || request()->is('admin/raw-materials*') 
                                     || request()->is('admin/raw-material-requests*')
-                                    || request()->is('admin/stock-ins*') 
-                                    || request()->is('admin/stock-outs*') 
-                                    || request()->is('admin/wastes*')
-                                    || request()->is('admin/warehouse-inventory*') 
-                                    || request()->is('admin/transfers*')    
+                                    || request()->is('admin/raw-material-stock-ins*') 
+                                    || request()->is('admin/raw-material-stock-outs*') 
+                                    || request()->is('admin/raw-material-wastes*')
+                                    || request()->is('admin/raw-material-warehouse-inventory*') 
+                                    || request()->is('admin/raw-material-transfers*')    
                                     ? 'active' : '' }}" data-bs-toggle="collapse" aria-expanded="{{ request()->is('admin/units*') 
                                     || request()->is('admin/raw-materials*') 
                                     || request()->is('admin/raw-material-requests*')
-                                    || request()->is('admin/stock-ins*') 
-                                    || request()->is('admin/stock-outs*') 
-                                    || request()->is('admin/wastes*')
-                                    || request()->is('admin/warehouse-inventory*') 
-                                    || request()->is('admin/transfers*')
+                                    || request()->is('admin/raw-material-stock-ins*') 
+                                    || request()->is('admin/raw-material-stock-outs*') 
+                                    || request()->is('admin/raw-material-wastes*')
+                                    || request()->is('admin/raw-material-warehouse-inventory*') 
+                                    || request()->is('admin/raw-material-transfers*')
                                     ? 'true' : 'false' }}" aria-controls="collapseProduction">
 
                                         <i class="bi bi-rulers pe-nav-icon"></i>
@@ -198,8 +198,8 @@
                                         {{-- Stock In --}}
                                         @hasPermission('production.rawMaterialStockIn-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('stock-ins') }}"
-                                                class="pe-nav-link {{ request()->is('admin/stock-ins*') ? 'active' : '' }}">
+                                            <a href="{{ route('raw-material-stock-ins') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-stock-ins*') ? 'active' : '' }}">
                                                 Stock In List
                                             </a>
                                         </li>
@@ -208,8 +208,8 @@
                                         {{-- Stock Out --}}
                                         @hasPermission('production.rawMaterialStockOut-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('stock-outs') }}"
-                                                class="pe-nav-link {{ request()->is('admin/stock-outs*') ? 'active' : '' }}">
+                                            <a href="{{ route('raw-material-stock-outs') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-stock-outs*') ? 'active' : '' }}">
                                                 Stock Out List
                                             </a>
                                         </li>
@@ -218,8 +218,8 @@
                                         {{-- Waste --}}
                                         @hasPermission('production.rawMaterialWaste-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('wastes') }}"
-                                                class="pe-nav-link {{ request()->is('admin/wastes*') ? 'active' : '' }}">
+                                            <a href="{{ route('raw-material-wastes') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-wastes*') ? 'active' : '' }}">
                                                 Waste List
                                             </a>
                                         </li>
@@ -228,8 +228,8 @@
                                         {{-- Transfer --}}
                                         @hasPermission('production.rawMaterialTransfer-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('transfers') }}"
-                                                class="pe-nav-link {{ request()->is('admin/transfers*') ? 'active' : '' }}">
+                                            <a href="{{ route('raw-material-transfers') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-transfers*') ? 'active' : '' }}">
                                                 Transfer List
                                             </a>
                                         </li>
@@ -238,8 +238,8 @@
                                         {{-- Warehouse Inventory --}}
                                         @hasPermission('production.rawMaterialWarehouseInventory-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('warehouse-inventory') }}"
-                                                class="pe-nav-link {{ request()->is('admin/warehouse-inventory*') ? 'active' : '' }}">
+                                            <a href="{{ route('raw-material-warehouse-inventory') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-warehouse-inventory*') ? 'active' : '' }}">
                                                 Warehouse Inventory
                                             </a>
                                         </li>
