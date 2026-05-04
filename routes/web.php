@@ -9,18 +9,20 @@ use App\Livewire\RawMaterialRequests\RawMaterialRequestCreate;
 use App\Livewire\RawMaterialRequests\RawMaterialRequestIndex;
 use App\Livewire\RawMaterials\RawMaterialCreate;
 use App\Livewire\RawMaterials\RawMaterialIndex;
+use App\Livewire\RawMaterialStockIn\RawMaterialStockInCreate;
+use App\Livewire\RawMaterialStockIn\RawMaterialStockInIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\Shifts\ShiftIndex;
 use App\Http\Controllers\Auth\AuthCallbackController;
-use App\Livewire\StockIn\StockInCreate;
-use App\Livewire\StockIn\StockInIndex;
-use App\Livewire\StockOut\StockOutCreate;
-use App\Livewire\StockOut\StockOutIndex;
+use App\Livewire\RawMaterialStockOut\RawMaterialStockOutCreate;
+use App\Livewire\RawMaterialStockOut\RawMaterialStockOutIndex;
+use App\Livewire\RawMaterialTransfer\RawMaterialTransferCreate;
+use App\Livewire\RawMaterialTransfer\RawMaterialTransferIndex;
 use App\Livewire\Units\UnitCreate;
 use App\Livewire\Units\UnitIndex;
-use App\Livewire\WarehouseInventory\WarehouseInventoryIndex;
-use App\Livewire\Waste\WasteCreate;
-use App\Livewire\Waste\WasteIndex;
+use App\Livewire\RawMaterialWarehouseInventory\RawMaterialWarehouseInventoryIndex;
+use App\Livewire\RawMaterialWaste\RawMaterialWasteCreate;
+use App\Livewire\RawMaterialWaste\RawMaterialWasteIndex;
 use Illuminate\Support\Facades\Route;
 
 
@@ -136,11 +138,11 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Stock Ins
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'stock-ins'], function () {
-        Route::get('/', StockInIndex::class)->name('stock-ins');
-        Route::get('/create', StockInCreate::class)->name('stock-ins.create');
-        Route::get('/edit/{id}', StockInCreate::class)->name('stock-ins.edit');
-        Route::get('/view/{id}/{viewStatus}', StockInCreate::class)->name('stock-ins.view');
+    Route::group(['prefix' => 'raw-material-stock-ins'], function () {
+        Route::get('/', RawMaterialStockInIndex::class)->name('raw-material-stock-ins');
+        Route::get('/create', RawMaterialStockInCreate::class)->name('raw-material-stock-ins.create');
+        Route::get('/edit/{id}', RawMaterialStockInCreate::class)->name('raw-material-stock-ins.edit');
+        Route::get('/view/{id}/{viewStatus}', RawMaterialStockInCreate::class)->name('raw-material-stock-ins.view');
 
     });
 
@@ -148,11 +150,11 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Stock Outs
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'stock-outs'], function () {
-        Route::get('/', StockOutIndex::class)->name('stock-outs');
-        Route::get('/create', StockOutCreate::class)->name('stock-outs.create');
-        Route::get('/edit/{id}', StockOutCreate::class)->name('stock-outs.edit');
-        Route::get('/view/{id}/{viewStatus}', StockOutCreate::class)->name('stock-outs.view');
+    Route::group(['prefix' => 'raw-material-stock-outs'], function () {
+        Route::get('/', RawMaterialStockOutIndex::class)->name('raw-material-stock-outs');
+        Route::get('/create', RawMaterialStockOutCreate::class)->name('raw-material-stock-outs.create');
+        Route::get('/edit/{id}', RawMaterialStockOutCreate::class)->name('raw-material-stock-outs.edit');
+        Route::get('/view/{id}/{viewStatus}', RawMaterialStockOutCreate::class)->name('raw-material-stock-outs.view');
 
     });
 
@@ -160,11 +162,11 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Waste
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'wastes'], function () {
-        Route::get('/', WasteIndex::class)->name('wastes');
-        Route::get('/create', WasteCreate::class)->name('wastes.create');
-        Route::get('/edit/{id}', WasteCreate::class)->name('wastes.edit');
-        Route::get('/view/{id}/{viewStatus}', WasteCreate::class)->name('wastes.view');
+    Route::group(['prefix' => 'raw-material-wastes'], function () {
+        Route::get('/', RawMaterialWasteIndex::class)->name('raw-material-wastes');
+        Route::get('/create', RawMaterialWasteCreate::class)->name('raw-material-wastes.create');
+        Route::get('/edit/{id}', RawMaterialWasteCreate::class)->name('raw-material-wastes.edit');
+        Route::get('/view/{id}/{viewStatus}', RawMaterialWasteCreate::class)->name('raw-material-wastes.view');
 
     });
 
@@ -172,10 +174,22 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Warehouse Inventory
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'warehouse-inventory'], function () {
-        Route::get('/', WarehouseInventoryIndex::class)->name('warehouse-inventory');
+    Route::group(['prefix' => 'raw-material-warehouse-inventory'], function () {
+        Route::get('/', RawMaterialWarehouseInventoryIndex::class)->name('raw-material-warehouse-inventory');
     });
 
+    // |---------------------------------------------------------------------------
+    // | Transfers
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'raw-material-transfers'], function () {
+        Route::get('/', RawMaterialTransferIndex::class)->name('raw-material-transfers');
+        Route::get('/create', RawMaterialTransferCreate::class)->name('raw-material-transfers.create');
+        Route::get('/edit/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.edit');
+        Route::get('/view/{id}/{viewStatus}', RawMaterialTransferCreate::class)->name('raw-material-transfers.view');
+        Route::get('/approve-load/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.approve-load');
+        Route::get('/approve-receive/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.approve-receive');
+    });
 
     // |--------------------------------------------------------------------------
     // | Shift

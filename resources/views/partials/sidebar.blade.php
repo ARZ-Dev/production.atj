@@ -128,102 +128,124 @@
 
                                 @endhasAnyPermission
 
-                                @hasAnyPermission(['production.unit-list', 'production.rawMaterial-list',
-                                'production.rawMaterialRequest-list'])
+                                @hasAnyPermission([
+                                'production.unit-list',
+                                'production.rawMaterial-list',
+                                'production.rawMaterialRequest-list',
+                                'production.rawMaterialStockIn-list',
+                                'production.rawMaterialStockOut-list',
+                                'production.rawMaterialWaste-list',
+                                'production.rawMaterialWarehouseInventory-list',
+                                'production.rawMaterialTransfer-list'
+                                ])
                                 <li class="pe-slide pe-has-sub">
-                                    <a href="#collapseUnits"
-                                        class="pe-nav-link {{ request()->is('admin/units*') || request()->is('admin/raw-materials*') || request()->is('admin/raw-material-requests*') ? 'active' : '' }}"
-                                        data-bs-toggle="collapse"
-                                        aria-expanded="{{ request()->is('admin/units*') || request()->is('admin/raw-materials*') || request()->is('admin/raw-material-requests*') ? 'true' : 'false' }}"
-                                        aria-controls="collapseUnits">
+                                    <a href="#collapseProduction" class="pe-nav-link 
+                                    {{ request()->is('admin/units*') 
+                                    || request()->is('admin/raw-materials*') 
+                                    || request()->is('admin/raw-material-requests*')
+                                    || request()->is('admin/raw-material-stock-ins*') 
+                                    || request()->is('admin/raw-material-stock-outs*') 
+                                    || request()->is('admin/raw-material-wastes*')
+                                    || request()->is('admin/raw-material-warehouse-inventory*') 
+                                    || request()->is('admin/raw-material-transfers*')    
+                                    ? 'active' : '' }}" data-bs-toggle="collapse" aria-expanded="{{ request()->is('admin/units*') 
+                                    || request()->is('admin/raw-materials*') 
+                                    || request()->is('admin/raw-material-requests*')
+                                    || request()->is('admin/raw-material-stock-ins*') 
+                                    || request()->is('admin/raw-material-stock-outs*') 
+                                    || request()->is('admin/raw-material-wastes*')
+                                    || request()->is('admin/raw-material-warehouse-inventory*') 
+                                    || request()->is('admin/raw-material-transfers*')
+                                    ? 'true' : 'false' }}" aria-controls="collapseProduction">
+
                                         <i class="bi bi-rulers pe-nav-icon"></i>
-                                        <span class="pe-nav-content">Raw Materials</span>
+                                        <span class="pe-nav-content">Raw Materials Settings</span>
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse" id="collapseUnits">
+                                    <ul class="pe-slide-menu collapse" id="collapseProduction">
+
+                                        {{-- Units --}}
                                         @hasPermission('production.unit-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('units') }}"
-                                                class="pe-nav-link {{ request()->is('admin/units*') ? " active" : ""
-                                                }}">
+                                                class="pe-nav-link {{ request()->is('admin/units*') ? 'active' : '' }}">
                                                 Unit List
                                             </a>
                                         </li>
                                         @endhasPermission
+
+                                        {{-- Raw Materials --}}
                                         @hasPermission('production.rawMaterial-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('raw-materials') }}"
-                                                class="pe-nav-link {{ request()->is('admin/raw-materials*') ? " active"
-                                                : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/raw-materials*') ? 'active' : '' }}">
                                                 Raw Material List
                                             </a>
                                         </li>
                                         @endhasPermission
+
+                                        {{-- Requests --}}
                                         @hasPermission('production.rawMaterialRequest-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('raw-material-requests') }}"
-                                                class="pe-nav-link {{ request()->is('admin/raw-material-requests*') ? "
-                                                active" : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-requests*') ? 'active' : '' }}">
                                                 Raw Material Requests
                                             </a>
                                         </li>
                                         @endhasPermission
-                                    </ul>
-                                </li>
-                                @endhasAnyPermission
 
-                                @hasAnyPermission(['production.stockIn-list', 'production.stockOut-list', 'production.waste-list'])
-                                <li class="pe-slide pe-has-sub">
-                                    <a href="#collapseInventory"
-                                        class="pe-nav-link {{ request()->is('admin/stock-ins*') || request()->is('admin/stock-outs*') || request()->is('admin/wastes*') ? 'active' : '' }}"
-                                        data-bs-toggle="collapse"
-                                        aria-expanded="{{ request()->is('admin/stock-ins*') || request()->is('admin/stock-outs*') || request()->is('admin/wastes*') ? 'true' : 'false' }}"
-                                        aria-controls="collapseInventory">
-                                        <i class="bi bi-box pe-nav-icon"></i>
-                                        <span class="pe-nav-content">Inventory Setup</span>
-                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
-                                    </a>
-
-                                    <ul class="pe-slide-menu collapse" id="collapseInventory">
-                                        @hasPermission('production.stockIn-list')
+                                        {{-- Stock In --}}
+                                        @hasPermission('production.rawMaterialStockIn-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('stock-ins') }}"
-                                                class="pe-nav-link {{ request()->is('admin/stock-ins*') ? " active" : ""
-                                                }}">
+                                            <a href="{{ route('raw-material-stock-ins') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-stock-ins*') ? 'active' : '' }}">
                                                 Stock In List
                                             </a>
                                         </li>
                                         @endhasPermission
-                                        @hasPermission('production.stockOut-list')
+
+                                        {{-- Stock Out --}}
+                                        @hasPermission('production.rawMaterialStockOut-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('stock-outs') }}"
-                                                class="pe-nav-link {{ request()->is('admin/stock-outs*') ? " active" : ""
-                                                }}">
+                                            <a href="{{ route('raw-material-stock-outs') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-stock-outs*') ? 'active' : '' }}">
                                                 Stock Out List
                                             </a>
                                         </li>
                                         @endhasPermission
-                                        @hasPermission('production.waste-list')
+
+                                        {{-- Waste --}}
+                                        @hasPermission('production.rawMaterialWaste-list')
                                         <li class="pe-slide-item">
-                                            <a href="{{ route('wastes') }}"
-                                                class="pe-nav-link {{ request()->is('admin/wastes*') ? " active" : ""
-                                                }}">
+                                            <a href="{{ route('raw-material-wastes') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-wastes*') ? 'active' : '' }}">
                                                 Waste List
                                             </a>
                                         </li>
                                         @endhasPermission
-                                    </ul>
-                                </li>
-                                @endhasAnyPermission
 
-                                @hasAnyPermission(['production.warehouseInventory-list'])
-                                <li class="pe-slide pe-has-sub">
-                                    <a href="{{ route('warehouse-inventory') }}"
-                                        class="pe-nav-link {{ request()->is('admin/warehouse-inventory*') ? " active" : "" }}">
-                                        <i class="bi bi-archive pe-nav-icon"></i>
-                                        <span class="pe-nav-content">Warehouse Inventory</span>
-                                    </a>
+                                        {{-- Transfer --}}
+                                        @hasPermission('production.rawMaterialTransfer-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('raw-material-transfers') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-transfers*') ? 'active' : '' }}">
+                                                Transfer List
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                        {{-- Warehouse Inventory --}}
+                                        @hasPermission('production.rawMaterialWarehouseInventory-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('raw-material-warehouse-inventory') }}"
+                                                class="pe-nav-link {{ request()->is('admin/raw-material-warehouse-inventory*') ? 'active' : '' }}">
+                                                Warehouse Inventory
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                    </ul>
                                 </li>
                                 @endhasAnyPermission
 
