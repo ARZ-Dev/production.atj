@@ -12,7 +12,7 @@ return new class extends Migration {
     {
         Schema::create('raw_material_requests', function (Blueprint $table) {
             $table->id();
-
+            $table->unsignedBigInteger('warehouse_id');
             $table->string('code')->unique();
 
             $table->enum('status', [

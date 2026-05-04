@@ -12,8 +12,15 @@ use App\Livewire\RawMaterials\RawMaterialIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\Shifts\ShiftIndex;
 use App\Http\Controllers\Auth\AuthCallbackController;
+use App\Livewire\StockIn\StockInCreate;
+use App\Livewire\StockIn\StockInIndex;
+use App\Livewire\StockOut\StockOutCreate;
+use App\Livewire\StockOut\StockOutIndex;
 use App\Livewire\Units\UnitCreate;
 use App\Livewire\Units\UnitIndex;
+use App\Livewire\WarehouseInventory\WarehouseInventoryIndex;
+use App\Livewire\Waste\WasteCreate;
+use App\Livewire\Waste\WasteIndex;
 use Illuminate\Support\Facades\Route;
 
 
@@ -124,6 +131,50 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/edit/{id}', UnitCreate::class)->name('units.edit');
     });
 
+
+    // |--------------------------------------------------------------------------
+    // | Stock Ins
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'stock-ins'], function () {
+        Route::get('/', StockInIndex::class)->name('stock-ins');
+        Route::get('/create', StockInCreate::class)->name('stock-ins.create');
+        Route::get('/edit/{id}', StockInCreate::class)->name('stock-ins.edit');
+        Route::get('/view/{id}/{viewStatus}', StockInCreate::class)->name('stock-ins.view');
+
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Stock Outs
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'stock-outs'], function () {
+        Route::get('/', StockOutIndex::class)->name('stock-outs');
+        Route::get('/create', StockOutCreate::class)->name('stock-outs.create');
+        Route::get('/edit/{id}', StockOutCreate::class)->name('stock-outs.edit');
+        Route::get('/view/{id}/{viewStatus}', StockOutCreate::class)->name('stock-outs.view');
+
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Waste
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'wastes'], function () {
+        Route::get('/', WasteIndex::class)->name('wastes');
+        Route::get('/create', WasteCreate::class)->name('wastes.create');
+        Route::get('/edit/{id}', WasteCreate::class)->name('wastes.edit');
+        Route::get('/view/{id}/{viewStatus}', WasteCreate::class)->name('wastes.view');
+
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Warehouse Inventory
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'warehouse-inventory'], function () {
+        Route::get('/', WarehouseInventoryIndex::class)->name('warehouse-inventory');
+    });
 
 
     // |--------------------------------------------------------------------------

@@ -26,6 +26,8 @@ class RawMaterialCreate extends Component
 
     public function mount($id = null)
     {
+        authorizeRequest($id ? 'production.raw-material-edit' : 'production.raw-material-create');
+        
         $this->units = Unit::where('is_base', true)
             ->where('is_active', true)
             ->get();

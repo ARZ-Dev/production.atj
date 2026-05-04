@@ -6,23 +6,28 @@ use App\Models\RawMaterialRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Services\ApiService;
 
 class RawMaterialRequestIndex extends Component
 {
     use AuthorizesRequests;
 
+
     public $requests;
+    public $warehouseMap = [];
 
-    public function mount()
+    public function mount(ApiService $api)
     {
+            authorizeRequest('production.raw-material-request-list');
 
-        $this->requests = RawMaterialRequest::with(['items'])->latest()->get();
+        $this->warehouseMap = collect($warehouses)->pluck('name', 'id')->toArray();
     }
 
     #[On('delete')]
     public function delete($id)
     {
-
+        authorizeRequest('production.raw-material-request-delete');
+         
         $request = RawMaterialRequest::findOrFail($id);
         $request->items()->delete(); // Soft delete related items
         $request->delete();
