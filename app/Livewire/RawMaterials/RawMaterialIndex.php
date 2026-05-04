@@ -16,14 +16,14 @@ class RawMaterialIndex extends Component
 
     public function mount()
     {
-
+        authorizeRequest('production.raw-material-list');
         $this->rawMaterials = RawMaterial::with(['baseUnit', 'purchaseUnit'])->get();
     }
 
     #[On('delete')]
     public function delete($id)
     {
-
+        authorizeRequest('production.raw-material-delete');
         $rawMaterial = RawMaterial::findOrFail($id);
         $rawMaterial->delete();
 

@@ -6,19 +6,19 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Unit extends Model
+class WarehouseInventory extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
 
-    public function baseUnit()
+    public function rawMaterial()
     {
-        return $this->belongsTo(Unit::class, 'base_unit_id');
+        return $this->belongsTo(RawMaterial::class, 'raw_material_id');
     }
 
-    public function reportRawMaterials()
+    public function unit()
     {
-        return $this->hasMany(ReportRawMaterial::class, 'unit_id');
+        return $this->belongsTo(Unit::class, 'unit_id');
     }
 }

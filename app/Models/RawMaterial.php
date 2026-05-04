@@ -21,4 +21,9 @@ class RawMaterial extends Model
     {
         return $this->belongsTo(Unit::class, 'purchase_unit_id');
     }
+
+    public function reportRawMaterials()
+    {
+        return $this->hasMany(ReportRawMaterial::class, 'raw_material_id');
+    }
 }

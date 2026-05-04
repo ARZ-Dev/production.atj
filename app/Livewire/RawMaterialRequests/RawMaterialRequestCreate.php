@@ -5,6 +5,7 @@ namespace App\Livewire\RawMaterialRequests;
 use App\Models\RawMaterial;
 use App\Models\RawMaterialRequest;
 use App\Models\Unit;
+use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -16,24 +17,29 @@ class RawMaterialRequestCreate extends Component
     public $code;
     public $notes;
     public $items = [];
+    public $warehouses = [];
+    public $warehouse_id;
 
     protected $listeners = [
         'updateQuantity' => 'handleUpdateQuantity',
     ];
 
-    public function mount($id = null)
+    public function mount(ApiService $api, $id = null)
     {
+        authorizeRequest($id ? 'production.raw-material-request-edit' : 'production.raw-material-request-create');
+        $this->warehouses = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
         if ($id) {
-            $request        = RawMaterialRequest::with('items')->findOrFail($id);
-            $this->id       = $request->id;
-            $this->code     = $request->code;
-            $this->notes    = $request->notes;
-            $this->items    = $request->items->map(fn($item) => [
-                'id'              => $item->id,
+            $request = RawMaterialRequest::with('items')->findOrFail($id);
+            $this->id = $request->id;
+            $this->code = $request->code;
+            $this->notes = $request->notes;
+            $this->items = $request->items->map(fn($item) => [
+                'id' => $item->id,
                 'raw_material_id' => $item->raw_material_id,
-                'quantity'        => (float) $item->quantity,
-                'unit_id'         => $item->unit_id,
+                'quantity' => (float) $item->quantity,
+                'unit_id' => $item->unit_id,
             ])->toArray();
+            $this->warehouse_id = $request->warehouse_id;
         }
 
         if (empty($this->items)) {
@@ -52,7 +58,7 @@ class RawMaterialRequestCreate extends Component
     {
         // When raw_material_id changes on any item, auto-set unit_id to its purchase unit
         if (str_ends_with($key, '.raw_material_id') && $value) {
-            $index    = explode('.', $key)[0];
+            $index = explode('.', $key)[0];
             $material = RawMaterial::find($value);
 
             if ($material && $material->purchase_unit_id) {
@@ -64,10 +70,10 @@ class RawMaterialRequestCreate extends Component
     public function addRow(): void
     {
         $this->items[] = [
-            'id'              => null,
+            'id' => null,
             'raw_material_id' => null,
-            'quantity'        => 0.0,
-            'unit_id'         => null,
+            'quantity' => 0.0,
+            'unit_id' => null,
         ];
     }
 
@@ -80,24 +86,29 @@ class RawMaterialRequestCreate extends Component
     public function save(): void
     {
         $this->validate([
-            'notes'                   => 'nullable|string',
-            'items'                   => 'required|array|min:1',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
             'items.*.raw_material_id' => 'required|exists:raw_materials,id',
-            'items.*.quantity'        => 'required|numeric|min:0.000001',
-            'items.*.unit_id'         => 'required|exists:units,id',
+            'items.*.quantity' => 'required|numeric|min:0.000001',
+            'items.*.unit_id' => 'required|exists:units,id',
+            'warehouse_id' => 'required',
         ]);
 
         if ($this->id) {
 
             $request = RawMaterialRequest::findOrFail($this->id);
-            $request->update(['notes' => $this->notes]);
+            $request->update([
+                'notes' => $this->notes,
+                'warehouse_id' => $this->warehouse_id,
+            ]);
 
             $message = 'Request updated successfully.';
         } else {
             $request = RawMaterialRequest::create([
-                'code'         => 'REQ-' . time(),
-                'status'       => 'pending',
-                'notes'        => $this->notes,
+                'code' => 'REQ-' . time(),
+                'status' => 'pending',
+                'notes' => $this->notes,
+                'warehouse_id' => $this->warehouse_id,
                 'requested_by' => auth()->id(),
                 'requested_at' => now(),
             ]);
@@ -109,15 +120,15 @@ class RawMaterialRequestCreate extends Component
 
         foreach ($this->items as $item) {
             $material = RawMaterial::findOrFail($item['raw_material_id']);
-            $unit     = Unit::findOrFail($item['unit_id']);
-            $baseQty  = (float) $item['quantity'] * (float) $unit->conversion_factor_to_base;
+            $unit = Unit::findOrFail($item['unit_id']);
+            $baseQty = (float) $item['quantity'] * (float) $unit->conversion_factor_to_base;
 
             $data = [
                 'raw_material_id' => $material->id,
-                'quantity'        => (float) $item['quantity'],
-                'unit_id'         => $unit->id,
-                'base_quantity'   => $baseQty,
-                'base_unit_id'    => $material->base_unit_id,
+                'quantity' => (float) $item['quantity'],
+                'unit_id' => $unit->id,
+                'base_quantity' => $baseQty,
+                'base_unit_id' => $material->base_unit_id,
             ];
 
             if (!empty($item['id'])) {

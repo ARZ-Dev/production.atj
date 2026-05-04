@@ -11,6 +11,26 @@
                             <i class="bi bi-arrow-left me-1"></i>Back
                         </a>
                     </div>
+                    <div class="card-body">
+                        <div class="row g-4">
+                            <div class="col-12 col-md-6">
+                                <div wire:ignore>
+                                    <label for="warehouse" class="form-label">Warehouse <span
+                                            class="text-danger">*</span></label>
+                                    <select id="warehouse" class="selectpicker w-100" title="Select Warehouse"
+                                        data-style="btn-default" data-live-search="true" data-icon-base="ti"
+                                        data-size="5" data-tick-icon="ti-check text-white" wire:model="warehouse_id">
+                                        @foreach($warehouses as $warehouse) <option value="{{ $warehouse['id'] }}"
+                                            @selected($warehouse_id==$warehouse['id'])>
+                                            {{ $warehouse['name'] }}
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                    @error('warehouse_id') <div class="text-danger small">{{ $message }}</div> @enderror
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card mt-2">
@@ -25,9 +45,9 @@
                         <div class="row g-3">
                             @foreach($items as $index => $item)
                             @php
-                                $selectedMaterial = $item['raw_material_id']
-                                    ? $materials->firstWhere('id', $item['raw_material_id'])
-                                    : null;
+                            $selectedMaterial = $item['raw_material_id']
+                            ? $materials->firstWhere('id', $item['raw_material_id'])
+                            : null;
                             @endphp
                             <div class="col-12" wire:key="raw-material-item-{{ $index }}">
                                 <div class="border rounded p-3">
@@ -51,19 +71,17 @@
                                                 <select wire:model="items.{{ $index }}.raw_material_id"
                                                     id="raw_material_{{ $index }}"
                                                     class="selectpicker w-100 item-raw-material"
-                                                    title="Select Raw Material"
-                                                    data-style="btn-default"
-                                                    data-live-search="true"
-                                                    data-icon-base="ti"
-                                                    data-size="5"
-                                                    data-tick-icon="ti-check text-white"
-                                                    data-index="{{ $index }}">
+                                                    title="Select Raw Material" data-style="btn-default"
+                                                    data-live-search="true" data-icon-base="ti" data-size="5"
+                                                    data-tick-icon="ti-check text-white" data-index="{{ $index }}">
                                                     @foreach($materials as $material)
                                                     <option value="{{ $material->id }}"
                                                         data-purchase-unit="{{ $material->purchaseUnit?->name }} ({{ $material->purchaseUnit?->symbol }})"
                                                         data-purchase-unit-id="{{ $material->purchase_unit_id }}"
-                                                        @selected($item['raw_material_id'] === $material->id)>
-                                                        {{ $material->name }} ({{ $material->code }}) — {{ $material->purchaseUnit?->name ?? '—' }} ({{ $material->purchaseUnit?->symbol ?? '—' }})
+                                                        @selected($item['raw_material_id']===$material->id)>
+                                                        {{ $material->name }} ({{ $material->code }}) — {{
+                                                        $material->purchaseUnit?->name ?? '—' }} ({{
+                                                        $material->purchaseUnit?->symbol ?? '—' }})
                                                     </option>
                                                     @endforeach
                                                 </select>
@@ -78,11 +96,9 @@
                                             <label class="form-label" for="quantity_{{ $index }}">
                                                 Quantity <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text"
-                                                value="{{ $item['quantity'] ?? '' }}"
+                                            <input type="text" value="{{ $item['quantity'] ?? '' }}"
                                                 id="quantity_{{ $index }}"
-                                                class="form-control cleave-input quantity-input"
-                                                placeholder="Qty"
+                                                class="form-control cleave-input quantity-input" placeholder="Qty"
                                                 data-index="{{ $index }}">
                                             @error('items.'.$index.'.quantity')
                                             <div class="text-danger small">{{ $message }}</div>
@@ -92,12 +108,10 @@
                                         {{-- Unit (read-only display, driven by selected material) --}}
                                         {{-- <div class="col-12 col-md-3">
                                             <label class="form-label">Unit</label>
-                                            <input type="text"
-                                                class="form-control unit-display"
+                                            <input type="text" class="form-control unit-display"
                                                 data-index="{{ $index }}"
                                                 value="{{ $selectedMaterial?->purchaseUnit ? $selectedMaterial->purchaseUnit->name . ' (' . $selectedMaterial->purchaseUnit->symbol . ')' : '—' }}"
-                                                readonly
-                                                placeholder="Auto-filled from material">
+                                                readonly placeholder="Auto-filled from material">
                                             @error('items.'.$index.'.unit_id')
                                             <div class="text-danger small">{{ $message }}</div>
                                             @enderror
