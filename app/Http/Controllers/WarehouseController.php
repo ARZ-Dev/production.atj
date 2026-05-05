@@ -42,6 +42,7 @@ class WarehouseController extends Controller
             ->toArray();
         $data['item_types'] = $this->api->get('/v1/item-types', ['module' => 'production'])['data'] ?? [];
         return view('warehouses.create', $data);
+        
     }
 
     /**
