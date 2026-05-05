@@ -31,15 +31,20 @@ class RawMaterialStockInCreate extends Component
     public $notes;
 
     public $documents = [];
-    public function mount(ApiService $api,$id = null, $viewStatus = null)
+    public function mount(ApiService $api, $id = null, $viewStatus = null)
     {
         authorizeRequest('production.stockIn-create');
         $this->viewStatus = $viewStatus;
 
-      
-            $this->warehouses = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
-            $this->availableRawMaterials = RawMaterial::all();
-            $this->units = Unit::all();
+
+        $this->warehouses = collect(
+            $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? []
+        )->filter(function ($warehouse) {
+            return isset($warehouse['department']['related_to_production'])
+                && $warehouse['department']['related_to_production'] == 1;
+        })->values()->toArray();
+        $this->availableRawMaterials = RawMaterial::all();
+        // $this->units = Unit::all();
 
         $this->rawMaterials = [
             [
@@ -80,7 +85,7 @@ class RawMaterialStockInCreate extends Component
     }
 
 
-   
+
     public function addRow()
     {
         $this->rawMaterials[] = [
@@ -104,6 +109,21 @@ class RawMaterialStockInCreate extends Component
         unset($this->rawMaterials[$index]);
         $this->rawMaterials = array_values($this->rawMaterials);
     }
+
+    #[On('getUnits')]
+    public function getUnits($rawMaterialId, $index)
+    {
+        $rawMaterial = RawMaterial::find($rawMaterialId);
+
+        if ($rawMaterial && $rawMaterial->purchase_unit_id) {
+            $units = Unit::where('id', $rawMaterial->purchase_unit_id)->get();
+        }
+        $this->dispatch('setUnits', [
+            'units' => $units,
+            'index' => $index
+        ]);
+    }
+
 
 
     public function submit()
