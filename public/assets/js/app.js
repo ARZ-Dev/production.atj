@@ -74,7 +74,7 @@ function setOptions(selector, options) {
         if (value.name === undefined) {
             text = `${value.first_name} ${value.last_name}`;
             if (selector.hasClass('unit-select')) {
-                text = value.unit;
+                text = value.name;
             }else if(selector.hasClass('production-line-select')) {
                 text = 'Production Line #' + value.id;
             }

@@ -92,7 +92,7 @@
                                                             @foreach($availableRawMaterials as $availableRawMaterial)
                                                                 <option value="{{ $availableRawMaterial->id }}"
                                                                     @selected($availableRawMaterial->id == ($rawMaterials[$index]['raw_material_id'] ?? ''))>
-                                                                    {{ $availableRawMaterial->name }}
+                                                                  {{ $availableRawMaterial->name }}{{ $availableRawMaterial->code ? ' (' . $availableRawMaterial->code . ')' : '' }}
                                                                 </option>
                                                             @endforeach
                                                         </select>
@@ -118,12 +118,12 @@
                                                             data-size="5"
                                                             data-tick-icon="ti-check text-white"
                                                             data-index="{{ $index }}">
-                                                            @foreach($units as $unit)
+                                                            {{-- @foreach($units as $unit)
                                                                 <option value="{{ $unit->id }}"
                                                                     @selected($unit->id == ($rawMaterials[$index]['unit_id'] ?? ''))>
                                                                     {{ $unit->name }}
                                                                 </option>
-                                                            @endforeach
+                                                            @endforeach --}}
                                                         </select>
                                                     </div>
                                                     @error('rawMaterials.' . $index . '.unit_id')
@@ -181,6 +181,27 @@
         Livewire.hook('morph.added', ({ el }) => {
             $('.selectpicker').selectpicker();
             triggerCleave();
+        });
+
+          $(document).on('change', '.raw-material-select', function() {
+            let index = $(this).attr('data-index');
+            let rawMaterialId = $(this).val();
+
+            if(index !== undefined){
+                $wire.dispatch('getUnits', {
+                    rawMaterialId: rawMaterialId,
+                    index: index
+                })
+            }
+        });
+
+        $wire.on('setUnits', function (params) {
+            let data = params[0];
+
+            let units = data.units;
+            let index = data.index;
+
+            setOptions($('#unit_' + index + '_id'), units);
         });
     </script>
     @endscript

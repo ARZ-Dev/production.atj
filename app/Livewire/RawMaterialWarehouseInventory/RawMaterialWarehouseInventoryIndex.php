@@ -24,7 +24,12 @@ class RawMaterialWarehouseInventoryIndex extends Component
     {
         authorizeRequest('production.rawMaterialWarehouseInventory-list');
 
-        $this->warehouses = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
+        $this->warehouses = collect(
+            $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? []
+        )->filter(function ($warehouse) {
+            return isset($warehouse['department']['related_to_production'])
+                && $warehouse['department']['related_to_production'] == 1;
+        })->values()->toArray();
         $this->warehouseMap = collect($this->warehouses)->pluck('name', 'id')->toArray();
     }
 
@@ -46,21 +51,21 @@ class RawMaterialWarehouseInventoryIndex extends Component
                     $q->where('status', 'approved')
                         ->where('warehouse_id', $warehouseId);
                 })
-                ->orWhereHas('stockOut', function ($q) use ($warehouseId) {
-                    $q->where('status', 'approved')
-                        ->where('warehouse_id', $warehouseId);
-                })
-                ->orWhereHas('waste', function ($q) use ($warehouseId) {
-                    $q->where('status', 'approved')
-                        ->where('warehouse_id', $warehouseId);
-                })
-                ->orWhereHas('transfer', function ($q) use ($warehouseId) {
-                    $q->where('status', 'approved')
-                        ->where(function ($qq) use ($warehouseId) {
-                            $qq->where('warehouse_from_id', $warehouseId)
-                                ->orWhere('warehouse_to_id', $warehouseId);
-                        });
-                });                
+                    ->orWhereHas('stockOut', function ($q) use ($warehouseId) {
+                        $q->where('status', 'approved')
+                            ->where('warehouse_id', $warehouseId);
+                    })
+                    ->orWhereHas('waste', function ($q) use ($warehouseId) {
+                        $q->where('status', 'approved')
+                            ->where('warehouse_id', $warehouseId);
+                    })
+                    ->orWhereHas('transfer', function ($q) use ($warehouseId) {
+                        $q->where('status', 'approved')
+                            ->where(function ($qq) use ($warehouseId) {
+                                $qq->where('warehouse_from_id', $warehouseId)
+                                    ->orWhere('warehouse_to_id', $warehouseId);
+                            });
+                    });
             })
                 ->with(['rawMaterial', 'unit'])
                 ->get()
@@ -71,12 +76,12 @@ class RawMaterialWarehouseInventoryIndex extends Component
                     $first = $group->first();
 
                     return (object) [
-                        'warehouse_id'    => $warehouseId,
+                        'warehouse_id' => $warehouseId,
                         'raw_material_id' => $first->raw_material_id,
-                        'unit_id'         => $first->unit_id,
-                        'rawMaterial'     => $first->rawMaterial->name,
-                        'unit'            => $first->unit->name,
-                        'total_quantity'  => $group->sum('quantity'),
+                        'unit_id' => $first->unit_id,
+                        'rawMaterial' => $first->rawMaterial->name,
+                        'unit' => $first->unit->name,
+                        'total_quantity' => $group->sum('quantity'),
                     ];
                 })
                 ->values();
@@ -88,7 +93,7 @@ class RawMaterialWarehouseInventoryIndex extends Component
     {
         // Use warehouseMap from API instead of DB query
         $this->selectedWarehouse = (object) [
-            'id'   => $warehouseId,
+            'id' => $warehouseId,
             'name' => $this->warehouseMap[$warehouseId] ?? 'Unknown',
         ];
 
@@ -99,21 +104,21 @@ class RawMaterialWarehouseInventoryIndex extends Component
                     $q->where('status', 'approved')
                         ->where('warehouse_id', $warehouseId);
                 })
-                ->orWhereHas('stockOut', function ($q) use ($warehouseId) {
-                    $q->where('status', 'approved')
-                        ->where('warehouse_id', $warehouseId);
-                })
-                ->orWhereHas('waste', function ($q) use ($warehouseId) {
-                    $q->where('status', 'approved')
-                        ->where('warehouse_id', $warehouseId);
-                })
-                ->orWhereHas('transfer', function ($q) use ($warehouseId) {
-                    $q->where('status', 'approved')
-                        ->where(function ($qq) use ($warehouseId) {
-                            $qq->where('warehouse_from_id', $warehouseId)
-                                ->orWhere('warehouse_to_id', $warehouseId);
-                        });
-                });
+                    ->orWhereHas('stockOut', function ($q) use ($warehouseId) {
+                        $q->where('status', 'approved')
+                            ->where('warehouse_id', $warehouseId);
+                    })
+                    ->orWhereHas('waste', function ($q) use ($warehouseId) {
+                        $q->where('status', 'approved')
+                            ->where('warehouse_id', $warehouseId);
+                    })
+                    ->orWhereHas('transfer', function ($q) use ($warehouseId) {
+                        $q->where('status', 'approved')
+                            ->where(function ($qq) use ($warehouseId) {
+                                $qq->where('warehouse_from_id', $warehouseId)
+                                    ->orWhere('warehouse_to_id', $warehouseId);
+                            });
+                    });
             })
             ->orderBy('created_at', 'asc')
             ->with(['rawMaterial', 'unit'])

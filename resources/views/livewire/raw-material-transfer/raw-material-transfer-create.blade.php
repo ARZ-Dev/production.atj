@@ -115,7 +115,7 @@
                                                         @foreach($availableRawMaterials as $rawMaterial)
                                                             <option value="{{ $rawMaterial->id }}"
                                                                 @selected($rawMaterial->id == ($item['raw_material_id'] ?? ''))>
-                                                                {{ $rawMaterial->name }}
+                                                                {{ $rawMaterial->name }}{{ $rawMaterial->code ? ' (' . $rawMaterial->code . ')' : '' }}
                                                             </option>
                                                         @endforeach
                                                     </select>
@@ -139,12 +139,12 @@
                                                         data-tick-icon="ti-check text-white"
                                                         data-index="{{ $index }}"
                                                         {{ $confirmStatus ? 'disabled' : '' }}>
-                                                        @foreach($units as $unit)
+                                                        {{-- @foreach($units as $unit)
                                                             <option value="{{ $unit->id }}"
                                                                 @selected($unit->id == ($item['unit_id'] ?? ''))>
                                                                 {{ $unit->name }}
                                                             </option>
-                                                        @endforeach
+                                                        @endforeach --}}
                                                     </select>
                                                 </div>
                                                 @error('rawMaterials.' . $index . '.unit_id')
@@ -229,6 +229,27 @@
 
         $(document).on('change', '.selectpicker', function () {
             $wire.set($(this).attr('wire:model'), $(this).val());
+        });
+
+         $(document).on('change', '.raw-material-select', function() {
+            let index = $(this).attr('data-index');
+            let rawMaterialId = $(this).val();
+
+            if(index !== undefined){
+                $wire.dispatch('getUnits', {
+                    rawMaterialId: rawMaterialId,
+                    index: index
+                })
+            }
+        });
+
+        $wire.on('setUnits', function (params) {
+            let data = params[0];
+
+            let units = data.units;
+            let index = data.index;
+
+            setOptions($('#unit_' + index + '_id'), units);
         });
     </script>
     @endscript
