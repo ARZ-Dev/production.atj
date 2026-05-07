@@ -25,17 +25,14 @@ class RawMaterialStockInCreate extends Component
 
     public $rawMaterials = [];
     public $availableRawMaterials = [];
-    public $units = [];
     public $viewStatus;
-
     public $notes;
-
     public $documents = [];
+
     public function mount(ApiService $api, $id = null, $viewStatus = null)
     {
         authorizeRequest('production.stockIn-create');
         $this->viewStatus = $viewStatus;
-
 
         $this->warehouses = collect(
             $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? []
@@ -43,14 +40,15 @@ class RawMaterialStockInCreate extends Component
             return isset($warehouse['department']['related_to_production'])
                 && $warehouse['department']['related_to_production'] == 1;
         })->values()->toArray();
+
         $this->availableRawMaterials = RawMaterial::all();
-        // $this->units = Unit::all();
 
         $this->rawMaterials = [
             [
                 'raw_material_id' => '',
                 'unit_id' => '',
                 'quantity' => '',
+                'units' => [],
             ]
         ];
 
@@ -63,28 +61,26 @@ class RawMaterialStockInCreate extends Component
             $this->warehouse_id = $this->stockIn->warehouse_id;
             $this->notes = $this->stockIn->notes;
 
-            $this->availableRawMaterials = RawMaterial::all();
-            $this->rawMaterials = [];
             $this->rawMaterials = $this->stockIn->reportRawMaterials->map(function ($item) {
+                $units = [];
+
+                if ($item->rawMaterial && $item->rawMaterial->purchase_unit_id) {
+                    $units = Unit::where('id', $item->rawMaterial->purchase_unit_id)
+                        ->get()
+                        ->map(fn($u) => ['id' => $u->id, 'name' => $u->name])
+                        ->toArray();
+                }
+
                 return [
                     'id' => $item->id,
                     'raw_material_id' => $item->raw_material_id,
                     'unit_id' => $item->unit_id,
                     'quantity' => $item->quantity,
-                    'units' => $item->item?->itemUnits,
+                    'units' => $units,
                 ];
             })->toArray();
-
-            // if (count($this->stockIn->documents)) {
-            //     $this->documents = [];
-            //     foreach ($this->stockIn->documents as $document) {
-            //         $this->documents[] = asset('storage/' . $document->document);
-            //     }
-            // }
         }
     }
-
-
 
     public function addRow()
     {
@@ -92,12 +88,12 @@ class RawMaterialStockInCreate extends Component
             'raw_material_id' => '',
             'unit_id' => '',
             'quantity' => '',
+            'units' => [],
         ];
     }
 
     public function removeItem($index)
     {
-        // ✅ Prevent deleting the last row
         if (count($this->rawMaterials) <= 1) {
             $this->dispatch('swal:error', [
                 'title' => 'Warning',
@@ -113,18 +109,26 @@ class RawMaterialStockInCreate extends Component
     #[On('getUnits')]
     public function getUnits($rawMaterialId, $index)
     {
+        $units = [];
         $rawMaterial = RawMaterial::find($rawMaterialId);
 
         if ($rawMaterial && $rawMaterial->purchase_unit_id) {
-            $units = Unit::where('id', $rawMaterial->purchase_unit_id)->get();
+            $units = Unit::where('id', $rawMaterial->purchase_unit_id)
+                ->get()
+                ->map(fn($u) => ['id' => $u->id, 'name' => $u->name])
+                ->toArray();
         }
+
+        // Clear unit selection when raw material changes
+        $this->rawMaterials[$index]['units'] = $units;
+        $this->rawMaterials[$index]['unit_id'] = count($units) === 1 ? $units[0]['id'] : '';
+
         $this->dispatch('setUnits', [
             'units' => $units,
-            'index' => $index
+            'index' => $index,
+            'selectedUnitId' => $this->rawMaterials[$index]['unit_id'],
         ]);
     }
-
-
 
     public function submit()
     {
@@ -147,14 +151,11 @@ class RawMaterialStockInCreate extends Component
         DB::beginTransaction();
         try {
             if ($this->editing) {
-                // Update existing stock in
                 $this->stockIn->update([
                     'warehouse_id' => $this->warehouse_id,
                     'notes' => $this->notes,
                 ]);
-
             } else {
-                // Create new stock in
                 $this->stockIn = RawMaterialStockIn::create([
                     'warehouse_id' => $this->warehouse_id,
                     'notes' => $this->notes,
@@ -162,12 +163,12 @@ class RawMaterialStockInCreate extends Component
             }
 
             foreach ($this->rawMaterials as $item) {
-                $inventory = RawMaterialWarehouseInventory::where('warehouse_id', $this->warehouse_id)
+                $exists = RawMaterialWarehouseInventory::where('warehouse_id', $this->warehouse_id)
                     ->where('raw_material_id', $item['raw_material_id'])
                     ->where('unit_id', $item['unit_id'])
-                    ->first();
+                    ->exists();
 
-                if (!$inventory) {
+                if (!$exists) {
                     RawMaterialWarehouseInventory::create([
                         'warehouse_id' => $this->warehouse_id,
                         'raw_material_id' => $item['raw_material_id'],
@@ -178,56 +179,37 @@ class RawMaterialStockInCreate extends Component
             }
 
             $existingItemIds = [];
-            // Update or create report items
             foreach ($this->rawMaterials as $item) {
-                // Update existing item
-                $reportItem = $this->stockIn->reportRawMaterials()
-                    ->updateOrCreate([
-                        'id' => $item['id'] ?? null,
-                    ], [
+                $reportItem = $this->stockIn->reportRawMaterials()->updateOrCreate(
+                    ['id' => $item['id'] ?? null],
+                    [
                         'warehouse_id' => $this->warehouse_id,
                         'raw_material_id' => $item['raw_material_id'],
                         'unit_id' => $item['unit_id'],
                         'quantity' => $item['quantity'],
-                    ]);
+                    ]
+                );
                 $existingItemIds[] = $reportItem->id;
             }
-            // Delete removed items
+
             $this->stockIn->reportRawMaterials()->whereNotIn('id', $existingItemIds)->delete();
 
-            // Handle documents
-            // if ($this->documents) {
-            //     foreach ($this->documents as $document) {
-            //         $documentPath = $document->store('stockIn', ['disk' => 'public']);
-            //         $this->stockIn->documents()->create([
-            //             'document' => $documentPath,
-            //         ]);
-            //     }
-            // }
-
             DB::commit();
-            return to_route('raw-material-stock-ins')->with('success', $this->editing ? 'Stock In updated successfully!' : 'Stock In created successfully!');
+
+            return to_route('raw-material-stock-ins')->with(
+                'success',
+                $this->editing ? 'Stock In updated successfully!' : 'Stock In created successfully!'
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return $this->dispatch('swal:error', [
+            $this->dispatch('swal:error', [
                 'title' => 'Error',
                 'text' => 'An error occurred: ' . $e->getMessage()
             ]);
         }
     }
 
-    // #[On('deleteDocument')]
-    // public function deleteDocument($filename = null)
-    // {
-    //     if (!$filename)
-    //         return;
-
-    //     if ($this->stockIn) {
-    //         $filename = preg_replace('/.*\/stockIn\//', 'stockIn/', $filename);
-    //         $this->stockIn->documents()->where('document', $filename)->delete();
-    //     }
-    // }
     public function render()
     {
         if ($this->viewStatus == 1) {
