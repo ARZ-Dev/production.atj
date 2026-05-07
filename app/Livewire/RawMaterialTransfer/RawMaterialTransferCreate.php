@@ -25,7 +25,6 @@ class RawMaterialTransferCreate extends Component
 
     public $rawMaterials = [];
     public $availableRawMaterials = [];
-    public $units = [];
     public $viewStatus;
     public $confirmStatus = 0;
 
@@ -52,20 +51,21 @@ class RawMaterialTransferCreate extends Component
             return isset($warehouse['department']['related_to_production'])
                 && $warehouse['department']['related_to_production'] == 1;
         })->values()->toArray();
+
         $this->availableRawMaterials = RawMaterial::all();
-        // $this->units = Unit::all();
 
         $this->rawMaterials = [
             [
-                'raw_material_id' => '',
-                'unit_id' => '',
-                'quantity' => '',
+                'raw_material_id'   => '',
+                'unit_id'           => '',
+                'quantity'          => '',
                 'received_quantity' => '',
+                'units'             => [],
             ]
         ];
 
         if ($id) {
-            $this->id = $id;
+            $this->id      = $id;
             $this->editing = true;
 
             $this->transfer = RawMaterialTransfer::with('reportRawMaterials')->findOrFail($id);
@@ -80,21 +80,32 @@ class RawMaterialTransferCreate extends Component
                 return redirect()->route('raw-material-transfers');
             }
 
-            $this->warehouses = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
+            $this->warehouses        = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
             $this->warehouse_from_id = $this->transfer->warehouse_from_id;
-            $this->warehouse_to_id = $this->transfer->warehouse_to_id;
-
-            $this->availableRawMaterials = RawMaterial::all();
+            $this->warehouse_to_id   = $this->transfer->warehouse_to_id;
 
             $this->rawMaterials = $this->transfer->reportRawMaterials->map(function ($item) {
+                $units = [];
+
+                if ($item->rawMaterial && $item->rawMaterial->purchase_unit_id) {
+                    $units = Unit::where('id', $item->rawMaterial->purchase_unit_id)
+                        ->get()
+                        ->map(fn($u) => ['id' => $u->id, 'name' => $u->name])
+                        ->toArray();
+                }
+
                 return [
-                    'id' => $item->id,
-                    'raw_material_id' => $item->raw_material_id,
-                    'unit_id' => $item->unit_id,
-                    'quantity' => $item->quantity,
-                    'received_quantity' => $this->confirmStatus == 2 ? ($item->received_quantity ?? $item->quantity) : null,
+                    'id'                => $item->id,
+                    'raw_material_id'   => $item->raw_material_id,
+                    'unit_id'           => $item->unit_id,
+                    'quantity'          => $item->quantity,
+                    'received_quantity' => $this->confirmStatus == 2
+                        ? ($item->received_quantity ?? $item->quantity)
+                        : null,
+                    'units'             => $units,
                 ];
             })->toArray();
+
         } else {
             $this->transfer = new RawMaterialTransfer();
         }
@@ -103,10 +114,11 @@ class RawMaterialTransferCreate extends Component
     public function addRow()
     {
         $this->rawMaterials[] = [
-            'raw_material_id' => '',
-            'unit_id' => '',
-            'quantity' => '',
+            'raw_material_id'   => '',
+            'unit_id'           => '',
+            'quantity'          => '',
             'received_quantity' => '',
+            'units'             => [],
         ];
     }
 
@@ -115,7 +127,7 @@ class RawMaterialTransferCreate extends Component
         if (count($this->rawMaterials) <= 1) {
             $this->dispatch('swal:error', [
                 'title' => 'Warning',
-                'text' => 'At least one item is required!'
+                'text'  => 'At least one item is required!'
             ]);
             return;
         }
@@ -133,43 +145,52 @@ class RawMaterialTransferCreate extends Component
         }
 
         return [
-            'warehouse_from_id' => 'required',
-            'warehouse_to_id' => 'required|different:warehouse_from_id',
-            'rawMaterials' => 'required|array|min:1',
+            'warehouse_from_id'              => 'required',
+            'warehouse_to_id'                => 'required|different:warehouse_from_id',
+            'rawMaterials'                   => 'required|array|min:1',
             'rawMaterials.*.raw_material_id' => 'required|exists:raw_materials,id',
-            'rawMaterials.*.unit_id' => 'required|exists:units,id',
-            'rawMaterials.*.quantity' => 'required|numeric|min:0.01',
+            'rawMaterials.*.unit_id'         => 'required|exists:units,id',
+            'rawMaterials.*.quantity'        => 'required|numeric|min:0.01',
         ];
     }
 
     protected function messages()
     {
         return [
-            'warehouse_to_id.different' => 'Warehouse To must be different from Warehouse From.',
-            'rawMaterials.required' => 'Please add at least one item.',
-            'rawMaterials.min' => 'Please add at least one item.',
+            'warehouse_to_id.different'               => 'Warehouse To must be different from Warehouse From.',
+            'rawMaterials.required'                   => 'Please add at least one item.',
+            'rawMaterials.min'                        => 'Please add at least one item.',
             'rawMaterials.*.raw_material_id.required' => 'Raw material is required.',
-            'rawMaterials.*.unit_id.required' => 'Unit is required.',
-            'rawMaterials.*.quantity.required' => 'Loaded quantity is required.',
-            'rawMaterials.*.quantity.numeric' => 'Loaded quantity must be a number.',
-            'rawMaterials.*.quantity.min' => 'Loaded quantity must be greater than 0.',
+            'rawMaterials.*.unit_id.required'         => 'Unit is required.',
+            'rawMaterials.*.quantity.required'        => 'Loaded quantity is required.',
+            'rawMaterials.*.quantity.numeric'         => 'Loaded quantity must be a number.',
+            'rawMaterials.*.quantity.min'             => 'Loaded quantity must be greater than 0.',
             'rawMaterials.*.received_quantity.required' => 'Received quantity is required.',
-            'rawMaterials.*.received_quantity.numeric' => 'Received quantity must be a number.',
-            'rawMaterials.*.received_quantity.min' => 'Received quantity must be 0 or greater.',
+            'rawMaterials.*.received_quantity.numeric'  => 'Received quantity must be a number.',
+            'rawMaterials.*.received_quantity.min'      => 'Received quantity must be 0 or greater.',
         ];
     }
 
     #[On('getUnits')]
     public function getUnits($rawMaterialId, $index)
     {
+        $units       = [];
         $rawMaterial = RawMaterial::find($rawMaterialId);
 
         if ($rawMaterial && $rawMaterial->purchase_unit_id) {
-            $units = Unit::where('id', $rawMaterial->purchase_unit_id)->get();
+            $units = Unit::where('id', $rawMaterial->purchase_unit_id)
+                ->get()
+                ->map(fn($u) => ['id' => $u->id, 'name' => $u->name])
+                ->toArray();
         }
+
+        $this->rawMaterials[$index]['units']   = $units;
+        $this->rawMaterials[$index]['unit_id'] = count($units) === 1 ? $units[0]['id'] : '';
+
         $this->dispatch('setUnits', [
-            'units' => $units,
-            'index' => $index
+            'units'          => $units,
+            'index'          => $index,
+            'selectedUnitId' => $this->rawMaterials[$index]['unit_id'],
         ]);
     }
 
@@ -187,28 +208,27 @@ class RawMaterialTransferCreate extends Component
 
                 $this->transfer->update([
                     'warehouse_from_id' => $this->warehouse_from_id,
-                    'warehouse_to_id' => $this->warehouse_to_id,
+                    'warehouse_to_id'   => $this->warehouse_to_id,
                 ]);
             } else {
                 $this->transfer = RawMaterialTransfer::create([
                     'warehouse_from_id' => $this->warehouse_from_id,
-                    'warehouse_to_id' => $this->warehouse_to_id,
-                    'status' => 'pending',
+                    'warehouse_to_id'   => $this->warehouse_to_id,
+                    'status'            => 'pending',
                 ]);
             }
 
             $existingItemIds = [];
             foreach ($this->rawMaterials as $item) {
-                $reportItem = $this->transfer->reportRawMaterials()
-                    ->updateOrCreate(
-                        ['id' => $item['id'] ?? null],
-                        [
-                            'warehouse_id' => $this->warehouse_from_id,
-                            'raw_material_id' => $item['raw_material_id'],
-                            'unit_id' => $item['unit_id'],
-                            'quantity' => $item['quantity'],
-                        ]
-                    );
+                $reportItem = $this->transfer->reportRawMaterials()->updateOrCreate(
+                    ['id' => $item['id'] ?? null],
+                    [
+                        'warehouse_id'    => $this->warehouse_from_id,
+                        'raw_material_id' => $item['raw_material_id'],
+                        'unit_id'         => $item['unit_id'],
+                        'quantity'        => $item['quantity'],
+                    ]
+                );
                 $existingItemIds[] = $reportItem->id;
             }
 
@@ -217,13 +237,17 @@ class RawMaterialTransferCreate extends Component
             }
 
             DB::commit();
-            return to_route('raw-material-transfers')->with('success', $this->editing ? 'Transfer updated successfully!' : 'Transfer created successfully!');
+
+            return to_route('raw-material-transfers')->with(
+                'success',
+                $this->editing ? 'Transfer updated successfully!' : 'Transfer created successfully!'
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
             $this->dispatch('swal:error', [
                 'title' => 'Error',
-                'text' => 'An error occurred: ' . $e->getMessage()
+                'text'  => 'An error occurred: ' . $e->getMessage()
             ]);
         }
     }
@@ -231,46 +255,46 @@ class RawMaterialTransferCreate extends Component
     public function confirmLoad()
     {
         $this->validate();
+
         DB::beginTransaction();
         try {
             $existingItemIds = [];
             foreach ($this->rawMaterials as $item) {
-                $reportItem = $this->transfer->reportRawMaterials()
-                    ->updateOrCreate(
-                        ['id' => $item['id'] ?? null],
-                        [
-                            'warehouse_id' => $this->warehouse_from_id,
-                            'raw_material_id' => $item['raw_material_id'],
-                            'unit_id' => $item['unit_id'],
-                            'quantity' => $item['quantity'],
-                        ]
-                    );
+                $reportItem = $this->transfer->reportRawMaterials()->updateOrCreate(
+                    ['id' => $item['id'] ?? null],
+                    [
+                        'warehouse_id'    => $this->warehouse_from_id,
+                        'raw_material_id' => $item['raw_material_id'],
+                        'unit_id'         => $item['unit_id'],
+                        'quantity'        => $item['quantity'],
+                    ]
+                );
                 $existingItemIds[] = $reportItem->id;
 
-                // Ensure inventory records exist for both warehouses
                 RawMaterialWarehouseInventory::firstOrCreate([
-                    'warehouse_id' => $this->warehouse_to_id,
+                    'warehouse_id'    => $this->warehouse_to_id,
                     'raw_material_id' => $item['raw_material_id'],
-                    'unit_id' => $item['unit_id'],
+                    'unit_id'         => $item['unit_id'],
                 ], ['quantity' => 0]);
 
                 RawMaterialWarehouseInventory::firstOrCreate([
-                    'warehouse_id' => $this->warehouse_from_id,
+                    'warehouse_id'    => $this->warehouse_from_id,
                     'raw_material_id' => $item['raw_material_id'],
-                    'unit_id' => $item['unit_id'],
+                    'unit_id'         => $item['unit_id'],
                 ], ['quantity' => 0]);
             }
 
             $this->transfer->update(['status' => 'loaded']);
 
             DB::commit();
+
             return to_route('raw-material-transfers')->with('success', 'Transfer load approved successfully!');
 
         } catch (\Exception $e) {
             DB::rollBack();
             $this->dispatch('swal:error', [
                 'title' => 'Error',
-                'text' => 'An error occurred: ' . $e->getMessage()
+                'text'  => 'An error occurred: ' . $e->getMessage()
             ]);
         }
     }
@@ -288,8 +312,7 @@ class RawMaterialTransferCreate extends Component
                     ->first();
 
                 if ($inventoryTo) {
-                    $inventoryTo->quantity += $item['received_quantity'];
-                    $inventoryTo->save();
+                    $inventoryTo->increment('quantity', $item['received_quantity']);
                 }
 
                 $inventoryFrom = RawMaterialWarehouseInventory::where('warehouse_id', $this->warehouse_from_id)
@@ -298,8 +321,7 @@ class RawMaterialTransferCreate extends Component
                     ->first();
 
                 if ($inventoryFrom) {
-                    $inventoryFrom->quantity -= $item['received_quantity'];
-                    $inventoryFrom->save();
+                    $inventoryFrom->decrement('quantity', $item['received_quantity']);
                 }
 
                 $this->transfer->reportRawMaterials()
@@ -310,13 +332,14 @@ class RawMaterialTransferCreate extends Component
             $this->transfer->update(['status' => 'approved']);
 
             DB::commit();
+
             return to_route('raw-material-transfers')->with('success', 'Transfer receive approved successfully!');
 
         } catch (\Exception $e) {
             DB::rollBack();
             $this->dispatch('swal:error', [
                 'title' => 'Error',
-                'text' => 'An error occurred: ' . $e->getMessage()
+                'text'  => 'An error occurred: ' . $e->getMessage()
             ]);
         }
     }
@@ -328,4 +351,4 @@ class RawMaterialTransferCreate extends Component
         }
         return view('livewire.raw-material-transfer.raw-material-transfer-create');
     }
-}
+}   
