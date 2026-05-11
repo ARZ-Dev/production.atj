@@ -16,9 +16,7 @@ class ItemController extends Controller
      */
     public function index()
     {
-        $data = [];
         $data['items'] = $this->api->get('/v1/items')['data'] ?? [];
-
         return view('items.index', $data);
     }
 
@@ -27,10 +25,10 @@ class ItemController extends Controller
      */
     public function create()
     {
-        $data = [];
+        $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
+        $data['sub_types']  = [];
         $data['route']      = route('items.store');
         $data['editing']    = false;
-        $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
 
         return view('items.create', $data);
     }
@@ -84,7 +82,6 @@ class ItemController extends Controller
      */
     public function edit(int $id)
     {
-        $data = [];
         $result = $this->api->get("/v1/items/{$id}");
 
         if (!($result['success'] ?? false)) {
@@ -92,10 +89,21 @@ class ItemController extends Controller
                 ->with('error', $result['message'] ?? 'Item not found.');
         }
 
-        $data['item']       = $result['data'];
+        $item = $result['data'];
+
+        // Fetch sub types filtered by the item's current item_type_id
+        $sub_types = [];
+        if (!empty($item['item_type_id'])) {
+            $sub_types = $this->api->get('/v1/item-sub-types', [
+                'item_type_id' => $item['item_type_id'],
+            ])['data'] ?? [];
+        }
+
+        $data['item']       = $item;
+        $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
+        $data['sub_types']  = $sub_types;
         $data['route']      = route('items.update', $id);
         $data['editing']    = true;
-        $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
 
         return view('items.create', $data);
     }
