@@ -39,3 +39,35 @@ if (!function_exists('authorizeRequest')) {
         return true;
     }
 }
+
+if (!function_exists('getRelationName')) {
+    function getRelationName($relation)
+    {
+        if (!$relation) {
+            return '';
+        }
+
+        $name = "";
+
+        if($relation['group'])
+        {
+            $name.=$relation['group']['name'];
+        }
+
+        if($relation['entity'])
+        {
+            $name.=" - ".$relation['entity']['name'];
+        }
+
+        if(isset($relation['subEntity']))
+        {
+            $name.=" - ".$relation['subEntity']['name'];
+        }
+
+        if(isset($relation['sub_entity']))
+        {
+            $name.=" - ".$relation['sub_entity']['name'];
+        }
+        return $name;
+    }
+}
