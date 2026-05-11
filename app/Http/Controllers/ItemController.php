@@ -9,7 +9,8 @@ class ItemController extends Controller
 {
     public function __construct(
         private ApiService $api
-    ) {}
+    ) {
+    }
 
     /**
      * List Items — DataTable page.
@@ -26,9 +27,9 @@ class ItemController extends Controller
     public function create()
     {
         $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
-        $data['sub_types']  = [];
-        $data['route']      = route('items.store');
-        $data['editing']    = false;
+        $data['sub_types'] = [];
+        $data['route'] = route('items.store');
+        $data['editing'] = false;
 
         return view('items.create', $data);
     }
@@ -46,7 +47,7 @@ class ItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'sub_types'    => $subTypes,
+            'sub_types' => $subTypes,
         ]);
     }
 
@@ -57,32 +58,29 @@ class ItemController extends Controller
     {
         $request->validate([
             'item_type_id' => 'required|integer',
-            'sub_type_id'  => 'nullable|integer',
-            'code'         => 'required|string|max:255',
-            'name'         => 'required|string|max:255',
-            'with_formula' => 'boolean',
-            'weight'       => 'nullable|numeric|min:0',
-            'volume'       => 'nullable|numeric|min:0',
-            'vat'          => 'nullable|numeric|min:0|max:100',
-            'image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'is_active'    => 'boolean',
+            'sub_type_id' => 'nullable|integer',
+            'code' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
+            'with_formula' => 'nullable',
+            'weight' => 'nullable|numeric|min:0',
+            'volume' => 'nullable|numeric|min:0',
+            'vat' => 'nullable|numeric|min:0|max:100',
+            'is_active' => 'nullable',
         ]);
 
         $payload = [
             'item_type_id' => $request->item_type_id,
-            'sub_type_id'  => $request->sub_type_id,
-            'code'         => $request->code,
-            'name'         => $request->name,
+            'sub_type_id' => $request->sub_type_id,
+            'code' => $request->code,
+            'name' => $request->name,
             'with_formula' => $request->boolean('with_formula'),
-            'weight'       => $request->weight,
-            'volume'       => $request->volume,
-            'vat'          => $request->vat,
-            'is_active'    => $request->boolean('is_active'),
+            'weight' => $request->weight,
+            'volume' => $request->volume,
+            'vat' => $request->vat,
+            'is_active' => $request->boolean('is_active'),
         ];
 
-        $result = $request->hasFile('image')
-            ? $this->api->postMultipart('/v1/items', $payload, ['image' => $request->file('image')])
-            : $this->api->post('/v1/items', $payload);
+        $result = $this->api->post('/v1/items', $payload); // ← uncommented
 
         if (!($result['success'] ?? false)) {
             return back()->withInput()->withErrors(
@@ -93,7 +91,6 @@ class ItemController extends Controller
         return redirect()->route('items.index')
             ->with('success', 'Item created successfully.');
     }
-
     /**
      * Show edit form.
      */
@@ -115,11 +112,11 @@ class ItemController extends Controller
             $sub_types = $this->api->get("/v1/item-sub-types/$typeId")['data'] ?? [];
         }
 
-        $data['item']       = $item;
+        $data['item'] = $item;
         $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
-        $data['sub_types']  = $sub_types;
-        $data['route']      = route('items.update', $id);
-        $data['editing']    = true;
+        $data['sub_types'] = $sub_types;
+        $data['route'] = route('items.update', $id);
+        $data['editing'] = true;
 
         return view('items.create', $data);
     }
@@ -131,27 +128,27 @@ class ItemController extends Controller
     {
         $request->validate([
             'item_type_id' => 'required|integer',
-            'sub_type_id'  => 'nullable|integer',
-            'code'         => 'required|string|max:255',
-            'name'         => 'required|string|max:255',
+            'sub_type_id' => 'nullable|integer',
+            'code' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'with_formula' => 'boolean',
-            'weight'       => 'nullable|numeric|min:0',
-            'volume'       => 'nullable|numeric|min:0',
-            'vat'          => 'nullable|numeric|min:0|max:100',
-            'image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'is_active'    => 'boolean',
+            'weight' => 'nullable|numeric|min:0',
+            'volume' => 'nullable|numeric|min:0',
+            'vat' => 'nullable|numeric|min:0|max:100',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'is_active' => 'boolean',
         ]);
 
         $payload = [
             'item_type_id' => $request->item_type_id,
-            'sub_type_id'  => $request->sub_type_id,
-            'code'         => $request->code,
-            'name'         => $request->name,
+            'sub_type_id' => $request->sub_type_id,
+            'code' => $request->code,
+            'name' => $request->name,
             'with_formula' => $request->boolean('with_formula'),
-            'weight'       => $request->weight,
-            'volume'       => $request->volume,
-            'vat'          => $request->vat,
-            'is_active'    => $request->boolean('is_active'),
+            'weight' => $request->weight,
+            'volume' => $request->volume,
+            'vat' => $request->vat,
+            'is_active' => $request->boolean('is_active'),
         ];
 
         $result = $request->hasFile('image')
