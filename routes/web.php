@@ -80,6 +80,21 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::post('/suppliers/{id}', [\App\Http\Controllers\SupplierController::class, 'update'])->name('suppliers.update');
     Route::get('/suppliers/delete/{id}', [\App\Http\Controllers\SupplierController::class, 'destroy'])->name('suppliers.destroy');
 
+    // |--------------------------------------------------------------------------
+    // | Item Types
+    // |--------------------------------------------------------------------------
+
+    Route::resource('/item-types', \App\Http\Controllers\ItemTypeController::class)->except(['show', 'update', 'destroy']);
+    Route::post('/item-types/{id}', [\App\Http\Controllers\ItemTypeController::class, 'update'])->name('item-types.update');
+    Route::get('/item-types/delete/{id}', [\App\Http\Controllers\ItemTypeController::class, 'destroy'])->name('item-types.destroy');
+
+    // |--------------------------------------------------------------------------
+    // | Items
+    // |--------------------------------------------------------------------------
+
+    Route::resource('/items', \App\Http\Controllers\ItemController::class)->except(['show', 'update', 'destroy']);
+    Route::post('/items/{id}', [\App\Http\Controllers\ItemController::class, 'update'])->name('items.update');
+    Route::get('/items/delete/{id}', [\App\Http\Controllers\ItemController::class, 'destroy'])->name('items.destroy');
 
     // |--------------------------------------------------------------------------
     // | Units

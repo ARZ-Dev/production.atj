@@ -249,6 +249,40 @@
                                 </li>
                                 @endhasAnyPermission
 
+                                @hasAnyPermission(['production.itemType-list', 'production.item-list'])
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="#collapseItems"
+                                        class="pe-nav-link {{ request()->is('admin/item-types*') || request()->is('admin/items*') ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ request()->is('admin/item-types*') || request()->is('admin/items*') ? 'true' : 'false' }}"
+                                        aria-controls="collapseItems">
+                                        <i class="bi bi-box-seam pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Supply Chain</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
+                                    </a>
+
+                                    <ul class="pe-slide-menu collapse" id="collapseItems">
+                                        @hasPermission('production.itemType-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('item-types.index') }}"
+                                                class="pe-nav-link {{ request()->is('admin/item-types*') ? " active" : ""
+                                                }}">
+                                                Item Types
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+                                        @hasPermission('production.item-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('items.index') }}"
+                                                class="pe-nav-link {{ request()->is('admin/items*') ? " active" : ""
+                                                }}">
+                                                Item List
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+                                    </ul>
+                                @endhasAnyPermission
+
 
                                 @hasAnyPermission(['production.shift-list', 'production.eventType-list'])
                                 <li class="pe-slide pe-has-sub">
