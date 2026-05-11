@@ -95,6 +95,8 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::resource('/items', \App\Http\Controllers\ItemController::class)->except(['show', 'update', 'destroy']);
     Route::post('/items/{id}', [\App\Http\Controllers\ItemController::class, 'update'])->name('items.update');
     Route::get('/items/delete/{id}', [\App\Http\Controllers\ItemController::class, 'destroy'])->name('items.destroy');
+    Route::get('/get-item-sub-types/{typeId}', [\App\Http\Controllers\ItemController::class, 'getSubTypes'])->name('items.get-sub-types');
+
 
     // |--------------------------------------------------------------------------
     // | Units

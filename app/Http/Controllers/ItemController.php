@@ -33,6 +33,23 @@ class ItemController extends Controller
         return view('items.create', $data);
     }
 
+    public function getSubTypes($typeId)
+    {
+        if (!$typeId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'item_type_id is required.',
+            ], 422);
+        }
+
+        $subTypes = $this->api->get("/v1/item-sub-types/$typeId")['data'] ?? [];
+
+        return response()->json([
+            'success' => true,
+            'sub_types'    => $subTypes,
+        ]);
+    }
+
     /**
      * Store new item.
      */
@@ -94,9 +111,8 @@ class ItemController extends Controller
         // Fetch sub types filtered by the item's current item_type_id
         $sub_types = [];
         if (!empty($item['item_type_id'])) {
-            $sub_types = $this->api->get('/v1/item-sub-types', [
-                'item_type_id' => $item['item_type_id'],
-            ])['data'] ?? [];
+            $typeId = $item['item_type_id'];
+            $sub_types = $this->api->get("/v1/item-sub-types/$typeId")['data'] ?? [];
         }
 
         $data['item']       = $item;

@@ -233,22 +233,25 @@
     <script>
          $('.selectpicker').selectpicker();
 
-         $('#item_type_id').on('change', function () {
-            const itemTypeId = $(this).val();
-            const $subType   = $('#sub_type_id');
+         $(document).on('change', '#item_type_id', function() {
+             let typeId = $(this).val();
+             let subTypeSelector = $('#sub_type_id');
 
-            $subType.empty().append('<option value="">Select Sub Type</option>');
-            $subType.selectpicker('refresh');
+             subTypeSelector.html('<option value="">Select sub type…</option>').selectpicker('refresh');
 
-            if (!itemTypeId) return;
-
-            $.get('/api/v1/item-sub-types', { item_type_id: itemTypeId }, function (res) {
-                if (res.success && res.data.length) {
-                    res.data.forEach(function (st) {
-                        $subType.append(`<option value="${st.id}">${st.name}</option>`);
-                    });
-                }
-                $subType.selectpicker('refresh');
-            });
-        });
+             if (typeId) {
+                 $.ajax({
+                     url: "{{ route('items.get-sub-types', '%typeId%') }}".replace('%typeId%', typeId),
+                     type: 'GET',
+                     success: function (data) {
+                         setOptions(subTypeSelector, data.sub_types);
+                     },
+                     error: function () {
+                         subTypeSelector.html('<option value="">Error loading sub types</option>').selectpicker('refresh');
+                     }
+                 });
+             } else {
+                 subTypeSelector.html('<option value="">Select neighborhood…</option>').selectpicker('refresh');
+             }
+         })
     </script>
