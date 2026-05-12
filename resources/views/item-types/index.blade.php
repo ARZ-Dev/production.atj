@@ -25,7 +25,7 @@
                         <tr>
                             <td>{{ $item_type['id'] }}</td>
                             <td>{{ $item_type['name'] }}</td>
-                            <td>{{ getRelationName($item_type['groupEntityRelation']) }}</td>
+                            <td>{{ getRelationName($item_type['groupEntityRelation'] ?? null) }}</td>
                             <td>
                                 @if($item_type['has_pos_suppliers'])
                                     <span class="badge bg-success">Yes</span>
