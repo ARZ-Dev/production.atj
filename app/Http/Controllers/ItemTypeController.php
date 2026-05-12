@@ -18,7 +18,9 @@ class ItemTypeController extends Controller
     {
         $data = [];
         $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
-        $data['group_entity_relations'] = $this->api->get('/v1/group-entity-relations', ['module' => 'production'])['data'] ?? [];
+        $data['group_entity_relations'] = $this->api->get('/v1/group-entity-relations')['data'] ?? [];
+
+        // dd($data['group_entity_relations']);
 
         return view('item-types.index', $data);
     }
@@ -29,7 +31,7 @@ class ItemTypeController extends Controller
     public function create()
     {
         $data = [];
-        $data['group_entity_relations'] = $this->api->get('/v1/group-entity-relations', ['module' => 'production'])['data'] ?? [];
+        $data['group_entity_relations'] = $this->api->get('/v1/group-entity-relations')['data'] ?? [];
         $data['route']     = route('item-types.store');
         $data['editing']   = false;
         $data['item_type'] = [];
