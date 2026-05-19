@@ -9,8 +9,7 @@ class ItemController extends Controller
 {
     public function __construct(
         private ApiService $api
-    ) {
-    }
+    ) {}
 
     /**
      * List Items — DataTable page.
@@ -27,13 +26,17 @@ class ItemController extends Controller
     public function create()
     {
         $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
-        $data['sub_types'] = [];
-        $data['route'] = route('items.store');
-        $data['editing'] = false;
+        $data['sub_types']  = [];
+        $data['route']      = route('items.store');
+        $data['editing']    = false;
+        $data['item']       = [];
 
         return view('items.create', $data);
     }
 
+    /**
+     * Fetch sub types for a given item type (AJAX).
+     */
     public function getSubTypes($typeId)
     {
         if (!$typeId) {
@@ -46,7 +49,7 @@ class ItemController extends Controller
         $subTypes = $this->api->get("/v1/item-sub-types/$typeId")['data'] ?? [];
 
         return response()->json([
-            'success' => true,
+            'success'   => true,
             'sub_types' => $subTypes,
         ]);
     }
@@ -57,30 +60,42 @@ class ItemController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'item_type_id' => 'required|integer',
-            'sub_type_id' => 'nullable|integer',
-            'code' => 'required|string|max:255',
-            'name' => 'required|string|max:255',
-            'with_formula' => 'nullable',
-            'weight' => 'nullable|numeric|min:0',
-            'volume' => 'nullable|numeric|min:0',
-            'vat' => 'nullable|numeric|min:0|max:100',
-            'is_active' => 'nullable',
+            'item_type_id'       => 'required|integer',
+            'sub_type_id'        => 'nullable|integer',
+            'code'               => 'required|string|max:255',
+            'name'               => 'required|string|max:255',
+            'with_formula'       => 'nullable',
+            'weight'             => 'nullable|numeric|min:0',
+            'volume'             => 'nullable|numeric|min:0',
+            'vat'                => 'nullable|numeric|min:0|max:100',
+            'is_active'          => 'nullable',
+            'units'              => 'nullable|array',
+            'units.*.name'       => 'required|string|max:255',
+            'units.*.symbol'     => 'required|string|max:50',
+            'units.*.basic'      => 'nullable|boolean',
+            'units.*.is_box'     => 'nullable|boolean',
+            'units.*.box_qty'    => 'nullable|numeric|min:0',
+            'units.*.price_type' => 'nullable|integer',
+            'units.*.formula'    => 'nullable|numeric',
+            'units.*.weight'     => 'nullable|numeric|min:0',
+            'units.*.volume'     => 'nullable|numeric|min:0',
+            'units.*.vat'        => 'nullable|numeric|min:0|max:100',
         ]);
 
         $payload = [
             'item_type_id' => $request->item_type_id,
-            'sub_type_id' => $request->sub_type_id,
-            'code' => $request->code,
-            'name' => $request->name,
+            'sub_type_id'  => $request->sub_type_id,
+            'code'         => $request->code,
+            'name'         => $request->name,
             'with_formula' => $request->boolean('with_formula'),
-            'weight' => $request->weight,
-            'volume' => $request->volume,
-            'vat' => $request->vat,
-            'is_active' => $request->boolean('is_active'),
+            'weight'       => $request->weight,
+            'volume'       => $request->volume,
+            'vat'          => $request->vat,
+            'is_active'    => $request->boolean('is_active'),
+            'units'        => $this->normalizeUnits($request->input('units', [])),
         ];
 
-        $result = $this->api->post('/v1/items', $payload); // ← uncommented
+        $result = $this->api->post('/v1/items', $payload);
 
         if (!($result['success'] ?? false)) {
             return back()->withInput()->withErrors(
@@ -88,9 +103,9 @@ class ItemController extends Controller
             );
         }
 
-        return redirect()->route('items.index')
-            ->with('success', 'Item created successfully.');
+        return redirect()->route('items.index')->with('success', 'Item created successfully.');
     }
+
     /**
      * Show edit form.
      */
@@ -105,18 +120,16 @@ class ItemController extends Controller
 
         $item = $result['data'];
 
-        // Fetch sub types filtered by the item's current item_type_id
         $sub_types = [];
         if (!empty($item['item_type_id'])) {
-            $typeId = $item['item_type_id'];
-            $sub_types = $this->api->get("/v1/item-sub-types/$typeId")['data'] ?? [];
+            $sub_types = $this->api->get("/v1/item-sub-types/{$item['item_type_id']}")['data'] ?? [];
         }
 
-        $data['item'] = $item;
+        $data['item']       = $item;
         $data['item_types'] = $this->api->get('/v1/item-types')['data'] ?? [];
-        $data['sub_types'] = $sub_types;
-        $data['route'] = route('items.update', $id);
-        $data['editing'] = true;
+        $data['sub_types']  = $sub_types;
+        $data['route']      = route('items.update', $id);
+        $data['editing']    = true;
 
         return view('items.create', $data);
     }
@@ -127,28 +140,41 @@ class ItemController extends Controller
     public function update(Request $request, int $id)
     {
         $request->validate([
-            'item_type_id' => 'required|integer',
-            'sub_type_id' => 'nullable|integer',
-            'code' => 'required|string|max:255',
-            'name' => 'required|string|max:255',
-            'with_formula' => 'boolean',
-            'weight' => 'nullable|numeric|min:0',
-            'volume' => 'nullable|numeric|min:0',
-            'vat' => 'nullable|numeric|min:0|max:100',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'is_active' => 'boolean',
+            'item_type_id'       => 'required|integer',
+            'sub_type_id'        => 'nullable|integer',
+            'code'               => 'required|string|max:255',
+            'name'               => 'required|string|max:255',
+            'with_formula'       => 'nullable',
+            'weight'             => 'nullable|numeric|min:0',
+            'volume'             => 'nullable|numeric|min:0',
+            'vat'                => 'nullable|numeric|min:0|max:100',
+            'image'              => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'is_active'          => 'nullable',
+            'units'              => 'nullable|array',
+            'units.*.id'         => 'nullable|integer',
+            'units.*.name'       => 'required|string|max:255',
+            'units.*.symbol'     => 'required|string|max:50',
+            'units.*.basic'      => 'nullable|boolean',
+            'units.*.is_box'     => 'nullable|boolean',
+            'units.*.box_qty'    => 'nullable|numeric|min:0',
+            'units.*.price_type' => 'nullable|integer',
+            'units.*.formula'    => 'nullable|numeric',
+            'units.*.weight'     => 'nullable|numeric|min:0',
+            'units.*.volume'     => 'nullable|numeric|min:0',
+            'units.*.vat'        => 'nullable|numeric|min:0|max:100',
         ]);
 
         $payload = [
             'item_type_id' => $request->item_type_id,
-            'sub_type_id' => $request->sub_type_id,
-            'code' => $request->code,
-            'name' => $request->name,
+            'sub_type_id'  => $request->sub_type_id,
+            'code'         => $request->code,
+            'name'         => $request->name,
             'with_formula' => $request->boolean('with_formula'),
-            'weight' => $request->weight,
-            'volume' => $request->volume,
-            'vat' => $request->vat,
-            'is_active' => $request->boolean('is_active'),
+            'weight'       => $request->weight,
+            'volume'       => $request->volume,
+            'vat'          => $request->vat,
+            'is_active'    => $request->boolean('is_active'),
+            'units'        => $this->normalizeUnits($request->input('units', [])),
         ];
 
         $result = $request->hasFile('image')
@@ -161,8 +187,7 @@ class ItemController extends Controller
             );
         }
 
-        return redirect()->route('items.index')
-            ->with('success', 'Item updated successfully.');
+        return redirect()->route('items.index')->with('success', 'Item updated successfully.');
     }
 
     /**
@@ -170,13 +195,32 @@ class ItemController extends Controller
      */
     public function destroy(int $id)
     {
-        $result = $this->api->get("/v1/items/delete/{$id}");
+        $result = $this->api->delete("/v1/items/{$id}");
 
         if (!($result['success'] ?? false)) {
             return back()->with('error', $result['message'] ?? 'Failed to delete item.');
         }
 
-        return redirect()->route('items.index')
-            ->with('success', 'Item deleted successfully.');
+        return redirect()->route('items.index')->with('success', 'Item deleted successfully.');
+    }
+
+    /**
+     * Normalize units — casts checkbox/radio values from HTML forms correctly.
+     */
+    private function normalizeUnits(array $units): array
+    {
+        return array_map(fn($unit) => [
+            'id'         => $unit['id'] ?? null,
+            'name'       => $unit['name'] ?? '',
+            'symbol'     => $unit['symbol'] ?? '',
+            'basic'      => !empty($unit['basic']) ? 1 : 0,
+            'is_box'     => !empty($unit['is_box']) ? 1 : 0,
+            'box_qty'    => $unit['box_qty'] ?? null,
+            'price_type' => $unit['price_type'] ?? 0,
+            'formula'    => $unit['formula'] ?? null,
+            'weight'     => $unit['weight'] ?? null,
+            'volume'     => $unit['volume'] ?? null,
+            'vat'        => $unit['vat'] ?? null,
+        ], $units);
     }
 }

@@ -49,10 +49,13 @@
                 @endif
               </td>
               <td class="text-center">
-                <a href="{{ route('items.edit', $item['id']) }}" class="btn btn-sm btn-warning" title="Edit Item">
+                <a href="{{ route('items.edit', $item['id']) }}" class="btn btn-light-primary icon-btn-sm"
+                  data-bs-toggle="tooltip" data-bs-custom-class="tooltip-white" data-bs-placement="top"
+                  data-bs-title="Edit">
                   <i class="bi bi-pencil-square"></i>
                 </a>
-                <button type="button" class="btn btn-sm btn-danger delete-item" title="Delete Item"
+                <button type="button" class="btn btn-light-danger icon-btn-sm delete-item" data-bs-toggle="tooltip"
+                  data-bs-custom-class="tooltip-white" data-bs-placement="top" data-bs-title="Delete"
                   data-id="{{ $item['id'] }}" data-name="{{ $item['name'] }}">
                   <i class="bi bi-trash"></i>
                 </button>

@@ -12,41 +12,42 @@
             <div class="table-responsive">
                 <table id="buttons-datatables" class="table table-nowrap table-striped table-bordered w-100">
                     <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Group Entity Relation</th>
-                        <th>Has POS Suppliers</th>
-                        <th>Action</th>
-                    </tr>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Group Entity Relation</th>
+                            <th>Has POS Suppliers</th>
+                            <th>Action</th>
+                        </tr>
                     </thead>
                     <tbody>
-                    @foreach($item_types as $item_type)
+                        @foreach($item_types as $item_type)
                         <tr>
                             <td>{{ $item_type['id'] }}</td>
                             <td>{{ $item_type['name'] }}</td>
                             <td>{{ $item_type['group_entity_relation_name'] ?? null }}</td>
                             <td>
                                 @if($item_type['has_pos_suppliers'] ?? false)
-                                    <span class="badge bg-success">Yes</span>
+                                <span class="badge bg-success">Yes</span>
                                 @else
-                                    <span class="badge bg-danger">No</span>
+                                <span class="badge bg-danger">No</span>
                                 @endif
                             </td>
                             <td class="text-center">
-                                <a href="{{ route('item-types.edit', $item_type['id']) }}" class="btn btn-sm btn-warning" title="Edit Item Type">
+                                <a href="{{ route('item-types.edit', $item_type['id']) }}"
+                                    class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
+                                    data-bs-custom-class="tooltip-white" data-bs-placement="top" data-bs-title="Edit">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
-                                <button type="button"
-                                        class="btn btn-sm btn-danger delete-item-type"
-                                        title="Delete Item Type"
-                                        data-id="{{ $item_type['id'] }}"
-                                        data-name="{{ $item_type['name'] }}">
+                                <button type="button" class="btn btn-light-danger icon-btn-sm delete-item-type"
+                                    data-bs-toggle="tooltip" data-bs-custom-class="tooltip-white"
+                                    data-bs-placement="top" data-bs-title="Delete" data-id="{{ $item_type['id'] }}"
+                                    data-name="{{ $item_type['name'] }}">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </td>
                         </tr>
-                    @endforeach
+                        @endforeach
                     </tbody>
                 </table>
             </div>
