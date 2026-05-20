@@ -5,6 +5,8 @@ use App\Livewire\Events\EventCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Plans\PlanView;
+use App\Livewire\PreperationItems\PreperationItemCreate;
+use App\Livewire\PreperationItems\PreperationItemIndex;
 use App\Livewire\RawMaterialRequests\RawMaterialRequestCreate;
 use App\Livewire\RawMaterialRequests\RawMaterialRequestIndex;
 use App\Livewire\RawMaterials\RawMaterialCreate;
@@ -207,6 +209,20 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/approve-load/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.approve-load');
         Route::get('/approve-receive/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.approve-receive');
     });
+
+
+    // |--------------------------------------------------------------------------
+    // | Preperation Items
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'preperation-items'], function () {
+        Route::get('/', PreperationItemIndex::class)->name('preperation-items');
+        Route::get('/create', PreperationItemCreate::class)->name('preperation-items.create');
+        Route::get('/edit/{id}', PreperationItemCreate::class)->name('preperation-items.edit');
+        Route::get('/view/{id}', PreperationItemCreate::class)->name('preperation-items.view');
+
+    });
+
 
     // |--------------------------------------------------------------------------
     // | Shift

@@ -265,8 +265,8 @@
                                         @hasPermission('production.itemType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('item-types.index') }}"
-                                                class="pe-nav-link {{ request()->is('admin/item-types*') ? " active" : ""
-                                                }}">
+                                                class="pe-nav-link {{ request()->is('admin/item-types*') ? " active"
+                                                : "" }}">
                                                 Item Types
                                             </a>
                                         </li>
@@ -281,7 +281,37 @@
                                         </li>
                                         @endhasPermission
                                     </ul>
+                                </li>
                                 @endhasAnyPermission
+
+
+                                @hasAnyPermission(['preperationItem-list'])
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="#collapsePreperationItems"
+                                        class="pe-nav-link {{ request()->is('admin/preperation-items*')  ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ request()->is('admin/preperation-items*')  ? 'true' : 'false' }}"
+                                        aria-controls="collapsePreperationItems">
+                                        <i class="bi bi-diagram-2 pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Preperation Items</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
+                                    </a>
+
+                                    <ul class="pe-slide-menu collapse" id="collapsePreperationItems">
+                                        @hasPermission('production.preperationItem-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('preperation-items') }}"
+                                                class="pe-nav-link {{ request()->is('admin/preperation-items*') ? "
+                                                active" : "" }}">
+                                                Preperation Items List
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                    </ul>
+                                </li>
+                                @endhasAnyPermission
+
 
 
                                 @hasAnyPermission(['production.shift-list', 'production.eventType-list'])
@@ -321,7 +351,7 @@
                                     </ul>
                                 </li>
                                 @endhasAnyPermission
-                                
+
                                 <li class="pe-slide pe-has-sub">
                                     <a href="{{ route('plans') }}"
                                         class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? "
