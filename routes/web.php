@@ -13,6 +13,8 @@ use App\Livewire\RawMaterials\RawMaterialCreate;
 use App\Livewire\RawMaterials\RawMaterialIndex;
 use App\Livewire\RawMaterialStockIn\RawMaterialStockInCreate;
 use App\Livewire\RawMaterialStockIn\RawMaterialStockInIndex;
+use App\Livewire\Recipes\RecipeCreate;
+use App\Livewire\Recipes\RecipeIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\Shifts\ShiftIndex;
 use App\Http\Controllers\Auth\AuthCallbackController;
@@ -222,6 +224,23 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/view/{id}', PreperationItemCreate::class)->name('preperation-items.view');
 
     });
+
+
+
+    // |--------------------------------------------------------------------------
+    // | Recipes
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'recipes'], function () {
+        Route::get('/', RecipeIndex::class)->name('recipes');
+        Route::get('/create', RecipeCreate::class)->name('recipes.create');
+        Route::get('/edit/{id}', RecipeCreate::class)->name('recipes.edit');
+        Route::get('/view/{id}', RecipeCreate::class)->name('recipes.view');
+
+    });
+
+
+
 
 
     // |--------------------------------------------------------------------------

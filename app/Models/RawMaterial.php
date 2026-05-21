@@ -26,4 +26,9 @@ class RawMaterial extends Model
     {
         return $this->hasMany(ReportRawMaterial::class, 'raw_material_id');
     }
+
+    public function recipeInputs()
+    {
+        return $this->hasMany(RecipeInput::class, 'raw_material_id');
+    }
 }

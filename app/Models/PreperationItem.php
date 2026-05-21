@@ -17,4 +17,13 @@ class PreperationItem extends Model
     {
         return $this->hasMany(PreperationItemUnit::class);
     }
+
+    public function recipes()
+    {
+        return $this->hasMany(Recipe::class);
+    }
+    public function recipeInputs()
+    {
+        return $this->hasMany(RecipeInput::class);
+    }
 }

@@ -285,7 +285,7 @@
                                 @endhasAnyPermission
 
 
-                                @hasAnyPermission(['preperationItem-list'])
+                                @hasAnyPermission(['production.preperationItem-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapsePreperationItems"
                                         class="pe-nav-link {{ request()->is('admin/preperation-items*')  ? 'active' : '' }}"
@@ -309,6 +309,17 @@
                                         @endhasPermission
 
                                     </ul>
+                                </li>
+                                @endhasAnyPermission
+
+                                @hasAnyPermission(['production.recipe-list'])
+                                <li class="pe-slide pe-has-sub">
+                                    <a href="{{ route('recipes') }}"
+                                        class="pe-nav-link {{ request()->is('admin/recipes*') ? "
+                                        active" : "" }}">
+                                        <i class="bi bi-beaker pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Recipes</span>
+                                    </a>
                                 </li>
                                 @endhasAnyPermission
 

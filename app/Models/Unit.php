@@ -21,4 +21,9 @@ class Unit extends Model
     {
         return $this->hasMany(ReportRawMaterial::class, 'unit_id');
     }
+
+    public function recipeInputs()
+    {
+        return $this->hasMany(RecipeInput::class,'raw_material_unit_id');
+    }
 }

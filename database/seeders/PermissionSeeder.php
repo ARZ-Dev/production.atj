@@ -103,6 +103,13 @@ class PermissionSeeder extends Seeder
             'preperationItem-edit',
             'preperationItem-view',
             'preperationItem-delete',
+           
+            // Recipe Page
+            'recipe-list',
+            'recipe-create',
+            'recipe-edit',
+            'recipe-view',
+            'recipe-delete',
 
         ];
         
