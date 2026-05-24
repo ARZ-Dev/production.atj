@@ -2,259 +2,87 @@
 
 namespace App\Livewire\Events;
 
-use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventType;
-use Livewire\Attributes\On;
+use App\Models\Plan;
+use Carbon\Carbon;
 use Livewire\Component;
 
 class EventCreate extends Component
 {
-    public $company_id = null;
-    public $companies = [];
-    public $eventTypes = [];
-
-    public $events = [];
     public $planId;
-
+    public $plan;
+    public $eventTypes = [];
+    public $events = [];
     public $removedEventIds = [];
-    public $pendingRemoveIndex = null;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Lifecycle
-    |--------------------------------------------------------------------------
-    */
-
-    public function mount($planId)
+    public function mount($planId): void
     {
-        $this->planId = $planId;
+        authorizeRequest('production.event-create');
 
-        if (authUser()->hasRole('Super Admin')) {
-            $this->companies = Company::orderBy('name')->get();
-        } else {
-            $this->company_id = authUser()->company_id;
-            $this->eventTypes = EventType::where('company_id', authUser()->company_id)->get();
-        }
+        $this->planId     = $planId;
+        $this->plan       = Plan::with('shift')->findOrFail($planId);
+        $this->eventTypes = EventType::orderBy('name')->get();
 
         $this->loadExistingEvents();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Load Existing Events (Edit Mode)
-    |--------------------------------------------------------------------------
-    */
-
-    public function loadExistingEvents()
+    public function loadExistingEvents(): void
     {
-        $existingEvents = Event::where('plan_id', $this->planId)->get();
+        $existing = Event::where('plan_id', $this->planId)->get();
 
-        if ($existingEvents->isEmpty()) {
+        if ($existing->isEmpty()) {
             $this->addEventRow();
             return;
         }
 
-        // Super Admin: set company from existing events
-        if (authUser()->hasRole('Super Admin') && $existingEvents->first()) {
-            $this->company_id = $existingEvents->first()->company_id;
-            $this->eventTypes = EventType::where('company_id', $this->company_id)->get();
-        }
-
-        foreach ($existingEvents as $event) {
-            $type = $this->eventTypes->firstWhere('id', $event->event_type_id);
-            $hasRecipe = $type ? (bool) $type->has_recipe : false;
-
-            // Get base duration: from recipe if has_recipe, otherwise from event type
-            if ($hasRecipe && $event->recipe_id) {
-                $recipe = \App\Models\Recipe::find($event->recipe_id);
-                $baseDuration = $recipe ? (int) $recipe->duration : 0;
-            } else {
-                $baseDuration = $type ? (int) $type->duration : 0;
-            }
-
-            $calculatedDuration = (int) $event->calculated_duration;
-            $batchCount = ($hasRecipe && $baseDuration > 0)
-                ? max(1, intdiv($calculatedDuration, $baseDuration))
-                : 1;
-
-            $fromTime = $event->from_time
-                ? \Carbon\Carbon::parse($event->from_time)->format('H:i')
-                : '';
-            $toTime = $event->to_time
-                ? \Carbon\Carbon::parse($event->to_time)->format('H:i')
-                : '';
-
+        foreach ($existing as $event) {
             $this->events[] = [
-                'id'             => $event->id,
-                'event_type_id'  => $event->event_type_id,
-                'recipe_id'      => $event->recipe_id,
-                'name'           => $event->name,
-                'has_recipe'     => $hasRecipe,
-                'duration'       => $baseDuration,
-                'batch_count'    => $batchCount,
-                'total_duration' => $calculatedDuration,
-                'from_time'      => $fromTime,
-                'to_time'        => $toTime,
+                'id'            => $event->id,
+                'event_type_id' => $event->event_type_id,
+                'from_time'     => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : '',
+                'to_time'       => $event->to_time   ? Carbon::parse($event->to_time)->format('H:i')   : '',
+                'description'   => $event->description ?? '',
             ];
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Company Change (Super Admin)
-    |--------------------------------------------------------------------------
-    */
-
-    #[On('getEventTypes')]
-    public function getEventTypes($companyId)
-    {
-        $this->company_id = $companyId;
-        $this->eventTypes = EventType::where('company_id', $this->company_id)->get();
-
-        $this->events = [];
-        $this->removedEventIds = [];
-        $this->addEventRow();
-
-        $this->dispatch('setEventTypes', $this->eventTypes);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Add / Remove Event Rows
-    |--------------------------------------------------------------------------
-    */
-
-    public function addEventRow()
+    public function addEventRow(): void
     {
         $this->events[] = [
-            'id'             => null,
-            'event_type_id'  => null,
-            'recipe_id'      => null,
-            'name'           => '',
-            'has_recipe'     => false,
-            'duration'       => 0,
-            'batch_count'    => 1,
-            'total_duration' => 0,
-            'from_time'      => '',
-            'to_time'        => '',
+            'id'            => null,
+            'event_type_id' => null,
+            'from_time'     => '',
+            'to_time'       => '',
+            'description'   => '',
         ];
     }
 
-   public function removeEventRow($index)
-{
-    $event = $this->events[$index] ?? null;
-
-    if (!$event) {
-        return;
-    }
-
-    if (!empty($event['id'])) {
-        $this->removedEventIds[] = $event['id'];
-    }
-
-    unset($this->events[$index]);
-    $this->events = array_values($this->events);
-}
-
-    /*
-    |--------------------------------------------------------------------------
-    | Event Type Changed
-    |--------------------------------------------------------------------------
-    */
-
-    public function onEventTypeChanged($index, $eventTypeId)
+    public function removeEventRow(int $index): void
     {
-        $type = collect($this->eventTypes)->firstWhere('id', (int) $eventTypeId);
+        $event = $this->events[$index] ?? null;
 
-        if (!$type) {
+        if (!$event) {
             return;
         }
 
-        $hasRecipe = (bool) $type['has_recipe'];
-
-        $this->events[$index]['event_type_id'] = $eventTypeId;
-        $this->events[$index]['has_recipe']    = $hasRecipe;
-        $this->events[$index]['name']          = $type['name'];
-
-        if ($hasRecipe) {
-            $recipe = \App\Models\Recipe::find($type['recipe_id']);
-            $this->events[$index]['recipe_id'] = $recipe?->id;
-            $this->events[$index]['duration']  = $recipe?->duration ?? 0;
-        } else {
-            $this->events[$index]['recipe_id'] = null;
-            $this->events[$index]['duration']  = $type['duration'] ?? 0;
+        if (!empty($event['id'])) {
+            $this->removedEventIds[] = $event['id'];
         }
 
-        $this->events[$index]['batch_count'] = 1;
-
-        $this->recalculate($index);
+        unset($this->events[$index]);
+        $this->events = array_values($this->events);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Auto-Recalculate on Field Update
-    |--------------------------------------------------------------------------
-    */
-
-    public function updatedEvents($value, $key)
-    {
-        $parts = explode('.', $key);
-        if (count($parts) === 2) {
-            $index = (int) $parts[0];
-            $field = $parts[1];
-
-            if (in_array($field, ['batch_count', 'from_time'])) {
-                $this->recalculate($index);
-            }
-        }
-    }
-
-    public function recalculate($index)
-    {
-        $event = &$this->events[$index];
-
-        $duration   = (int) $event['duration'];
-        $batchCount = max(1, (int) ($event['batch_count'] ?? 1));
-
-        $event['total_duration'] = $event['has_recipe']
-            ? $duration * $batchCount
-            : $duration;
-
-        if (!empty($event['from_time'])) {
-            try {
-                $from = \Carbon\Carbon::createFromFormat('H:i', $event['from_time']);
-                $to   = $from->copy()->addMinutes($event['total_duration']);
-                $event['to_time'] = $to->format('H:i');
-            } catch (\Exception $e) {
-                $event['to_time'] = '';
-            }
-        } else {
-            $event['to_time'] = '';
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Validation
-    |--------------------------------------------------------------------------
-    */
-
-    protected function rules()
+    protected function rules(): array
     {
         $rules = [];
 
-        if (authUser()->hasRole('Super Admin')) {
-            $rules['company_id'] = 'required|exists:companies,id';
-        }
-
         foreach ($this->events as $index => $event) {
-            $rules["events.{$index}.event_type_id"] = 'required';
-            $rules["events.{$index}.name"]           = 'required|string|max:255';
+            $rules["events.{$index}.event_type_id"] = 'required|exists:event_types,id';
             $rules["events.{$index}.from_time"]      = 'required|date_format:H:i';
-            if (!empty($event['has_recipe'])) {
-                $rules["events.{$index}.batch_count"] = 'required|integer|min:1';
-            }
+            $rules["events.{$index}.to_time"]        = 'nullable|date_format:H:i';
+            $rules["events.{$index}.description"]    = 'nullable|string|max:1000';
         }
 
         return $rules;
@@ -262,104 +90,140 @@ class EventCreate extends Component
 
     protected $messages = [
         'events.*.event_type_id.required' => 'Event type is required.',
-        'events.*.name.required'          => 'Event name is required.',
+        'events.*.event_type_id.exists'   => 'Selected event type is invalid.',
         'events.*.from_time.required'     => 'From time is required.',
-        'events.*.batch_count.required'   => 'Batch count is required.',
-        'events.*.batch_count.min'        => 'Batch count must be at least 1.',
+        'events.*.from_time.date_format'  => 'Invalid time format (H:i).',
+        'events.*.to_time.date_format'    => 'Invalid time format (H:i).',
     ];
 
-    /**
-     * Check for time overlaps between events.
-     * Event A conflicts with Event B if A starts before B ends AND B starts before A ends.
-     */
-    public function validateTimeConflicts()
+    private function validateShiftTimes(): bool
     {
-        $errors = [];
+        if (!$this->plan->shift) {
+            return true;
+        }
 
-        // Build time ranges for each event
-        $ranges = [];
+        $shiftFrom  = Carbon::parse($this->plan->shift->from_time);
+        $shiftTo    = Carbon::parse($this->plan->shift->to_time);
+        $shiftLabel = $shiftFrom->format('H:i') . ' – ' . $shiftTo->format('H:i');
+        $hasErrors  = false;
+
         foreach ($this->events as $index => $event) {
-            if (empty($event['from_time']) || empty($event['to_time'])) {
+            if (empty($event['from_time'])) {
                 continue;
             }
 
-            $ranges[] = [
-                'index' => $index,
-                'name'  => $event['name'] ?: 'Event #' . ($index + 1),
-                'from'  => \Carbon\Carbon::createFromFormat('H:i', $event['from_time']),
-                'to'    => \Carbon\Carbon::createFromFormat('H:i', $event['to_time']),
-            ];
-        }
+            $eventFrom = Carbon::parse($event['from_time']);
+            $eventTo   = !empty($event['to_time']) ? Carbon::parse($event['to_time']) : null;
 
-        // Compare each pair
-        for ($i = 0; $i < count($ranges); $i++) {
-            for ($j = $i + 1; $j < count($ranges); $j++) {
-                $a = $ranges[$i];
-                $b = $ranges[$j];
+            if ($eventFrom->lt($shiftFrom) || $eventFrom->gt($shiftTo)) {
+                $this->addError("events.{$index}.from_time", "Must be within shift hours ({$shiftLabel}).");
+                $hasErrors = true;
+            }
 
-                // Overlap: A starts before B ends AND B starts before A ends
-                if ($a['from']->lt($b['to']) && $b['from']->lt($a['to'])) {
-                    $errors["events.{$a['index']}.from_time"] = "Time conflict: \"{$a['name']}\" ({$a['from']->format('H:i')}–{$a['to']->format('H:i')}) overlaps with \"{$b['name']}\" ({$b['from']->format('H:i')}–{$b['to']->format('H:i')}).";
-                    $errors["events.{$b['index']}.from_time"] = "Time conflict: \"{$b['name']}\" ({$b['from']->format('H:i')}–{$b['to']->format('H:i')}) overlaps with \"{$a['name']}\" ({$a['from']->format('H:i')}–{$a['to']->format('H:i')}).";
+            if ($eventTo) {
+                if ($eventTo->gt($shiftTo)) {
+                    $this->addError("events.{$index}.to_time", "Must be within shift hours ({$shiftLabel}).");
+                    $hasErrors = true;
+                }
+                if ($eventTo->lte($eventFrom)) {
+                    $this->addError("events.{$index}.to_time", 'Must be after the from time.');
+                    $hasErrors = true;
                 }
             }
         }
 
-        if (!empty($errors)) {
-            foreach ($errors as $field => $message) {
-                $this->addError($field, $message);
-            }
-
-            $this->dispatch('swal:error', [
-                'title' => 'Time Conflict',
-                'text'  => 'Some events have overlapping times. Please fix the conflicts before saving.',
-            ]);
-
-            throw new \Illuminate\Validation\ValidationException(
-                validator: \Illuminate\Support\Facades\Validator::make([], []),
-                response: null
-            );
-        }
+        return !$hasErrors;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Submit (Create + Update + Delete)
-    |--------------------------------------------------------------------------
-    */
+    private function validateNoOverlap(): bool
+    {
+        $count     = count($this->events);
+        $hasErrors = false;
 
-    public function submit()
+        for ($i = 0; $i < $count; $i++) {
+            $a = $this->events[$i];
+            if (empty($a['from_time'])) {
+                continue;
+            }
+
+            $aFrom = Carbon::parse($a['from_time']);
+            $aTo   = !empty($a['to_time']) ? Carbon::parse($a['to_time']) : null;
+
+            for ($j = $i + 1; $j < $count; $j++) {
+                $b = $this->events[$j];
+                if (empty($b['from_time'])) {
+                    continue;
+                }
+
+                $bFrom = Carbon::parse($b['from_time']);
+                $bTo   = !empty($b['to_time']) ? Carbon::parse($b['to_time']) : null;
+
+                $overlaps = false;
+
+                if ($aTo && $bTo) {
+                    // Both have ranges: overlap when aFrom < bTo AND bFrom < aTo
+                    $overlaps = $aFrom->lt($bTo) && $bFrom->lt($aTo);
+                } elseif ($aTo) {
+                    // A is a range, B is a point
+                    $overlaps = $bFrom->gte($aFrom) && $bFrom->lt($aTo);
+                } elseif ($bTo) {
+                    // B is a range, A is a point
+                    $overlaps = $aFrom->gte($bFrom) && $aFrom->lt($bTo);
+                } else {
+                    // Both are points — overlap only if identical
+                    $overlaps = $aFrom->eq($bFrom);
+                }
+
+                if ($overlaps) {
+                    $this->addError(
+                        "events.{$i}.from_time",
+                        "Event #" . ($i + 1) . " overlaps with event #" . ($j + 1) . "."
+                    );
+                    $this->addError(
+                        "events.{$j}.from_time",
+                        "Event #" . ($j + 1) . " overlaps with event #" . ($i + 1) . "."
+                    );
+                    $hasErrors = true;
+                }
+            }
+        }
+
+        return !$hasErrors;
+    }
+
+    public function submit(): void
     {
         $this->validate();
-        $this->validateTimeConflicts();
 
-        $companyId = authUser()->hasRole('Super Admin')
-            ? $this->company_id
-            : authUser()->company_id;
+        if (!$this->validateShiftTimes()) {
+            return;
+        }
+
+        if (!$this->validateNoOverlap()) {
+            return;
+        }
+
+        $typeNames = EventType::whereIn('id',
+            array_filter(array_column($this->events, 'event_type_id'))
+        )->pluck('name', 'id');
 
         try {
             \DB::beginTransaction();
 
-            // 1) Delete removed events
             if (!empty($this->removedEventIds)) {
                 Event::whereIn('id', $this->removedEventIds)
                     ->where('plan_id', $this->planId)
                     ->delete();
             }
 
-            // 2) Update existing or create new
             foreach ($this->events as $event) {
                 $data = [
-                    'company_id'          => $companyId,
-                    'plan_id'             => $this->planId,
-                    'event_type_id'       => $event['event_type_id'],
-                    'recipe_id'           => $event['recipe_id'] ?? null,
-                    'name'                => $event['name'],
-                    'planned_duration'    => $event['duration'],
-                    'batch_count'         => $event['batch_count'] ?? null,
-                    'calculated_duration' => $event['total_duration'],
-                    'from_time'           => $event['from_time'] ?: null,
-                    'to_time'             => $event['to_time'] ?: null,
+                    'plan_id'       => $this->planId,
+                    'event_type_id' => $event['event_type_id'],
+                    'name'          => $typeNames[$event['event_type_id']] ?? '',
+                    'from_time'     => $event['from_time'],
+                    'to_time'       => $event['to_time'] ?: null,
+                    'description'   => $event['description'] ?: null,
                 ];
 
                 if (!empty($event['id'])) {
@@ -374,19 +238,14 @@ class EventCreate extends Component
             \DB::commit();
             $this->removedEventIds = [];
 
-            return redirect()->route('plans')->with('success', 'Events saved successfully.');
+            redirect()->route('plans.view', $this->planId)
+                ->with('success', 'Events saved successfully.');
 
         } catch (\Exception $e) {
             \DB::rollBack();
             session()->flash('error', 'Failed to save events: ' . $e->getMessage());
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Render
-    |--------------------------------------------------------------------------
-    */
 
     public function render()
     {

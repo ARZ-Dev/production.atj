@@ -30,3 +30,4 @@
 {{-- filepond --}}
 <link rel="stylesheet" href="{{ asset('assets/libs/filepond/filepond.css') }}">
 <link rel="stylesheet" href="{{ asset('assets/libs/filepond/filepond-plugin-image-preview.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/css/production.css') }}">

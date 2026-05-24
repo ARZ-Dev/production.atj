@@ -17,16 +17,6 @@ class Event extends Model
         return $this->belongsTo(EventType::class);
     }
 
-    public function recipe()
-    {
-        return $this->belongsTo(Recipe::class);
-    }
-
-    public function shifts()
-    {
-        return $this->hasMany(Shift::class);
-    }
-
     public function plan()
     {
         return $this->belongsTo(Plan::class);
