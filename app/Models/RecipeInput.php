@@ -6,17 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Recipe extends Model
+class RecipeInput extends Model
 {
-
     use HasFactory, SoftDeletes;
+
     protected $guarded = [];
 
-    public function inputs()
+    public function recipe()
     {
-        return $this->hasMany(RecipeInput::class);
+        return $this->belongsTo(Recipe::class);
     }
-
     public function preperationItem()
     {
         return $this->belongsTo(PreperationItem::class);
@@ -26,6 +25,5 @@ class Recipe extends Model
     {
         return $this->belongsTo(PreperationItemUnit::class);
     }
-
 
 }

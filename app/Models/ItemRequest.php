@@ -6,26 +6,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Recipe extends Model
+class ItemRequest extends Model
 {
-
     use HasFactory, SoftDeletes;
+
     protected $guarded = [];
 
     public function inputs()
     {
-        return $this->hasMany(RecipeInput::class);
+        return $this->hasMany(ItemRequestInput::class, 'request_id');
     }
 
-    public function preperationItem()
+    public function reportRawMaterials()
     {
-        return $this->belongsTo(PreperationItem::class);
+        return $this->hasMany(ReportRawMaterial::class, 'raw_material_request_id');
     }
-
-    public function preperationItemUnit()
-    {
-        return $this->belongsTo(PreperationItemUnit::class);
-    }
-
 
 }

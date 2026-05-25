@@ -3,26 +3,24 @@
 use App\Livewire\DashboardView;
 use App\Livewire\Events\EventCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
+use App\Livewire\ItemRequests\ItemRequestCreate;
+use App\Livewire\ItemRequests\ItemRequestIndex;
 use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Plans\PlanView;
-use App\Livewire\RawMaterialRequests\RawMaterialRequestCreate;
-use App\Livewire\RawMaterialRequests\RawMaterialRequestIndex;
-use App\Livewire\RawMaterials\RawMaterialCreate;
-use App\Livewire\RawMaterials\RawMaterialIndex;
-use App\Livewire\RawMaterialStockIn\RawMaterialStockInCreate;
-use App\Livewire\RawMaterialStockIn\RawMaterialStockInIndex;
+use App\Livewire\StockIn\StockInCreate;
+use App\Livewire\StockIn\StockInIndex;
+use App\Livewire\Recipes\RecipeCreate;
+use App\Livewire\Recipes\RecipeIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\Shifts\ShiftIndex;
 use App\Http\Controllers\Auth\AuthCallbackController;
-use App\Livewire\RawMaterialStockOut\RawMaterialStockOutCreate;
-use App\Livewire\RawMaterialStockOut\RawMaterialStockOutIndex;
-use App\Livewire\RawMaterialTransfer\RawMaterialTransferCreate;
-use App\Livewire\RawMaterialTransfer\RawMaterialTransferIndex;
-use App\Livewire\Units\UnitCreate;
-use App\Livewire\Units\UnitIndex;
-use App\Livewire\RawMaterialWarehouseInventory\RawMaterialWarehouseInventoryIndex;
-use App\Livewire\RawMaterialWaste\RawMaterialWasteCreate;
-use App\Livewire\RawMaterialWaste\RawMaterialWasteIndex;
+use App\Livewire\StockOut\StockOutCreate;
+use App\Livewire\StockOut\StockOutIndex;
+use App\Livewire\Transfer\TransferCreate;
+use App\Livewire\Transfer\TransferIndex;
+use App\Livewire\WarehouseInventory\WarehouseInventoryIndex;
+use App\Livewire\Waste\WasteCreate;
+use App\Livewire\Waste\WasteIndex;
 use Illuminate\Support\Facades\Route;
 
 
@@ -99,34 +97,13 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
 
     // |--------------------------------------------------------------------------
-    // | Units
+    // | Item Requests
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'units'], function () {
-        Route::get('/', UnitIndex::class)->name('units');
-        Route::get('/create', UnitCreate::class)->name('units.create');
-        Route::get('/edit/{id}', UnitCreate::class)->name('units.edit');
-    });
-
-    // |--------------------------------------------------------------------------
-    // | Raw Materials
-    // |--------------------------------------------------------------------------
-
-    Route::group(['prefix' => 'raw-materials'], function () {
-        Route::get('/', RawMaterialIndex::class)->name('raw-materials');
-        Route::get('/create', RawMaterialCreate::class)->name('raw-materials.create');
-        Route::get('/edit/{id}', RawMaterialCreate::class)->name('raw-materials.edit');
-    });
-
-
-    // |--------------------------------------------------------------------------
-    // | Raw Material Requests
-    // |--------------------------------------------------------------------------
-
-    Route::group(['prefix' => 'raw-material-requests'], function () {
-        Route::get('/', RawMaterialRequestIndex::class)->name('raw-material-requests');
-        Route::get('/create', RawMaterialRequestCreate::class)->name('raw-material-requests.create');
-        Route::get('/edit/{id}', RawMaterialRequestCreate::class)->name('raw-material-requests.edit');
+    Route::group(['prefix' => 'item-requests'], function () {
+        Route::get('/', ItemRequestIndex::class)->name('item-requests');
+        Route::get('/create', ItemRequestCreate::class)->name('item-requests.create');
+        Route::get('/edit/{id}', ItemRequestCreate::class)->name('item-requests.edit');
     });
 
     Route::resource('/suppliers', \App\Http\Controllers\SupplierController::class)->except(['show', 'update', 'destroy']);
@@ -140,26 +117,16 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::get('/municipalities/{provinceId}', [\App\Http\Controllers\SupplierController::class, 'getMunicipalities'])->name('get-municipalities');
     Route::get('/neighborhoods/{municipalityId}', [\App\Http\Controllers\SupplierController::class, 'getNeighborhoods'])->name('get-neighborhoods');
 
-    // |--------------------------------------------------------------------------
-    // | Units
-    // |--------------------------------------------------------------------------
-
-    Route::group(['prefix' => 'units'], function () {
-        Route::get('/', UnitIndex::class)->name('units');
-        Route::get('/create', UnitCreate::class)->name('units.create');
-        Route::get('/edit/{id}', UnitCreate::class)->name('units.edit');
-    });
-
 
     // |--------------------------------------------------------------------------
     // | Stock Ins
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'raw-material-stock-ins'], function () {
-        Route::get('/', RawMaterialStockInIndex::class)->name('raw-material-stock-ins');
-        Route::get('/create', RawMaterialStockInCreate::class)->name('raw-material-stock-ins.create');
-        Route::get('/edit/{id}', RawMaterialStockInCreate::class)->name('raw-material-stock-ins.edit');
-        Route::get('/view/{id}/{viewStatus}', RawMaterialStockInCreate::class)->name('raw-material-stock-ins.view');
+    Route::group(['prefix' => 'item-stock-ins'], function () {
+        Route::get('/', StockInIndex::class)->name('item-stock-ins');
+        Route::get('/create', StockInCreate::class)->name('item-stock-ins.create');
+        Route::get('/edit/{id}', StockInCreate::class)->name('item-stock-ins.edit');
+        Route::get('/view/{id}/{viewStatus}', StockInCreate::class)->name('item-stock-ins.view');
 
     });
 
@@ -167,11 +134,11 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Stock Outs
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'raw-material-stock-outs'], function () {
-        Route::get('/', RawMaterialStockOutIndex::class)->name('raw-material-stock-outs');
-        Route::get('/create', RawMaterialStockOutCreate::class)->name('raw-material-stock-outs.create');
-        Route::get('/edit/{id}', RawMaterialStockOutCreate::class)->name('raw-material-stock-outs.edit');
-        Route::get('/view/{id}/{viewStatus}', RawMaterialStockOutCreate::class)->name('raw-material-stock-outs.view');
+    Route::group(['prefix' => 'item-stock-outs'], function () {
+        Route::get('/', StockOutIndex::class)->name('item-stock-outs');
+        Route::get('/create', StockOutCreate::class)->name('item-stock-outs.create');
+        Route::get('/edit/{id}', StockOutCreate::class)->name('item-stock-outs.edit');
+        Route::get('/view/{id}/{viewStatus}', StockOutCreate::class)->name('item-stock-outs.view');
 
     });
 
@@ -179,11 +146,11 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Waste
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'raw-material-wastes'], function () {
-        Route::get('/', RawMaterialWasteIndex::class)->name('raw-material-wastes');
-        Route::get('/create', RawMaterialWasteCreate::class)->name('raw-material-wastes.create');
-        Route::get('/edit/{id}', RawMaterialWasteCreate::class)->name('raw-material-wastes.edit');
-        Route::get('/view/{id}/{viewStatus}', RawMaterialWasteCreate::class)->name('raw-material-wastes.view');
+    Route::group(['prefix' => 'item-wastes'], function () {
+        Route::get('/', WasteIndex::class)->name('item-wastes');
+        Route::get('/create', WasteCreate::class)->name('item-wastes.create');
+        Route::get('/edit/{id}', WasteCreate::class)->name('item-wastes.edit');
+        Route::get('/view/{id}/{viewStatus}', WasteCreate::class)->name('item-wastes.view');
 
     });
 
@@ -191,22 +158,40 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // | Warehouse Inventory
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'raw-material-warehouse-inventory'], function () {
-        Route::get('/', RawMaterialWarehouseInventoryIndex::class)->name('raw-material-warehouse-inventory');
+    Route::group(['prefix' => 'item-warehouse-inventory'], function () {
+        Route::get('/', WarehouseInventoryIndex::class)->name('item-warehouse-inventory');
     });
 
     // |---------------------------------------------------------------------------
     // | Transfers
     // |--------------------------------------------------------------------------
 
-    Route::group(['prefix' => 'raw-material-transfers'], function () {
-        Route::get('/', RawMaterialTransferIndex::class)->name('raw-material-transfers');
-        Route::get('/create', RawMaterialTransferCreate::class)->name('raw-material-transfers.create');
-        Route::get('/edit/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.edit');
-        Route::get('/view/{id}/{viewStatus}', RawMaterialTransferCreate::class)->name('raw-material-transfers.view');
-        Route::get('/approve-load/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.approve-load');
-        Route::get('/approve-receive/{id}', RawMaterialTransferCreate::class)->name('raw-material-transfers.approve-receive');
+    Route::group(['prefix' => 'item-transfers'], function () {
+        Route::get('/', TransferIndex::class)->name('item-transfers');
+        Route::get('/create', TransferCreate::class)->name('item-transfers.create');
+        Route::get('/edit/{id}', TransferCreate::class)->name('item-transfers.edit');
+        Route::get('/view/{id}/{viewStatus}', TransferCreate::class)->name('item-transfers.view');
+        Route::get('/approve-load/{id}', TransferCreate::class)->name('item-transfers.approve-load');
+        Route::get('/approve-receive/{id}', TransferCreate::class)->name('item-transfers.approve-receive');
     });
+
+
+
+    // |--------------------------------------------------------------------------
+    // | Recipes
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'recipes'], function () {
+        Route::get('/', RecipeIndex::class)->name('recipes');
+        Route::get('/create', RecipeCreate::class)->name('recipes.create');
+        Route::get('/edit/{id}', RecipeCreate::class)->name('recipes.edit');
+        Route::get('/view/{id}', RecipeCreate::class)->name('recipes.view');
+
+    });
+
+
+
+
 
     // |--------------------------------------------------------------------------
     // | Shift

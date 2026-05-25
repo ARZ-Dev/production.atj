@@ -46,4 +46,10 @@ class Constants
         "rejected" => "danger"
     ];
 
+
+      public const BusinessPrice = 1;
+    public const PosPrice = 2;
+    public const AllPrice = 3;
+
+
 }

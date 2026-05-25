@@ -97,6 +97,20 @@ class PermissionSeeder extends Seeder
             'eventType-view',
             'eventType-delete',
 
+            // Preperation Items Page
+            'preperationItem-list',
+            'preperationItem-create',
+            'preperationItem-edit',
+            'preperationItem-view',
+            'preperationItem-delete',
+           
+            // Recipe Page
+            'recipe-list',
+            'recipe-create',
+            'recipe-edit',
+            'recipe-view',
+            'recipe-delete',
+
         ];
         
         $permissionsIds = [];
