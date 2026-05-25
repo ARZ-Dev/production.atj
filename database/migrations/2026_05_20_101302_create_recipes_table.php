@@ -14,8 +14,8 @@ return new class extends Migration {
             $table->id();
             $table->tinyInteger('recipe_type'); // 1 = Preperation - 2 = Production
             $table->string('name');
-            $table->foreignId('preperation_item_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->foreignId('preperation_item_unit_id')->nullable()->constrained()->cascadeOnDelete();
+            // $table->foreignId('preperation_item_id')->nullable()->constrained()->cascadeOnDelete();
+            // $table->foreignId('preperation_item_unit_id')->nullable()->constrained()->cascadeOnDelete();
             $table->unsignedBigInteger('item_id')->nullable();
             $table->unsignedBigInteger('item_unit_id')->nullable();
             $table->integer('batch');
