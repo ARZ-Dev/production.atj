@@ -16,14 +16,6 @@ class RecipeInput extends Model
     {
         return $this->belongsTo(Recipe::class);
     }
-    public function preperationItem()
-    {
-        return $this->belongsTo(PreperationItem::class);
-    }
 
-    public function preperationItemUnit()
-    {
-        return $this->belongsTo(PreperationItemUnit::class);
-    }
 
 }
