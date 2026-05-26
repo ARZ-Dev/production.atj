@@ -36,6 +36,7 @@
                                 </label>
                                 <div wire:ignore>
                                     <select id="recipe_type"
+                                            wire:model="recipe_type"
                                             class="selectpicker w-100"
                                             title="Select Type"
                                             data-style="btn-default"
@@ -60,6 +61,7 @@
                                     </label>
                                     <div wire:ignore>
                                         <select id="header_item"
+                                                wire:model="item_id"
                                                 class="selectpicker w-100"
                                                 title="Select Item"
                                                 data-style="btn-default"
@@ -86,6 +88,7 @@
                                         Output Unit <span class="text-danger">*</span>
                                     </label>
                                     <select id="header_unit"
+                                            wire:model="item_unit_id"
                                             class="selectpicker w-100"
                                             title="Select Unit"
                                             data-style="btn-default"
@@ -215,7 +218,8 @@
                                                         </label>
                                                         <div wire:ignore>
                                                             <select id="input_item_{{ $index }}"
-                                                                    class="selectpicker w-100"
+                                                                    wire:model="inputRows.{{ $index }}.item_id"
+                                                                    class="selectpicker w-100 input-item-select"
                                                                     title="Select Item"
                                                                     data-style="btn-default"
                                                                     data-live-search="true"
@@ -490,43 +494,78 @@
         });
 
         // ── Sync all wire:ignore pickers to Livewire ──────────────────────────
-        $(document).on('changed.bs.select', '.selectpicker', function () {
-            const id    = $(this).attr('id');
-            const val   = $(this).val();
+        // $(document).on('changed.bs.select', '.selectpicker', function () {
+        //     const id    = $(this).attr('id');
+        //     const val   = $(this).val();
+        //     const index = parseInt($(this).data('index'));
+        //
+        //     // Recipe type → triggers updatedRecipeType()
+        //     if (id === 'recipe_type') {
+        //         $wire.set('recipe_type', val ? parseInt(val) : null).then(() => {
+        //             // setOptions($('#header_item'), []);
+        //             // setOptions($('#header_unit'), []);
+        //         });
+        //         return;
+        //     }
+        //
+        //     // Header item → triggers updatedItemId()
+        //     if (id === 'header_item') {
+        //         $wire.set('item_id', val ? parseInt(val) : null);
+        //         return;
+        //     }
+        //
+        //     // Header unit
+        //     if (id === 'header_unit') {
+        //         $wire.set('item_unit_id', val ? parseInt(val) : null);
+        //         return;
+        //     }
+        //
+        //     // Input row item pickers → load units via dedicated method
+        //     // if (id.startsWith('input_item_') && !isNaN(index)) {
+        //     //     $wire.call('onInputItemChanged', index, val ? parseInt(val) : null);
+        //     //     return;
+        //     // }
+        //
+        //     // Packaging row item pickers
+        //     if (id.startsWith('pkg_item_') && !isNaN(index)) {
+        //         $wire.call('onPackagingItemChanged', index, val ? parseInt(val) : null);
+        //         return;
+        //     }
+        // });
+
+        $(document).on('change', '.selectpicker', function () {
+            let wireModel = $(this).attr('wire:model');
+            if (wireModel) {
+                $wire.set(wireModel, $(this).val());
+            }
+        });
+
+        $wire.on('setItems', function (params) {
+            let headerItems = params[0].headerItems;
+            setOptions($('#header_item'), headerItems);
+        })
+
+        $(document).on('change', '#header_item', function () {
+            $wire.dispatch('getHeaderUnits', {
+                itemId: $(this).val()
+            });
+        });
+
+        $wire.on('setHeaderUnits', function (params) {
+            let headerUnits = params[0];
+            setOptions($('#header_unit'), headerUnits);
+        })
+
+        $(document).on('change', '.input-item-select', function () {
+            const id = $(this).attr('id');
+            const val = $(this).val();
             const index = parseInt($(this).data('index'));
 
-            // Recipe type → triggers updatedRecipeType()
-            if (id === 'recipe_type') {
-                $wire.set('recipe_type', val ? parseInt(val) : null).then(() => {
-                    setOptions($('#header_item'), []);
-                    setOptions($('#header_unit'), []);
-                });
+            if (index === undefined || isNaN(index)) {
                 return;
             }
+            $wire.call('onInputItemChanged', index, val ? parseInt(val) : null);
 
-            // Header item → triggers updatedItemId()
-            if (id === 'header_item') {
-                $wire.set('item_id', val ? parseInt(val) : null);
-                return;
-            }
-
-            // Header unit
-            if (id === 'header_unit') {
-                $wire.set('item_unit_id', val ? parseInt(val) : null);
-                return;
-            }
-
-            // Input row item pickers → load units via dedicated method
-            if (id.startsWith('input_item_') && !isNaN(index)) {
-                $wire.call('onInputItemChanged', index, val ? parseInt(val) : null);
-                return;
-            }
-
-            // Packaging row item pickers
-            if (id.startsWith('pkg_item_') && !isNaN(index)) {
-                $wire.call('onPackagingItemChanged', index, val ? parseInt(val) : null);
-                return;
-            }
         });
     </script>
     @endscript

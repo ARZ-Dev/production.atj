@@ -7,6 +7,7 @@ use App\Models\RecipeInput;
 use App\Services\ApiService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class RecipeCreate extends Component
@@ -86,7 +87,17 @@ class RecipeCreate extends Component
         $this->status       = (bool) $recipe->status;
         $this->notes        = $recipe->notes;
 
-        $this->loadItemsForType($this->recipe_type);
+        if ($this->recipe_type == 1) {
+            // Preparation: output = Semi-Finished Goods, inputs = Raw Material
+            $this->headerItems    = $this->fetchItemsByType(self::TYPE_SEMI_FINISHED);
+            $this->inputItems     = $this->fetchItemsByType(self::TYPE_RAW_MATERIAL);
+            $this->packagingItems = [];
+        } elseif ($this->recipe_type == 2) {
+            // Production: output = Finished Goods, inputs = Semi-Finished Goods, packaging = Packaging Material
+            $this->headerItems    = $this->fetchItemsByType(self::TYPE_FINISHED_GOODS);
+            $this->inputItems     = $this->fetchItemsByType(self::TYPE_SEMI_FINISHED);
+            $this->packagingItems = $this->fetchItemsByType(self::TYPE_PACKAGING);
+        }
 
         if ($this->item_id) {
             $this->headerUnits = $this->fetchUnitsForItem($this->item_id);
@@ -147,6 +158,8 @@ class RecipeCreate extends Component
             $this->inputItems     = $this->fetchItemsByType(self::TYPE_SEMI_FINISHED);
             $this->packagingItems = $this->fetchItemsByType(self::TYPE_PACKAGING);
         }
+
+        $this->dispatch('setItems', ['headerItems' => $this->headerItems, 'inputItems' => $this->inputItems, 'packagingItems' => $this->packagingItems]);
     }
 
     protected function fetchItemsByType(string $type): array
@@ -225,6 +238,13 @@ class RecipeCreate extends Component
     {
         $this->item_unit_id = null;
         $this->headerUnits  = $value ? $this->fetchUnitsForItem($value) : [];
+    }
+
+    #[On('getHeaderUnits')]
+    public function getHeaderUnits($itemId)
+    {
+        $this->headerUnits  = $itemId ? $this->fetchUnitsForItem($itemId) : [];
+        $this->dispatch('setHeaderUnits', $this->headerUnits);
     }
 
     // ─── Row management ───────────────────────────────────────────────────────

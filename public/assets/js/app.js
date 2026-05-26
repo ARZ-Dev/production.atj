@@ -80,6 +80,10 @@ function setOptions(selector, options) {
             }
         }
 
+        if(selector.hasClass('input-item-select')) {
+            text = `${value.name} (${value.code})`;
+        }
+
         if (selector.attr('id') == 'role') {
             optionValue = value.name;
         }
@@ -148,7 +152,7 @@ function triggerCleavePhone()
 //     // Reset element state
 //     el.classList.remove('choices__input');
 //     el.removeAttribute('data-choice');
-    
+
 //     // Clear all options (important for empty roles)
 //     el.innerHTML = '';
 // }
