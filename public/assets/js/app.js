@@ -80,7 +80,7 @@ function setOptions(selector, options) {
             }
         }
 
-        if(selector.hasClass('input-item-select')) {
+        if(selector.hasClass('raw-item-select') || selector.hasClass('packaging-item-select')) {
             text = `${value.name} (${value.code})`;
         }
 

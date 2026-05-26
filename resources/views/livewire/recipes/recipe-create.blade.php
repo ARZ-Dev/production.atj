@@ -219,7 +219,7 @@
                                                         <div wire:ignore>
                                                             <select id="input_item_{{ $index }}"
                                                                     wire:model="inputRows.{{ $index }}.item_id"
-                                                                    class="selectpicker w-100 input-item-select"
+                                                                    class="selectpicker w-100 raw-item-select"
                                                                     title="Select Item"
                                                                     data-style="btn-default"
                                                                     data-live-search="true"
@@ -341,7 +341,8 @@
                                                             </label>
                                                             <div wire:ignore>
                                                                 <select id="pkg_item_{{ $index }}"
-                                                                        class="selectpicker w-100"
+                                                                        wire:model="packagingRows.{{ $index }}.item_id"
+                                                                        class="selectpicker w-100 packaging-item-select"
                                                                         title="Select Item"
                                                                         data-style="btn-default"
                                                                         data-live-search="true"
@@ -556,7 +557,7 @@
             setOptions($('#header_unit'), headerUnits);
         })
 
-        $(document).on('change', '.input-item-select', function () {
+        $(document).on('change', '.raw-item-select', function () {
             const id = $(this).attr('id');
             const val = $(this).val();
             const index = parseInt($(this).data('index'));
@@ -565,7 +566,17 @@
                 return;
             }
             $wire.call('onInputItemChanged', index, val ? parseInt(val) : null);
+        });
 
+        $(document).on('change', '.packaging-item-select', function () {
+            const id = $(this).attr('id');
+            const val = $(this).val();
+            const index = parseInt($(this).data('index'));
+
+            if (index === undefined || isNaN(index)) {
+                return;
+            }
+            $wire.call('onPackagingItemChanged', index, val ? parseInt(val) : null);
         });
     </script>
     @endscript
