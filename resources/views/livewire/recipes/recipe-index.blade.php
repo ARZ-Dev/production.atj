@@ -27,7 +27,7 @@
                                 @foreach($recipes as $r)
                                 <tr>
                                     <td>{{ $r->id }}</td>
-                                    <td>{{ $r->recipe_type }}</td>
+                                    <td>{{ $r->recipe_type == 1 ? 'Preparation' : ($r->recipe_type == 2 ? 'Production' : '-') }}</td>
                                     <td>{{ $r->name }}</td>
                                     <td>
                                         <span class="badge {{ $r->status ? 'bg-success' : 'bg-danger' }}">

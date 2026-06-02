@@ -93,8 +93,12 @@ class RecipeCreate extends Component
             $this->inputItems     = $this->fetchItemsByType(self::TYPE_RAW_MATERIAL);
             $this->packagingItems = [];
         } elseif ($this->recipe_type == 2) {
-            // Production: output = Finished Goods, inputs = Semi-Finished Goods, packaging = Packaging Material
-            $this->headerItems    = $this->fetchItemsByType(self::TYPE_FINISHED_GOODS);
+            // Production: output = all items except Raw Material, Semi-Finished Goods, Packaging Material
+            $this->headerItems    = $this->fetchItemsExcludingTypes([
+                self::TYPE_RAW_MATERIAL,
+                self::TYPE_SEMI_FINISHED,
+                self::TYPE_PACKAGING,
+            ]);
             $this->inputItems     = $this->fetchItemsByType(self::TYPE_SEMI_FINISHED);
             $this->packagingItems = $this->fetchItemsByType(self::TYPE_PACKAGING);
         }
@@ -153,8 +157,12 @@ class RecipeCreate extends Component
             $this->inputItems     = $this->fetchItemsByType(self::TYPE_RAW_MATERIAL);
             $this->packagingItems = [];
         } elseif ($type == 2) {
-            // Production: output = Finished Goods, inputs = Semi-Finished Goods, packaging = Packaging Material
-            $this->headerItems    = $this->fetchItemsByType(self::TYPE_FINISHED_GOODS);
+            // Production: output = all items except Raw Material, Semi-Finished Goods, Packaging Material
+            $this->headerItems    = $this->fetchItemsExcludingTypes([
+                self::TYPE_RAW_MATERIAL,
+                self::TYPE_SEMI_FINISHED,
+                self::TYPE_PACKAGING,
+            ]);
             $this->inputItems     = $this->fetchItemsByType(self::TYPE_SEMI_FINISHED);
             $this->packagingItems = $this->fetchItemsByType(self::TYPE_PACKAGING);
         }
@@ -168,6 +176,18 @@ class RecipeCreate extends Component
             'item_type' => $type,
             'is_active' => true,
         ])['data'] ?? [];
+    }
+
+    protected function fetchItemsExcludingTypes(array $excludedTypes): array
+    {
+        $items = $this->api->get('/v1/items', [
+            'is_active' => true,
+        ])['data'] ?? [];
+
+        return array_values(array_filter(
+            $items,
+            fn($item) => !in_array($item['item_type'] ?? null, $excludedTypes, true)
+        ));
     }
 
     protected function fetchUnitsForItem(int $itemId): array
