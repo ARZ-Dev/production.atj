@@ -89,6 +89,8 @@ class PermissionSeeder extends Seeder
             'shift-edit',
             'shift-view',
             'shift-delete',
+            'shift-viewAll',
+            'shift-assignUser',
 
             // Event Types Page
             'eventType-list',
@@ -110,6 +112,17 @@ class PermissionSeeder extends Seeder
             'recipe-edit',
             'recipe-view',
             'recipe-delete',
+            // Plans Page
+            'plans-list',
+            'plans-create',
+            'plans-edit',
+            'plans-delete',
+
+            // Events Page
+            'event-list',
+            'event-create',
+            'event-edit',
+            'event-delete',
 
         ];
         

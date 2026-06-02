@@ -12,9 +12,13 @@ class Shift extends Model
 
     protected $guarded = [];
 
-    public function company()
+    public function plans()
     {
-        return $this->belongsTo(Company::class);
+        return $this->hasMany(Plan::class);
     }
-    
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
+    }
 }

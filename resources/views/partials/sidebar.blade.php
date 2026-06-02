@@ -276,25 +276,30 @@
 
 
 
-                                @hasAnyPermission(['production.shift-list', 'production.eventType-list'])
+                                @hasAnyPermission(['production.shift-list', 'production.eventType-list', 'production.plan-list'])
                                 <li class="pe-slide pe-has-sub">
+                                    @php
+                                        $schedulingActive = request()->is('admin/shifts*')
+                                            || request()->is('admin/event-types*')
+                                            || request()->is('admin/plans*')
+                                            || request()->is('admin/events*');
+                                    @endphp
                                     <a href="#collapseShifts"
-                                        class="pe-nav-link {{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'active' : '' }}"
+                                        class="pe-nav-link {{ $schedulingActive ? 'active' : '' }}"
                                         data-bs-toggle="collapse"
-                                        aria-expanded="{{ request()->is('admin/shifts*') || request()->is('admin/event-types*') ? 'true' : 'false' }}"
+                                        aria-expanded="{{ $schedulingActive ? 'true' : 'false' }}"
                                         aria-controls="collapseShifts">
                                         <i class="bi bi-calendar-event pe-nav-icon"></i>
                                         <span class="pe-nav-content">Scheduling & Events</span>
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse" id="collapseShifts">
+                                    <ul class="pe-slide-menu collapse {{ $schedulingActive ? 'show' : '' }}" id="collapseShifts">
 
                                         @hasPermission('production.eventType-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('event-types') }}"
-                                                class="pe-nav-link {{ request()->is('admin/event-types*') ? " active"
-                                                : "" }}">
+                                                class="pe-nav-link {{ request()->is('admin/event-types*') ? 'active' : '' }}">
                                                 Event Types
                                             </a>
                                         </li>
@@ -303,12 +308,20 @@
                                         @hasPermission('production.shift-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('shifts') }}"
-                                                class="pe-nav-link {{ request()->is('admin/shifts*') ? " active" : ""
-                                                }}">
+                                                class="pe-nav-link {{ request()->is('admin/shifts*') ? 'active' : '' }}">
                                                 Shifts
                                             </a>
                                         </li>
                                         @endhasPermission
+
+                                        
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('plans') }}"
+                                                class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? 'active' : '' }}">
+                                                Plans
+                                            </a>
+                                        </li>
+                                      
 
                                     </ul>
                                 </li>

@@ -10,10 +10,10 @@ class EventType extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $guarded  = [];
+    protected $guarded = [];
 
-    public function recipe()
+    public function events()
     {
-        return $this->belongsTo(Recipe::class);
+        return $this->hasMany(Event::class);
     }
 }
