@@ -17,15 +17,5 @@ class Recipe extends Model
         return $this->hasMany(RecipeInput::class);
     }
 
-    public function preperationItem()
-    {
-        return $this->belongsTo(PreperationItem::class);
-    }
-
-    public function preperationItemUnit()
-    {
-        return $this->belongsTo(PreperationItemUnit::class);
-    }
-
 
 }
