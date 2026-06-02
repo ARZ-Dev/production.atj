@@ -9,19 +9,17 @@ class PlanView extends Component
 {
     public $plan;
     public $events;
-    public $status;
 
-    public function mount($id, $status)
+    public function mount($id)
     {
-        $this->status = $status;
+        // authorizeRequest('production.plan-list');
+
         $this->plan = Plan::with([
-            'company',
-            'productionLine',
+            'shift',
             'events' => function ($query) {
-                $query->orderBy('from_time', 'asc')->where('deleted_at', null);
+                $query->orderBy('created_at', 'asc')->whereNull('deleted_at');
             },
             'events.eventType',
-            'events.recipe',
         ])->findOrFail($id);
 
         $this->events = $this->plan->events;
