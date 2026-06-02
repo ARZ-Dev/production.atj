@@ -2,140 +2,153 @@
 
 namespace App\Livewire\Plans;
 
-use App\Models\Company;
 use App\Models\Plan;
-use App\Models\ProductionLine;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Models\Shift;
+use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PlanIndex extends Component
 {
-    use AuthorizesRequests;
+    public int $currentYear;
+    public int $currentMonth;
+    public $shifts = [];
 
-    public $plans;
-    public $companies = [];
-    public $productionLines = [];
-    public $company_id;
-    public $production_line_id;
-    public $date;
+    // Modal form fields
     public $plan_id;
-    public $editing = false;
+    public $shift_id;
+    public $date;
+    public bool $editing = false;
 
     public function mount()
     {
-        $this->loadPlans();
+        $this->currentYear  = now()->year;
+        $this->currentMonth = now()->month;
+        $this->loadShifts();
+    }
 
-        if (authUser()->hasRole('Super Admin')) {
-            $this->companies = Company::all();
+    public function loadShifts(): void
+    {
+        $user = authUser();
+        if ($user && $user->hasPermission('production.shift-viewAll')) {
+            $this->shifts = Shift::orderBy('from_time')->get();
         } else {
-            $this->company_id = authUser()->company_id;
-            $this->companies = Company::where('id', authUser()->company_id)->get();
-            $this->productionLines = ProductionLine::where('company_id', authUser()->company_id)->get();
+            $userId = $user?->id;
+            $this->shifts = Shift::whereHas('users', fn($q) => $q->where('user_id', $userId))
+                ->orderBy('from_time')->get();
         }
     }
 
-    public function loadPlans()
+    public function prevMonth(): void
     {
-        if (authUser()->hasRole('Super Admin')) {
-            $this->plans = Plan::all();
-        } else {
-            $this->plans = Plan::where('company_id', authUser()->company_id)->get();
-        }
+        $d = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1)->subMonth();
+        $this->currentYear  = $d->year;
+        $this->currentMonth = $d->month;
     }
 
-    public function resetForm()
+    public function nextMonth(): void
     {
-        $this->plan_id = null;
-        $this->production_line_id = '';
-        $this->date = '';
-        $this->editing = false;
-        if (!authUser()->hasRole('Super Admin')) {
-            $this->company_id = authUser()->company_id;
-        } else {
-            $this->company_id = '';
-            $this->productionLines = [];
-        }
+        $d = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1)->addMonth();
+        $this->currentYear  = $d->year;
+        $this->currentMonth = $d->month;
+    }
+
+    public function goToToday(): void
+    {
+        $this->currentYear  = now()->year;
+        $this->currentMonth = now()->month;
+    }
+
+    public function resetForm(): void
+    {
+        $this->plan_id  = null;
+        $this->shift_id = '';
+        $this->date     = '';
+        $this->editing  = false;
         $this->resetValidation();
     }
 
-    public function create()
+    public function create(): void
     {
         $this->resetForm();
         $this->dispatch('openModal');
     }
 
-    public function edit($id)
+    public function createForDate(string $date): void
     {
         $this->resetForm();
+        $this->date = $date;
+        $this->dispatch('openModal');
+    }
 
+    public function edit(int $id): void
+    {
+        $this->resetForm();
         $plan = Plan::findOrFail($id);
-        $this->plan_id = $plan->id;
-        $this->company_id = $plan->company_id;
-        $this->production_line_id = $plan->production_line_id;
-        $this->date = $plan->date;
-        $this->editing = true;
-
-        if ($this->company_id) {
-            $this->productionLines = ProductionLine::where('company_id', $this->company_id)->get();
-            $this->dispatch('setProductionLines', $this->productionLines->map->only(['id'])->values()->toArray());
-        }
-
+        $this->plan_id  = $plan->id;
+        $this->shift_id = $plan->shift_id;
+        $this->date     = Carbon::parse($plan->date)->format('Y-m-d');
+        $this->editing  = true;
         $this->dispatch('openModal');
     }
 
-    #[On('GetProductionLines')]
-    public function getProductionLines($company_id)
-    {
-        $productionLines = ProductionLine::where('company_id', $company_id)->get();
-        $this->dispatch('setProductionLines', $productionLines);
-
-    }
-
-    public function rules()
+    protected function rules(): array
     {
         return [
-            'company_id' => 'required|exists:companies,id',
-            'production_line_id' => 'required|exists:production_lines,id',
-            'date' => 'required|date',
+            'shift_id' => 'required|exists:shifts,id',
+            'date'     => 'required|date',
         ];
     }
 
-    public function submit()
+    public function submit(): void
     {
         $this->validate();
 
-        $data = [
-            'company_id' => $this->company_id,
-            'production_line_id' => $this->production_line_id,
-            'date' => $this->date,
-        ];
+        $duplicate = Plan::where('shift_id', $this->shift_id)
+            ->whereDate('date', $this->date)
+            ->when($this->editing, fn($q) => $q->where('id', '!=', $this->plan_id))
+            ->exists();
+
+        if ($duplicate) {
+            $this->addError('shift_id', 'This shift already has a plan for the selected date.');
+            return;
+        }
+
+        $data = ['shift_id' => $this->shift_id, 'date' => $this->date];
 
         if ($this->editing) {
-            $plan = Plan::findOrFail($this->plan_id);
-            $plan->update($data);
+            Plan::findOrFail($this->plan_id)->update($data);
         } else {
             Plan::create($data);
         }
 
-        $this->loadPlans();
         $this->dispatch('closeModal');
         $this->resetForm();
-
-        return to_route('plans')->with('success', $this->editing ? 'Plan updated successfully.' : 'Plan created successfully.');
+        session()->flash('success', $this->editing ? 'Plan updated.' : 'Plan created.');
     }
 
     #[On('delete')]
-    public function delete($id)
+    public function delete(int $id): void
     {
-        $plan = Plan::findOrFail($id);
-        $plan->delete();
-
-        return to_route('plans')->with('success', 'Plan deleted successfully.');
+        Plan::findOrFail($id)->delete();
+        session()->flash('success', 'Plan deleted.');
     }
 
     public function render()
     {
-        return view('livewire.plans.plan-index');
+        $plansByDate = Plan::with('shift')
+            ->withCount('events')
+            ->leftJoin('shifts', 'shifts.id', '=', 'plans.shift_id')
+            ->select('plans.*')
+            ->whereYear('plans.date', $this->currentYear)
+            ->whereMonth('plans.date', $this->currentMonth)
+            ->orderBy('plans.date')
+            ->orderBy('shifts.from_time')
+            ->get()
+            ->groupBy(fn($p) => Carbon::parse($p->date)->format('Y-m-d'));
+
+        $startOfMonth = Carbon::createFromDate($this->currentYear, $this->currentMonth, 1);
+
+        return view('livewire.plans.plan-index', compact('plansByDate', 'startOfMonth'));
     }
 }

@@ -12,10 +12,9 @@ class Plan extends Model
 
     protected $guarded = [];
 
-
-    public function productionLine()
+    public function shift()
     {
-        return $this->belongsTo(ProductionLine::class);
+        return $this->belongsTo(Shift::class);
     }
 
     public function events()

@@ -1,12 +1,19 @@
 <div>
+    @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
+
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Event Types List</h5>
+                    <h5 class="card-title mb-0">Event Types</h5>
                     @hasPermission('production.eventType-create')
                     <button type="button" class="btn btn-primary" wire:click="create">
-                        <i class="bi bi-plus-lg me-1"></i> Add New Event Type
+                        <i class="bi bi-plus-lg me-1"></i> Add Event Type
                     </button>
                     @endhasPermission
                 </div>
@@ -15,35 +22,31 @@
                     <table id="buttons-datatables" class="table table-nowrap table-striped table-bordered w-100">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Company</th>
+                                <th>#</th>
                                 <th>Name</th>
-                                <th>Duration</th>
-                                <th>Action</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($eventTypes as $eventType)
                             <tr>
                                 <td>{{ $eventType->id }}</td>
-                                <td>{{ $eventType->company->name }}</td>
                                 <td>{{ $eventType->name }}</td>
-                                <td>{{ $eventType->duration }} Minute</td>
                                 <td>
                                     @hasPermission('production.eventType-edit')
                                     <button type="button" wire:click="edit({{ $eventType->id }})"
-                                        class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
-                                        data-bs-custom-class="tooltip-white" data-bs-placement="top"
-                                        data-bs-title="Edit">
+                                        class="btn btn-light-primary icon-btn-sm"
+                                        data-bs-toggle="tooltip" data-bs-custom-class="tooltip-white"
+                                        data-bs-placement="top" data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
                                     @endhasPermission
 
                                     @hasPermission('production.eventType-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
-                                        data-id="{{ $eventType->id }}" data-bs-toggle="tooltip"
-                                        data-bs-custom-class="tooltip-white" data-bs-placement="top"
-                                        data-bs-title="Delete">
+                                        data-id="{{ $eventType->id }}"
+                                        data-bs-toggle="tooltip" data-bs-custom-class="tooltip-white"
+                                        data-bs-placement="top" data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     @endhasPermission
@@ -57,33 +60,32 @@
         </div>
     </div>
 
-    <!-- Create/Edit Modal -->
+    <!-- Create / Edit Modal -->
     <div class="modal fade" id="eventTypeModal" tabindex="-1" aria-labelledby="eventTypeModalLabel" aria-hidden="true"
         wire:ignore.self data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="eventTypeModalLabel">
-                        {{ $editing ? 'Edit Event Type' : 'Create Event Type' }}
+                        {{ $editing ? 'Edit Event Type' : 'New Event Type' }}
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
+                        wire:click="resetForm"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row g-4">
-                        
-                        <div class="col-12">
-                            <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="name" wire:model="name"
-                                placeholder="Enter event type name">
-                            @error('name')<div class="text-danger">{{ $message }}</div>@enderror
-                        </div>
-
+                    <div class="mb-3">
+                        <label for="et_name" class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control @error('name') is-invalid @enderror"
+                            id="et_name" wire:model="name" placeholder="e.g. Cleaning, Production, Maintenance">
+                        @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" wire:click="submit">
-                        {{ $editing ? 'Update Event Type' : 'Create Event Type' }}
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal"
+                        wire:click="resetForm">Cancel</button>
+                    <button type="button" class="btn btn-primary" wire:click="submit" wire:loading.attr="disabled">
+                        <span wire:loading wire:target="submit" class="spinner-border spinner-border-sm me-1"></span>
+                        {{ $editing ? 'Update' : 'Create' }}
                     </button>
                 </div>
             </div>
@@ -94,19 +96,8 @@
     <script>
         const eventTypeModal = new bootstrap.Modal(document.getElementById('eventTypeModal'));
 
-        $wire.on('closeModal', () => {
-            eventTypeModal.hide();
-        });
-
-        $('.selectpicker').selectpicker();
-
-        $(document).on('change', '.selectpicker', function() {
-            $wire.set($(this).attr('wire:model'), $(this).val());
-        });
-
-        Livewire.hook('morph.added', ({el}) => {
-            $(el).find('.selectpicker').selectpicker();
-        });
+        $wire.on('openModal', () => eventTypeModal.show());
+        $wire.on('closeModal', () => eventTypeModal.hide());
     </script>
     @include('livewire.deleteConfirm')
     @endscript

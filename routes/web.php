@@ -216,7 +216,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------
     Route::group(['prefix' => 'plans'], function () {
         Route::get('/', PlanIndex::class)->name('plans');
-        Route::get('/view/{id}/{status}', PlanView::class)->name('plans.view');
+        Route::get('/view/{id}', PlanView::class)->name('plans.view');
 
     });
 

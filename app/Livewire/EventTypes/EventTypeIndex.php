@@ -3,41 +3,31 @@
 namespace App\Livewire\EventTypes;
 
 use App\Models\EventType;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class EventTypeIndex extends Component
 {
-    use AuthorizesRequests;
-
     public $eventTypes;
     public $name;
-    public $duration;
     public $event_type_id;
     public $editing = false;
 
     public function mount()
     {
         authorizeRequest('production.eventType-list');
-        
         $this->loadEventTypes();
-
     }
 
     public function loadEventTypes()
     {
-        if (authUser()->hasRole('Super Admin')) {
-            $this->eventTypes = EventType::all();
-        } else {
-        }
+        $this->eventTypes = EventType::orderBy('name')->get();
     }
 
     public function resetForm()
     {
         $this->event_type_id = null;
         $this->name = '';
-        $this->duration = '';
         $this->editing = false;
         $this->resetValidation();
     }
@@ -57,64 +47,42 @@ class EventTypeIndex extends Component
         $eventType = EventType::findOrFail($id);
         $this->event_type_id = $eventType->id;
         $this->name = $eventType->name;
-        $this->duration = $eventType->duration;
         $this->editing = true;
 
         $this->dispatch('openModal');
     }
 
-    
-
-    public function rules()
+    protected function rules()
     {
-        $rules = [
+        return [
             'name' => 'required|string|max:255',
         ];
-
-        /*if ($this->has_recipe) {
-            $rules['recipe_id'] = 'required|exists:recipes,id';
-        } else {
-            $rules['duration'] = 'required|integer|min:1';
-        }*/
-
-        return $rules;
     }
 
     public function submit()
     {
         $this->validate();
 
-        $data = [
-            'name' => $this->name,
-            //'duration' => $this->has_recipe ? null : $this->duration,
-        ];
-
         if ($this->editing) {
-            $eventType = EventType::findOrFail($this->event_type_id);
-            $this->authorize('eventType-edit');
-            $eventType->update($data);
-
-
+            authorizeRequest('production.eventType-edit');
+            EventType::findOrFail($this->event_type_id)->update(['name' => $this->name]);
         } else {
-            $this->authorize('eventType-create');
-            EventType::create($data);
-
+            authorizeRequest('production.eventType-create');
+            EventType::create(['name' => $this->name]);
         }
 
         $this->loadEventTypes();
         $this->dispatch('closeModal');
         $this->resetForm();
 
-        return to_route('event-types')->with('success', $this->editing ? 'Event Type updated successfully.' : 'Event Type created successfully.');
+        session()->flash('success', $this->editing ? 'Event Type updated successfully.' : 'Event Type created successfully.');
     }
 
     #[On('delete')]
     public function delete($id)
     {
-        $eventType = EventType::findOrFail($id);
-        $this->authorize('eventType-delete');
-        $eventType->delete();
-
+        authorizeRequest('production.eventType-delete');
+        EventType::findOrFail($id)->delete();
         $this->loadEventTypes();
         session()->flash('success', 'Event Type deleted successfully.');
     }
