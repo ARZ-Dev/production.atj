@@ -264,25 +264,57 @@
 
 
 
-                                @hasAnyPermission(['production.recipe-list'])
+                                @hasAnyPermission(['production.recipeType-list', 'production.recipe-list'])
                                 <li class="pe-slide pe-has-sub">
-                                    <a href="{{ route('recipes') }}"
-                                        class="pe-nav-link {{ request()->is('admin/recipes*') ? " active" : "" }}">
-                                        <i class="bi bi-beaker pe-nav-icon"></i>
+                                    @php
+                                    $schedulingActive = request()->is('admin/recipe-types*')
+                                    || request()->is('admin/recipes*');
+                                    @endphp
+                                    <a href="#collapseRecipes"
+                                        class="pe-nav-link {{ $schedulingActive ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ $schedulingActive ? 'true' : 'false' }}"
+                                        aria-controls="collapseRecipes">
+                                        <i class="bi bi-list pe-nav-icon"></i>
                                         <span class="pe-nav-content">Recipes</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
+
+                                    <ul class="pe-slide-menu collapse {{ $schedulingActive ? 'show' : '' }}"
+                                        id="collapseRecipes">
+
+                                        @hasPermission('production.recipeType-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('recipe-types') }}"
+                                                class="pe-nav-link {{ request()->is('admin/recipe-types*') ? 'active' : '' }}">
+                                                Recipe Types
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                        @hasPermission('production.recipe-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('recipes') }}"
+                                                class="pe-nav-link {{ request()->is('admin/recipes*') ? 'active' : '' }}">
+                                                Recipes
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                    </ul>
                                 </li>
                                 @endhasAnyPermission
 
 
 
-                                @hasAnyPermission(['production.shift-list', 'production.eventType-list', 'production.plan-list'])
+                                @hasAnyPermission(['production.shift-list', 'production.eventType-list',
+                                'production.plan-list'])
                                 <li class="pe-slide pe-has-sub">
                                     @php
-                                        $schedulingActive = request()->is('admin/shifts*')
-                                            || request()->is('admin/event-types*')
-                                            || request()->is('admin/plans*')
-                                            || request()->is('admin/events*');
+                                    $schedulingActive = request()->is('admin/shifts*')
+                                    || request()->is('admin/event-types*')
+                                    || request()->is('admin/plans*')
+                                    || request()->is('admin/events*');
                                     @endphp
                                     <a href="#collapseShifts"
                                         class="pe-nav-link {{ $schedulingActive ? 'active' : '' }}"
@@ -294,7 +326,8 @@
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse {{ $schedulingActive ? 'show' : '' }}" id="collapseShifts">
+                                    <ul class="pe-slide-menu collapse {{ $schedulingActive ? 'show' : '' }}"
+                                        id="collapseShifts">
 
                                         @hasPermission('production.eventType-list')
                                         <li class="pe-slide-item">
@@ -314,14 +347,14 @@
                                         </li>
                                         @endhasPermission
 
-                                        
+
                                         <li class="pe-slide-item">
                                             <a href="{{ route('plans') }}"
                                                 class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? 'active' : '' }}">
                                                 Plans
                                             </a>
                                         </li>
-                                      
+
 
                                     </ul>
                                 </li>
