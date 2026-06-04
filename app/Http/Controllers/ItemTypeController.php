@@ -53,6 +53,7 @@ class ItemTypeController extends Controller
             'name'                     => $request->name,
             'group_entity_relation_id' => $request->group_entity_relation_id,
             'has_pos_suppliers'        => $request->boolean('has_pos_suppliers'),
+            'can_be_consumed_in_recipe' => $request->boolean('can_be_consumed_in_recipe'),
             'sub_types'                => $this->mapSubTypes($request->input('subTypes', [])),
         ]);
 
@@ -106,6 +107,7 @@ class ItemTypeController extends Controller
             'name'                     => $request->name,
             'group_entity_relation_id' => $request->group_entity_relation_id,
             'has_pos_suppliers'        => $request->boolean('has_pos_suppliers'),
+            'can_be_consumed_in_recipe' => $request->boolean('can_be_consumed_in_recipe'),
             'sub_types'                => $this->mapSubTypes($request->input('subTypes', [])),
         ]);
 
