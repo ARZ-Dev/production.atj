@@ -12,10 +12,6 @@ class Shift extends Model
 
     protected $guarded = [];
 
-    protected $casts = [
-        'is_dpd' => 'boolean',
-    ];
-
     public function plans()
     {
         return $this->hasMany(Plan::class);

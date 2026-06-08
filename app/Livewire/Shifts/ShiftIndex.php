@@ -21,7 +21,7 @@ class ShiftIndex extends Component
     public function mount()
     {
         authorizeRequest('production.shift-list');
-        $this->users = User::where('is_dpd', false)->orderBy('first_name')->get();
+        $this->users = User::orderBy('first_name')->get();
         $this->loadShifts();
     }
 
