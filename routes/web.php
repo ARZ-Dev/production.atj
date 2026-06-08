@@ -1,12 +1,16 @@
 <?php
 
+use App\Livewire\Capacities\CapacityManage;
 use App\Livewire\DashboardView;
 use App\Livewire\Events\EventCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\ItemRequests\ItemRequestCreate;
 use App\Livewire\ItemRequests\ItemRequestIndex;
+use App\Livewire\Lines\LineIndex;
 use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Plans\PlanView;
+use App\Livewire\Preparations\PreparationIndex;
+use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RecipeTypes\RecipeTypeCreate;
 use App\Livewire\RecipeTypes\RecipeTypeIndex;
 use App\Livewire\StockIn\StockInCreate;
@@ -243,6 +247,33 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('{planId}/create', EventCreate::class)->name('events.create');
         // Route::get('/edit/{id}', EventCreate::class)->name('events.edit');
         // Route::get('/view/{id}', EventCreate::class)->name('events.view');
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Preparations
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'preparations'], function () {
+        Route::get('/', PreparationIndex::class)->name('preparations');
+        Route::get('/{id}/capacity', CapacityManage::class)
+            ->defaults('modelType', 'preparation')
+            ->name('preparations.capacity');
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Lines
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'lines'], function () {
+        Route::get('/', LineIndex::class)->name('lines');
+        Route::get('/{id}/capacity', CapacityManage::class)
+            ->defaults('modelType', 'line')
+            ->name('lines.capacity');
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Production Lines
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'production-lines'], function () {
+        Route::get('/', ProductionLineIndex::class)->name('production-lines');
     });
 });
 

@@ -143,7 +143,24 @@
                                 @enderror
                             </div>
 
-                           
+                            {{-- Is Internal --}}
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        id="is_internal"
+                                        name="is_internal"
+                                        value="1"
+                                        {{ old('is_internal', $warehouse['is_internal'] ?? false) ? 'checked' : '' }}
+                                    />
+                                    <label class="form-check-label fw-medium" for="is_internal">
+                                        Internal Warehouse
+                                        <small class="text-muted fw-normal d-block">Check if this warehouse is for internal use only</small>
+                                    </label>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 
