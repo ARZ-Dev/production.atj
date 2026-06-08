@@ -86,6 +86,19 @@
                 </label>
               </div>
             </div>
+            {{-- Can Be Consumed In Recipe --}}
+            <div class="col-md-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="can_be_consumed_in_recipe"
+                       id="can_be_consumed_in_recipe"
+                       @checked(old('can_be_consumed_in_recipe', $item_type['can_be_consumed_in_recipe'] ?? false))>
+                <label class="form-check-label fw-medium" for="can_be_consumed_in_recipe">
+                  Can Be Consumed In Recipe
+                </label>
+              </div>
+            </div>
 
             {{-- Sub Types --}}
             <div class="col-12">

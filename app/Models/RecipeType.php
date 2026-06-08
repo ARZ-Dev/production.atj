@@ -6,20 +6,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Recipe extends Model
+class RecipeType extends Model
 {
-
     use HasFactory, SoftDeletes;
+
     protected $guarded = [];
 
-    public function inputs()
-    {
-        return $this->hasMany(RecipeInput::class);
-    }
+    protected $casts = [
+        'item_type_ids' => 'array',
+    ];
 
-    public function recipeType()
+    public function recipes()
     {
-        return $this->belongsTo(RecipeType::class);
+        return $this->hasMany(Recipe::class);
     }
-
 }
