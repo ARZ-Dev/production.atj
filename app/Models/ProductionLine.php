@@ -6,23 +6,19 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Shift extends Model
+class ProductionLine extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $guarded = [];
 
-    protected $casts = [
-        'is_dpd' => 'boolean',
-    ];
-
-    public function plans()
+    public function preparations()
     {
-        return $this->hasMany(Plan::class);
+        return $this->belongsToMany(Preparation::class, 'production_line_preparation');
     }
 
-    public function users()
+    public function lines()
     {
-        return $this->belongsToMany(User::class);
+        return $this->belongsToMany(Line::class, 'line_production_line');
     }
 }

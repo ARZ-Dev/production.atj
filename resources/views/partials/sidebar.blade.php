@@ -327,14 +327,56 @@
                                 </li>
                                 @endhasAnyPermission
 
+                                @hasAnyPermission(['production.preparation-list', 'production.line-list', 'production.production-line-list'])
                                 <li class="pe-slide pe-has-sub">
-                                    <a href="{{ route('plans') }}"
-                                        class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? "
-                                        active" : "" }}">
-                                        <i class="bi bi-card-checklist pe-nav-icon"></i>
-                                        <span class="pe-nav-content">Production Plans</span>
+                                    @php
+                                        $productionActive = request()->is('admin/preparations*')
+                                            || request()->is('admin/lines*')
+                                            || request()->is('admin/production-lines*');
+                                    @endphp
+                                    <a href="#collapseProductionModules"
+                                        class="pe-nav-link {{ $productionActive ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ $productionActive ? 'true' : 'false' }}"
+                                        aria-controls="collapseProductionModules">
+                                        <i class="bi bi-diagram-3 pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Production Setup</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
+
+                                    <ul class="pe-slide-menu collapse {{ $productionActive ? 'show' : '' }}"
+                                        id="collapseProductionModules">
+
+                                        @hasPermission('production.preparation-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('preparations') }}"
+                                                class="pe-nav-link {{ request()->is('admin/preparations*') ? 'active' : '' }}">
+                                                Preparations
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                        @hasPermission('production.line-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('lines') }}"
+                                                class="pe-nav-link {{ request()->is('admin/lines*') ? 'active' : '' }}">
+                                                Lines
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                        @hasPermission('production.production-line-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('production-lines') }}"
+                                                class="pe-nav-link {{ request()->is('admin/production-lines*') ? 'active' : '' }}">
+                                                Production Lines
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                    </ul>
                                 </li>
+                                @endhasAnyPermission
 
                             </ul>
                         </div>

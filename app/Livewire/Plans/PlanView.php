@@ -15,7 +15,6 @@ class PlanView extends Component
         // authorizeRequest('production.plan-list');
 
         $this->plan = Plan::with([
-            'shift',
             'events' => function ($query) {
                 $query->orderBy('created_at', 'asc')->whereNull('deleted_at');
             },

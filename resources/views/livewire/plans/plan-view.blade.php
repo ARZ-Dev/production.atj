@@ -8,16 +8,6 @@
                         <i class="bi bi-calendar3 text-primary chip-icon"></i>
                         {{ \Carbon\Carbon::parse($plan->date)->format('d F Y') }}
                     </span>
-                    @if($plan->shift)
-                    <span class="pv-chip green">
-                        <i class="bi bi-clock chip-icon"></i>
-                        {{ $plan->shift->name }}
-                        <span class="chip-subtext">
-                            {{ \Carbon\Carbon::parse($plan->shift->from_time)->format('H:i') }}
-                            – {{ \Carbon\Carbon::parse($plan->shift->to_time)->format('H:i') }}
-                        </span>
-                    </span>
-                    @endif
                 </div>
             </div>
             <div class="d-flex gap-2 flex-shrink-0">
@@ -37,10 +27,6 @@
             <div class="card pv-stat pv-stat--primary mb-0">
                 <div class="s-label">Total Events</div>
                 <div class="s-val">{{ $total }}</div>
-            </div>
-            <div class="card pv-stat pv-stat--success mb-0">
-                <div class="s-label">Shift</div>
-                <div class="s-val s-val--sm">{{ $plan->shift?->name ?? '—' }}</div>
             </div>
             <div class="card pv-stat pv-stat--warning mb-0">
                 <div class="s-label">Date</div>
