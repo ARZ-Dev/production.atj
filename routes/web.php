@@ -11,6 +11,8 @@ use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Plans\PlanView;
 use App\Livewire\Preparations\PreparationIndex;
 use App\Livewire\ProductionLines\ProductionLineIndex;
+use App\Livewire\RecipeTypes\RecipeTypeCreate;
+use App\Livewire\RecipeTypes\RecipeTypeIndex;
 use App\Livewire\StockIn\StockInCreate;
 use App\Livewire\StockIn\StockInIndex;
 use App\Livewire\Recipes\RecipeCreate;
@@ -177,6 +179,18 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/view/{id}/{viewStatus}', TransferCreate::class)->name('item-transfers.view');
         Route::get('/approve-load/{id}', TransferCreate::class)->name('item-transfers.approve-load');
         Route::get('/approve-receive/{id}', TransferCreate::class)->name('item-transfers.approve-receive');
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Recipe Types
+    // |--------------------------------------------------------------------------
+
+    Route::group(['prefix' => 'recipe-types'], function () {
+        Route::get('/', RecipeTypeIndex::class)->name('recipe-types');
+        Route::get('/create', RecipeTypeCreate::class)->name('recipe-types.create');
+        Route::get('/edit/{id}', RecipeTypeCreate::class)->name('recipe-types.edit');
+        Route::get('/view/{id}', RecipeTypeCreate::class)->name('recipe-types.view');
+
     });
 
 
