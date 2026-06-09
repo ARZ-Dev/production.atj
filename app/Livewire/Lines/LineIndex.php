@@ -63,7 +63,7 @@ class LineIndex extends Component
     {
         authorizeRequest('production.line-create');
         $this->resetForm();
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', warehouses: []);
     }
 
     public function edit(int $id): void
@@ -79,7 +79,30 @@ class LineIndex extends Component
         $this->fg_warehouse_id  = $line->fg_warehouse_id;
         $this->editing          = true;
 
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', warehouses: $this->fetchInternalWarehouses($this->department_id));
+    }
+
+    public function onDepartmentChange(?int $deptId): void
+    {
+        $this->department_id    = $deptId;
+        $this->sfg_warehouse_id = null;
+        $this->fg_warehouse_id  = null;
+
+        $warehouses = $this->fetchInternalWarehouses($deptId);
+        $this->dispatch('lineWarehousesReady', warehouses: $warehouses);
+    }
+
+    private function fetchInternalWarehouses(?int $deptId): array
+    {
+        if (!$deptId) return [];
+        $all = $this->api->get('/v1/warehouses', [
+            'related_to_production' => true,
+            'department_id'         => $deptId,
+        ])['data'] ?? [];
+        return collect($all)
+            ->filter(fn($wh) => !empty($wh['type']['is_internal']))
+            ->values()
+            ->toArray();
     }
 
     protected function rules(): array

@@ -141,15 +141,6 @@
                                     title="Select factory warehouse…"
                                     data-style="btn-default"
                                     data-live-search="true">
-                                    @forelse($factories as $factory)
-                                    <option value="{{ $factory['id'] }}"
-                                        data-dept="{{ $factory['department_id'] }}"
-                                        @selected($factory_id == $factory['id'])>
-                                        {{ $factory['name'] }}
-                                    </option>
-                                    @empty
-                                    <option disabled>No factory warehouses available</option>
-                                    @endforelse
                                 </select>
                             </div>
                             @error('factory_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
@@ -214,35 +205,35 @@
     <script>
         const plModal = new bootstrap.Modal(document.getElementById('plModal'));
 
-        function filterPlFactories(deptId) {
-            $('#pl_factory_id').find('option').each(function () {
-                const optDept = $(this).data('dept');
-                $(this).prop('disabled', !!deptId && !!optDept && String(optDept) !== String(deptId));
+        function buildPlFactorySelect(factories, selectedId) {
+            const $sel = $('#pl_factory_id');
+            $sel.selectpicker('destroy');
+            $sel.empty();
+            (factories || []).forEach(f => {
+                $sel.append($('<option>', { value: f.id, text: f.name, selected: f.id == selectedId }));
             });
-            $('#pl_factory_id').selectpicker('refresh');
+            $sel.selectpicker();
         }
 
-        $wire.on('openModal', () => {
+        $wire.on('openModal', ({ factories }) => {
             plModal.show();
             setTimeout(() => {
-                ['#pl_department_id', '#pl_factory_id', '#pl_preparations', '#pl_lines'].forEach(id => {
+                ['#pl_department_id', '#pl_preparations', '#pl_lines'].forEach(id => {
                     $(id).selectpicker('destroy').selectpicker();
                 });
-                const deptId = $wire.get('department_id');
-                $('#pl_department_id').selectpicker('val', String(deptId || ''));
-                filterPlFactories(deptId);
-                $('#pl_factory_id').selectpicker('val', String($wire.get('factory_id') || ''));
+                $('#pl_department_id').selectpicker('val', String($wire.get('department_id') || ''));
+                buildPlFactorySelect(factories, $wire.get('factory_id'));
                 $('#pl_preparations').selectpicker('val', ($wire.get('selectedPreparations') || []).map(String));
                 $('#pl_lines').selectpicker('val', ($wire.get('selectedLines') || []).map(String));
             }, 150);
         });
 
+        $wire.on('plFactoriesReady', ({ factories }) => {
+            buildPlFactorySelect(factories, null);
+        });
+
         $(document).on('change', '#pl_department_id', function () {
-            const deptId = parseInt($(this).val()) || null;
-            $wire.set('department_id', deptId);
-            $wire.set('factory_id', null);
-            filterPlFactories(deptId);
-            $('#pl_factory_id').selectpicker('val', '');
+            $wire.call('onDepartmentChange', parseInt($(this).val()) || null);
         });
         $(document).on('change', '#pl_factory_id', function () {
             $wire.set('factory_id', parseInt($(this).val()) || null);
