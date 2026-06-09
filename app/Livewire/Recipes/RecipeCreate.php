@@ -181,7 +181,8 @@ class RecipeCreate extends Component
 
         if ($value) {
             $this->buildSections($value);
-            $this->dispatch('recipe-type-changed');
+
+            $this->dispatch('setSectionsItems', $this->sectionItems);
         }
     }
 
