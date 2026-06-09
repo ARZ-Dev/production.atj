@@ -26,7 +26,6 @@
                                 <th>Name</th>
                                 <th>From</th>
                                 <th>To</th>
-                                <th>Assigned Users</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -37,13 +36,6 @@
                                 <td>{{ $shift->name }}</td>
                                 <td>{{ \Carbon\Carbon::parse($shift->from_time)->format('h:i A') }}</td>
                                 <td>{{ \Carbon\Carbon::parse($shift->to_time)->format('h:i A') }}</td>
-                                <td>
-                                    @if($shift->relationLoaded('users') && $shift->users->count())
-                                        <span class="badge bg-light-primary">{{ $shift->users->count() }} user(s)</span>
-                                    @else
-                                        <span class="text-muted small">—</span>
-                                    @endif
-                                </td>
                                 <td>
                                     @hasPermission('production.shift-edit')
                                     <button type="button" wire:click="edit({{ $shift->id }})"
@@ -104,31 +96,6 @@
                                 id="to_time" wire:model="to_time">
                             @error('to_time')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-
-                        <div class="col-12">
-                            <label class="form-label">Assigned Users</label>
-                            <div wire:ignore>
-                                <select id="shift_users"
-                                    class="selectpicker w-100"
-                                    multiple
-                                    title="Select users…"
-                                    data-style="btn-default" data-live-search="true"
-                                    data-icon-base="ti" data-size="8"
-                                    data-tick-icon="ti-check text-white"
-                                    data-actions-box="true">
-                                    @foreach($users as $user)
-                                    <option value="{{ $user->id }}"
-                                        @selected(in_array($user->id, $selectedUsers))>
-                                        {{ $user->first_name }} {{ $user->last_name }}
-                                        @if($user->username) ({{ $user->username }}) @endif
-                                    </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @error('selectedUsers')
-                                <div class="text-danger small mt-1">{{ $message }}</div>
-                            @enderror
-                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -146,24 +113,8 @@
     @script
     <script>
         const shiftModal = new bootstrap.Modal(document.getElementById('shiftModal'));
-
-        $wire.on('openModal', () => {
-            shiftModal.show();
-            setTimeout(() => {
-                $('#shift_users').selectpicker();
-                let selected = $wire.get('selectedUsers') || [];
-                $('#shift_users').selectpicker('val', selected.map(String));
-            }, 250);
-        });
-
+        $wire.on('openModal', () => shiftModal.show());
         $wire.on('closeModal', () => shiftModal.hide());
-
-        $('#shift_users').selectpicker();
-
-        $(document).on('change', '#shift_users', function () {
-            let vals = $(this).val() || [];
-            $wire.set('selectedUsers', vals.map(Number));
-        });
     </script>
     @include('livewire.deleteConfirm')
     @endscript

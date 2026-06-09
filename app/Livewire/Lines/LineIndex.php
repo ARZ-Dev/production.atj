@@ -87,7 +87,7 @@ class LineIndex extends Component
         ];
     }
 
-    public function submit(): void
+    public function submit()
     {
         $this->validate();
 
@@ -101,25 +101,23 @@ class LineIndex extends Component
         if ($this->editing) {
             authorizeRequest('production.line-edit');
             Line::findOrFail($this->line_id)->update($data);
-            session()->flash('success', 'Line updated successfully.');
+            $message = 'Line updated successfully.';
         } else {
             authorizeRequest('production.line-create');
             Line::create($data);
-            session()->flash('success', 'Line created successfully.');
+            $message = 'Line created successfully.';
         }
 
-        $this->loadLines();
-        $this->resetForm();
-        $this->dispatch('closeModal');
+        return redirect()->route('lines')->with('success', $message);
     }
 
     #[On('delete')]
-    public function delete(int $id): void
+    public function delete(int $id)
     {
         authorizeRequest('production.line-delete');
         Line::findOrFail($id)->delete();
-        $this->loadLines();
-        session()->flash('success', 'Line deleted successfully.');
+
+        return redirect()->route('lines')->with('success', 'Line deleted successfully.');
     }
 
     public function render()

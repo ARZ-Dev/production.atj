@@ -216,16 +216,15 @@
         $wire.on('openModal', () => {
             plModal.show();
             setTimeout(() => {
-                $('#pl_department_id').selectpicker('refresh').selectpicker('val', String($wire.get('department_id') || ''));
-                $('#pl_factory_id').selectpicker('refresh').selectpicker('val', String($wire.get('factory_id') || ''));
-                $('#pl_preparations').selectpicker('refresh').selectpicker('val', ($wire.get('selectedPreparations') || []).map(String));
-                $('#pl_lines').selectpicker('refresh').selectpicker('val', ($wire.get('selectedLines') || []).map(String));
-            }, 250);
+                ['#pl_department_id', '#pl_factory_id', '#pl_preparations', '#pl_lines'].forEach(id => {
+                    $(id).selectpicker('destroy').selectpicker();
+                });
+                $('#pl_department_id').selectpicker('val', String($wire.get('department_id') || ''));
+                $('#pl_factory_id').selectpicker('val', String($wire.get('factory_id') || ''));
+                $('#pl_preparations').selectpicker('val', ($wire.get('selectedPreparations') || []).map(String));
+                $('#pl_lines').selectpicker('val', ($wire.get('selectedLines') || []).map(String));
+            }, 150);
         });
-
-        $wire.on('closeModal', () => plModal.hide());
-
-        $('.selectpicker').selectpicker();
 
         $(document).on('change', '#pl_department_id', function () {
             $wire.set('department_id', parseInt($(this).val()) || null);

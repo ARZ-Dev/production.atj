@@ -87,7 +87,7 @@ class PreparationIndex extends Component
         ];
     }
 
-    public function submit(): void
+    public function submit()
     {
         $this->validate();
 
@@ -101,25 +101,23 @@ class PreparationIndex extends Component
         if ($this->editing) {
             authorizeRequest('production.preparation-edit');
             Preparation::findOrFail($this->preparation_id)->update($data);
-            session()->flash('success', 'Preparation updated successfully.');
+            $message = 'Preparation updated successfully.';
         } else {
             authorizeRequest('production.preparation-create');
             Preparation::create($data);
-            session()->flash('success', 'Preparation created successfully.');
+            $message = 'Preparation created successfully.';
         }
 
-        $this->loadPreparations();
-        $this->resetForm();
-        $this->dispatch('closeModal');
+        return redirect()->route('preparations')->with('success', $message);
     }
 
     #[On('delete')]
-    public function delete(int $id): void
+    public function delete(int $id)
     {
         authorizeRequest('production.preparation-delete');
         Preparation::findOrFail($id)->delete();
-        $this->loadPreparations();
-        session()->flash('success', 'Preparation deleted successfully.');
+
+        return redirect()->route('preparations')->with('success', 'Preparation deleted successfully.');
     }
 
     public function render()
