@@ -185,15 +185,14 @@
         $wire.on('openModal', () => {
             prepModal.show();
             setTimeout(() => {
-                $('#prep_department_id').selectpicker('refresh').selectpicker('val', String($wire.get('department_id') || ''));
-                $('#prep_rm_warehouse_id').selectpicker('refresh').selectpicker('val', String($wire.get('rm_warehouse_id') || ''));
-                $('#prep_fg_warehouse_id').selectpicker('refresh').selectpicker('val', String($wire.get('fg_warehouse_id') || ''));
-            }, 250);
+                ['#prep_department_id', '#prep_rm_warehouse_id', '#prep_fg_warehouse_id'].forEach(id => {
+                    $(id).selectpicker('destroy').selectpicker();
+                });
+                $('#prep_department_id').selectpicker('val', String($wire.get('department_id') || ''));
+                $('#prep_rm_warehouse_id').selectpicker('val', String($wire.get('rm_warehouse_id') || ''));
+                $('#prep_fg_warehouse_id').selectpicker('val', String($wire.get('fg_warehouse_id') || ''));
+            }, 150);
         });
-
-        $wire.on('closeModal', () => prepModal.hide());
-
-        $('.selectpicker').selectpicker();
 
         $(document).on('change', '#prep_department_id', function () {
             $wire.set('department_id', parseInt($(this).val()) || null);

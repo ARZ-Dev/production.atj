@@ -179,15 +179,14 @@
         $wire.on('openModal', () => {
             lineModal.show();
             setTimeout(() => {
-                $('#line_department_id').selectpicker('refresh').selectpicker('val', String($wire.get('department_id') || ''));
-                $('#line_sfg_warehouse_id').selectpicker('refresh').selectpicker('val', String($wire.get('sfg_warehouse_id') || ''));
-                $('#line_fg_warehouse_id').selectpicker('refresh').selectpicker('val', String($wire.get('fg_warehouse_id') || ''));
-            }, 250);
+                ['#line_department_id', '#line_sfg_warehouse_id', '#line_fg_warehouse_id'].forEach(id => {
+                    $(id).selectpicker('destroy').selectpicker();
+                });
+                $('#line_department_id').selectpicker('val', String($wire.get('department_id') || ''));
+                $('#line_sfg_warehouse_id').selectpicker('val', String($wire.get('sfg_warehouse_id') || ''));
+                $('#line_fg_warehouse_id').selectpicker('val', String($wire.get('fg_warehouse_id') || ''));
+            }, 150);
         });
-
-        $wire.on('closeModal', () => lineModal.hide());
-
-        $('.selectpicker').selectpicker();
 
         $(document).on('change', '#line_department_id', function () {
             $wire.set('department_id', parseInt($(this).val()) || null);

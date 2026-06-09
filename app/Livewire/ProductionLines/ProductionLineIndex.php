@@ -108,7 +108,7 @@ class ProductionLineIndex extends Component
         ];
     }
 
-    public function submit(): void
+    public function submit()
     {
         $this->validate();
 
@@ -130,20 +130,17 @@ class ProductionLineIndex extends Component
         $pl->preparations()->sync($this->selectedPreparations ?? []);
         $pl->lines()->sync($this->selectedLines ?? []);
 
-        $this->loadProductionLines();
-        $this->resetForm();
-        $this->dispatch('closeModal');
-
-        session()->flash('success', $this->editing ? 'Production Line updated.' : 'Production Line created.');
+        return redirect()->route('production-lines')
+            ->with('success', $this->editing ? 'Production Line updated.' : 'Production Line created.');
     }
 
     #[On('delete')]
-    public function delete(int $id): void
+    public function delete(int $id)
     {
         authorizeRequest('production.production-line-delete');
         ProductionLine::findOrFail($id)->delete();
-        $this->loadProductionLines();
-        session()->flash('success', 'Production Line deleted.');
+
+        return redirect()->route('production-lines')->with('success', 'Production Line deleted.');
     }
 
     public function render()
