@@ -74,7 +74,7 @@ class ProductionLineIndex extends Component
     {
         authorizeRequest('production.production-line-create');
         $this->resetForm();
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', factories: []);
     }
 
     public function edit(int $id): void
@@ -91,7 +91,29 @@ class ProductionLineIndex extends Component
         $this->selectedLines        = $pl->lines->pluck('id')->toArray();
         $this->editing              = true;
 
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', factories: $this->fetchFactoryWarehouses($this->department_id));
+    }
+
+    public function onDepartmentChange(?int $deptId): void
+    {
+        $this->department_id = $deptId;
+        $this->factory_id    = null;
+
+        $factories = $this->fetchFactoryWarehouses($deptId);
+        $this->dispatch('plFactoriesReady', factories: $factories);
+    }
+
+    private function fetchFactoryWarehouses(?int $deptId): array
+    {
+        if (!$deptId) return [];
+        $all = $this->api->get('/v1/warehouses', [
+            'related_to_production' => true,
+            'department_id'         => $deptId,
+        ])['data'] ?? [];
+        return collect($all)
+            ->filter(fn($wh) => !empty($wh['type']['is_factory']))
+            ->values()
+            ->toArray();
     }
 
     protected function rules(): array

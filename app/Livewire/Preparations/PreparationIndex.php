@@ -63,7 +63,7 @@ class PreparationIndex extends Component
     {
         authorizeRequest('production.preparation-create');
         $this->resetForm();
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', warehouses: []);
     }
 
     public function edit(int $id): void
@@ -79,7 +79,30 @@ class PreparationIndex extends Component
         $this->fg_warehouse_id = $prep->fg_warehouse_id;
         $this->editing         = true;
 
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', warehouses: $this->fetchInternalWarehouses($this->department_id));
+    }
+
+    public function onDepartmentChange(?int $deptId): void
+    {
+        $this->department_id   = $deptId;
+        $this->rm_warehouse_id = null;
+        $this->fg_warehouse_id = null;
+
+        $warehouses = $this->fetchInternalWarehouses($deptId);
+        $this->dispatch('prepWarehousesReady', warehouses: $warehouses);
+    }
+
+    private function fetchInternalWarehouses(?int $deptId): array
+    {
+        if (!$deptId) return [];
+        $all = $this->api->get('/v1/warehouses', [
+            'related_to_production' => true,
+            'department_id'         => $deptId,
+        ])['data'] ?? [];
+        return collect($all)
+            ->filter(fn($wh) => !empty($wh['type']['is_internal']))
+            ->values()
+            ->toArray();
     }
 
     protected function rules(): array
