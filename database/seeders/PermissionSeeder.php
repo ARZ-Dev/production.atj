@@ -124,6 +124,26 @@ class PermissionSeeder extends Seeder
             'event-edit',
             'event-delete',
 
+            // Preparations
+            'production.preparation-list',
+            'production.preparation-create',
+            'production.preparation-edit',
+            'production.preparation-delete',
+            'production.preparation-capacity',
+
+            // Lines
+            'production.line-list',
+            'production.line-create',
+            'production.line-edit',
+            'production.line-delete',
+            'production.line-capacity',
+
+            // Production Lines
+            'production.production-line-list',
+            'production.production-line-create',
+            'production.production-line-edit',
+            'production.production-line-delete',
+
         ];
         
         $permissionsIds = [];

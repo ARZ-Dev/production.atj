@@ -40,6 +40,31 @@
 
                         <div class="col-12">
                             <hr>
+                            <h6 class="fw-semibold">Classification</h6>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox"
+                                    name="is_internal" id="is_internal"
+                                    @if(old('is_internal')) checked @endif
+                                    @if(isset($warehouse_type) && $warehouse_type['is_internal']) checked @endif>
+                                <label class="form-check-label fw-medium" for="is_internal">Internal Warehouse Type</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox"
+                                    name="is_factory" id="is_factory"
+                                    @if(old('is_factory')) checked @endif
+                                    @if(isset($warehouse_type) && $warehouse_type['is_factory']) checked @endif>
+                                <label class="form-check-label fw-medium" for="is_factory">Factory Warehouse Type</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <hr>
                             <h6 class="fw-semibold">Permissions & Features</h6>
                         </div>
 

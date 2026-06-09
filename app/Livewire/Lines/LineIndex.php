@@ -33,7 +33,12 @@ class LineIndex extends Component
         authorizeRequest('production.line-list');
 
         $this->departments = $api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
-        $this->warehouses  = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
+
+        $allWarehouses    = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
+        $this->warehouses = collect($allWarehouses)
+            ->filter(fn($wh) => !empty($wh['type']['is_internal']))
+            ->values()
+            ->toArray();
 
         $this->loadLines();
     }

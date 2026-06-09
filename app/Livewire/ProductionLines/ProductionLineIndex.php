@@ -39,10 +39,9 @@ class ProductionLineIndex extends Component
 
         $this->departments  = $api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
 
-        // Load all warehouses and filter by type "factory" client-side
-        $allWarehouses    = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
-        $this->factories  = collect($allWarehouses)
-            ->filter(fn($wh) => strtolower($wh['type']['name'] ?? '') === 'factory')
+        $allWarehouses   = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
+        $this->factories = collect($allWarehouses)
+            ->filter(fn($wh) => !empty($wh['type']['is_factory']))
             ->values()
             ->toArray();
 

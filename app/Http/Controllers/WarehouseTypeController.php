@@ -46,6 +46,8 @@ class WarehouseTypeController extends Controller
         $result = $this->api->post('/v1/warehouse-types', [
             'module'                => 'production',
             'name'                  => $request->name,
+            'is_internal'           => $request->boolean('is_internal'),
+            'is_factory'            => $request->boolean('is_factory'),
             'can_receive_transfer'  => $request->boolean('can_receive_transfer'),
             'can_receive_local_incoming_order'  => $request->boolean('can_receive_local_incoming_order'),
             'can_receive_international_incoming_order'  => $request->boolean('can_receive_international_incoming_order'),
@@ -100,8 +102,10 @@ class WarehouseTypeController extends Controller
         $request->validate($rules);
 
         $data = [
-            'module'     => 'production',
-            'name'       => $request->name,
+            'module'       => 'production',
+            'name'         => $request->name,
+            'is_internal'  => $request->boolean('is_internal'),
+            'is_factory'   => $request->boolean('is_factory'),
             'can_receive_transfer'  => $request->boolean('can_receive_transfer'),
             'can_receive_local_incoming_order'  => $request->boolean('can_receive_local_incoming_order'),
             'can_receive_international_incoming_order'  => $request->boolean('can_receive_international_incoming_order'),

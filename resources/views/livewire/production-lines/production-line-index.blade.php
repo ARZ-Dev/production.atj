@@ -143,6 +143,7 @@
                                     data-live-search="true">
                                     @forelse($factories as $factory)
                                     <option value="{{ $factory['id'] }}"
+                                        data-dept="{{ $factory['department_id'] }}"
                                         @selected($factory_id == $factory['id'])>
                                         {{ $factory['name'] }}
                                     </option>
@@ -213,13 +214,23 @@
     <script>
         const plModal = new bootstrap.Modal(document.getElementById('plModal'));
 
+        function filterPlFactories(deptId) {
+            $('#pl_factory_id').find('option').each(function () {
+                const optDept = $(this).data('dept');
+                $(this).prop('disabled', !!deptId && !!optDept && String(optDept) !== String(deptId));
+            });
+            $('#pl_factory_id').selectpicker('refresh');
+        }
+
         $wire.on('openModal', () => {
             plModal.show();
             setTimeout(() => {
                 ['#pl_department_id', '#pl_factory_id', '#pl_preparations', '#pl_lines'].forEach(id => {
                     $(id).selectpicker('destroy').selectpicker();
                 });
-                $('#pl_department_id').selectpicker('val', String($wire.get('department_id') || ''));
+                const deptId = $wire.get('department_id');
+                $('#pl_department_id').selectpicker('val', String(deptId || ''));
+                filterPlFactories(deptId);
                 $('#pl_factory_id').selectpicker('val', String($wire.get('factory_id') || ''));
                 $('#pl_preparations').selectpicker('val', ($wire.get('selectedPreparations') || []).map(String));
                 $('#pl_lines').selectpicker('val', ($wire.get('selectedLines') || []).map(String));
@@ -227,7 +238,11 @@
         });
 
         $(document).on('change', '#pl_department_id', function () {
-            $wire.set('department_id', parseInt($(this).val()) || null);
+            const deptId = parseInt($(this).val()) || null;
+            $wire.set('department_id', deptId);
+            $wire.set('factory_id', null);
+            filterPlFactories(deptId);
+            $('#pl_factory_id').selectpicker('val', '');
         });
         $(document).on('change', '#pl_factory_id', function () {
             $wire.set('factory_id', parseInt($(this).val()) || null);

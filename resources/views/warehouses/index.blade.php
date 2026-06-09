@@ -18,7 +18,6 @@
                             <th>Short Name</th>
                             <th>Department</th>
                             <th>Type</th>
-                            <th>Internal</th>
                             <th>Item Types</th>
                             <th>Action</th>
                         </tr>
@@ -31,13 +30,6 @@
                             <td>{{ $warehouse['shortname'] }}</td>
                             <td>{{ $warehouse['department']['name'] ?? '—' }}</td>
                             <td>{{ $warehouse['type']['name'] ?? '—' }}</td>
-                            <td>
-                                @if(!empty($warehouse['is_internal']))
-                                    <span class="badge bg-info">Internal</span>
-                                @else
-                                    <span class="text-muted small">—</span>
-                                @endif
-                            </td>
                             <td>
                                 <div class="d-flex flex-wrap gap-1">
                                     @forelse($warehouse['item_types'] as $itemType)

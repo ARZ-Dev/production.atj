@@ -15,6 +15,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Name</th>
+                        <th>Classification</th>
                         <th>Info</th>
                         <th>Action</th>
                     </tr>
@@ -24,6 +25,19 @@
                         <tr>
                             <td>{{ $warehouse_type['id'] }}</td>
                             <td>{{ $warehouse_type['name'] }}</td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @if(!empty($warehouse_type['is_internal']))
+                                        <span class="badge bg-info">Internal</span>
+                                    @endif
+                                    @if(!empty($warehouse_type['is_factory']))
+                                        <span class="badge bg-warning text-dark">Factory</span>
+                                    @endif
+                                    @if(empty($warehouse_type['is_internal']) && empty($warehouse_type['is_factory']))
+                                        <span class="text-muted small">—</span>
+                                    @endif
+                                </div>
+                            </td>
                             <td>
                                 @php
                                     $fields = [
