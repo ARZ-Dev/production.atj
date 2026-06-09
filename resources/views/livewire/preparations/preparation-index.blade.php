@@ -135,6 +135,7 @@
                                     data-live-search="true">
                                     @foreach($warehouses as $wh)
                                     <option value="{{ $wh['id'] }}"
+                                        data-dept="{{ $wh['department_id'] }}"
                                         @selected($rm_warehouse_id == $wh['id'])>
                                         {{ $wh['name'] }}
                                     </option>
@@ -154,6 +155,7 @@
                                     data-live-search="true">
                                     @foreach($warehouses as $wh)
                                     <option value="{{ $wh['id'] }}"
+                                        data-dept="{{ $wh['department_id'] }}"
                                         @selected($fg_warehouse_id == $wh['id'])>
                                         {{ $wh['name'] }}
                                     </option>
@@ -182,20 +184,38 @@
     <script>
         const prepModal = new bootstrap.Modal(document.getElementById('preparationModal'));
 
+        function filterPrepWarehouses(deptId) {
+            ['#prep_rm_warehouse_id', '#prep_fg_warehouse_id'].forEach(id => {
+                $(id).find('option').each(function () {
+                    const optDept = $(this).data('dept');
+                    $(this).prop('disabled', !!deptId && !!optDept && String(optDept) !== String(deptId));
+                });
+                $(id).selectpicker('refresh');
+            });
+        }
+
         $wire.on('openModal', () => {
             prepModal.show();
             setTimeout(() => {
                 ['#prep_department_id', '#prep_rm_warehouse_id', '#prep_fg_warehouse_id'].forEach(id => {
                     $(id).selectpicker('destroy').selectpicker();
                 });
-                $('#prep_department_id').selectpicker('val', String($wire.get('department_id') || ''));
+                const deptId = $wire.get('department_id');
+                $('#prep_department_id').selectpicker('val', String(deptId || ''));
+                filterPrepWarehouses(deptId);
                 $('#prep_rm_warehouse_id').selectpicker('val', String($wire.get('rm_warehouse_id') || ''));
                 $('#prep_fg_warehouse_id').selectpicker('val', String($wire.get('fg_warehouse_id') || ''));
             }, 150);
         });
 
         $(document).on('change', '#prep_department_id', function () {
-            $wire.set('department_id', parseInt($(this).val()) || null);
+            const deptId = parseInt($(this).val()) || null;
+            $wire.set('department_id', deptId);
+            $wire.set('rm_warehouse_id', null);
+            $wire.set('fg_warehouse_id', null);
+            filterPrepWarehouses(deptId);
+            $('#prep_rm_warehouse_id').selectpicker('val', '');
+            $('#prep_fg_warehouse_id').selectpicker('val', '');
         });
         $(document).on('change', '#prep_rm_warehouse_id', function () {
             $wire.set('rm_warehouse_id', parseInt($(this).val()) || null);

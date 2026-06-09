@@ -67,12 +67,11 @@ class WarehouseController extends Controller
         }
 
         $payload = [
-            'name'        => $request->input('name'),
-            'shortname'   => $request->input('shortname'),
-            'type_id'     => $request->input('type_id'),
+            'name'          => $request->input('name'),
+            'shortname'     => $request->input('shortname'),
+            'type_id'       => $request->input('type_id'),
             'department_id' => $request->input('department_id'),
             'items_type_id' => $request->input('items_type_id', []),
-            'is_internal' => $request->boolean('is_internal'),
         ];
 
         $response = $this->api->post('/v1/warehouses', $payload);
@@ -156,12 +155,11 @@ class WarehouseController extends Controller
         }
 
         $data = [
-            'name'        => $request->input('name'),
-            'shortname'   => $request->input('shortname'),
-            'type_id'     => $request->input('type_id'),
+            'name'          => $request->input('name'),
+            'shortname'     => $request->input('shortname'),
+            'type_id'       => $request->input('type_id'),
             'department_id' => $request->input('department_id'),
             'items_type_id' => $request->input('items_type_id', []),
-            'is_internal' => $request->boolean('is_internal'),
         ];
 
         $response = $this->api->post("/v1/warehouses/{$id}", $data);
