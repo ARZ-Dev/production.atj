@@ -63,13 +63,23 @@ class ShiftIndex extends Component
         return [
             'name'      => 'required|string|max:255',
             'from_time' => 'required|date_format:H:i',
-            'to_time'   => 'required|date_format:H:i|after:from_time',
+            'to_time'   => 'required|date_format:H:i',
         ];
     }
 
     public function submit()
     {
         $this->validate();
+
+        $duplicate = Shift::where('from_time', $this->from_time)
+            ->where('to_time', $this->to_time)
+            ->when($this->editing, fn($q) => $q->where('id', '!=', $this->shift_id))
+            ->exists();
+
+        if ($duplicate) {
+            $this->addError('from_time', 'A shift with these exact hours already exists.');
+            return;
+        }
 
         $data = [
             'name'      => $this->name,

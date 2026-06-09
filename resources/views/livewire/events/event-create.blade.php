@@ -1,4 +1,5 @@
 <div>
+    <script>window.ecShifts = @json($shifts);</script>
     <div class="ec-page">
 
         <div class="ec-info-bar card mb-0">
@@ -56,7 +57,19 @@
             @endif
 
             @foreach($events as $index => $event)
-            <div class="ec-card" wire:key="ec-{{ $index }}">
+            <div class="ec-card" wire:key="ec-{{ $index }}"
+                x-data="{
+                    fromTime: '{{ $event['from_time'] ?? '' }}',
+                    get matchingShift() {
+                        const t = this.fromTime;
+                        if (!t) return null;
+                        return (window.ecShifts || []).find(s =>
+                            s.from <= s.to
+                                ? (t >= s.from && t <= s.to)
+                                : (t >= s.from || t <= s.to)
+                        ) ?? null;
+                    }
+                }">
 
                 <div class="ec-card-head">
                     <span class="ec-seq-dot">{{ $loop->iteration }}</span>
@@ -99,7 +112,8 @@
                             <input type="time"
                                 class="form-control form-control-sm @error('events.'.$index.'.from_time') is-invalid @enderror"
                                 wire:model.defer="events.{{ $index }}.from_time"
-                                value="{{ $event['from_time'] ?? '' }}">
+                                value="{{ $event['from_time'] ?? '' }}"
+                                @input="fromTime = $event.target.value">
                             @error('events.' . $index . '.from_time')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
@@ -116,6 +130,14 @@
                             @error('events.' . $index . '.to_time')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
+                        </div>
+
+                        <div class="ms-auto d-flex align-items-center" x-show="matchingShift">
+                            <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle d-flex align-items-center gap-1" style="font-size: 11px; padding: 5px 10px;">
+                                <i class="bi bi-flag-fill" style="font-size: 9px;"></i>
+                                <span x-text="matchingShift?.name"></span>
+                                <span class="opacity-75" x-text="matchingShift ? matchingShift.from + '–' + matchingShift.to : ''"></span>
+                            </span>
                         </div>
                     </div>
 

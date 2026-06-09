@@ -5,6 +5,7 @@ namespace App\Livewire\Events;
 use App\Models\Event;
 use App\Models\EventType;
 use App\Models\Plan;
+use App\Models\Shift;
 use Carbon\Carbon;
 use Livewire\Component;
 
@@ -15,6 +16,7 @@ class EventCreate extends Component
     public $eventTypes = [];
     public $events = [];
     public $removedEventIds = [];
+    public array $shifts = [];
 
     public function mount($planId): void
     {
@@ -23,6 +25,16 @@ class EventCreate extends Component
         $this->planId     = $planId;
         $this->plan       = Plan::with('shift')->findOrFail($planId);
         $this->eventTypes = EventType::orderBy('name')->get();
+        $this->shifts     = Shift::orderBy('from_time')
+            ->get()
+            ->map(fn($s) => [
+                'id'   => $s->id,
+                'name' => $s->name,
+                'from' => Carbon::parse($s->from_time)->format('H:i'),
+                'to'   => Carbon::parse($s->to_time)->format('H:i'),
+            ])
+            ->values()
+            ->toArray();
 
         $this->loadExistingEvents();
     }
