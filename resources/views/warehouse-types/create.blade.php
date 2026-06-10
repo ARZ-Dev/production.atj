@@ -48,7 +48,7 @@
                                 <input class="form-check-input" type="checkbox"
                                     name="is_internal" id="is_internal"
                                     @if(old('is_internal')) checked @endif
-                                    @if(isset($warehouse_type) && $warehouse_type['is_internal']) checked @endif>
+                                    @if(isset($warehouse_type) && ($warehouse_type['is_internal'] ?? false)) checked @endif>
                                 <label class="form-check-label fw-medium" for="is_internal">Internal Warehouse Type</label>
                             </div>
                         </div>
@@ -58,7 +58,7 @@
                                 <input class="form-check-input" type="checkbox"
                                     name="is_factory" id="is_factory"
                                     @if(old('is_factory')) checked @endif
-                                    @if(isset($warehouse_type) && $warehouse_type['is_factory']) checked @endif>
+                                    @if(isset($warehouse_type) && ($warehouse_type['is_factory'] ?? false)) checked @endif>
                                 <label class="form-check-label fw-medium" for="is_factory">Factory Warehouse Type</label>
                             </div>
                         </div>
@@ -91,7 +91,7 @@
                                            name="{{ $field }}"
                                            id="{{ $field }}"
                                            @if(old($field)) checked @endif
-                                           @if(isset($warehouse_type) && $warehouse_type[$field]) checked @endif
+                                           @if(isset($warehouse_type) && ($warehouse_type[$field] ?? false)) checked @endif
                                     >
                                     <label class="form-check-label fw-medium" for="{{ $field }}">
                                         {{ $label }}
