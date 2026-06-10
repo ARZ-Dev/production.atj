@@ -3,7 +3,6 @@
 namespace App\Livewire\Plans;
 
 use App\Models\Plan;
-use App\Models\Shift;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -12,11 +11,9 @@ class PlanIndex extends Component
 {
     public int $currentYear;
     public int $currentMonth;
-    public $shifts = [];
 
     // Modal form fields
     public $plan_id;
-    public $shift_id;
     public $date;
     public bool $editing = false;
 
@@ -24,19 +21,6 @@ class PlanIndex extends Component
     {
         $this->currentYear  = now()->year;
         $this->currentMonth = now()->month;
-        $this->loadShifts();
-    }
-
-    public function loadShifts(): void
-    {
-        $user = authUser();
-        if ($user && $user->hasPermission('production.shift-viewAll')) {
-            $this->shifts = Shift::orderBy('from_time')->get();
-        } else {
-            $userId = $user?->id;
-            $this->shifts = Shift::whereHas('users', fn($q) => $q->where('user_id', $userId))
-                ->orderBy('from_time')->get();
-        }
     }
 
     public function prevMonth(): void
@@ -61,10 +45,9 @@ class PlanIndex extends Component
 
     public function resetForm(): void
     {
-        $this->plan_id  = null;
-        $this->shift_id = '';
-        $this->date     = '';
-        $this->editing  = false;
+        $this->plan_id = null;
+        $this->date    = '';
+        $this->editing = false;
         $this->resetValidation();
     }
 
@@ -85,18 +68,16 @@ class PlanIndex extends Component
     {
         $this->resetForm();
         $plan = Plan::findOrFail($id);
-        $this->plan_id  = $plan->id;
-        $this->shift_id = $plan->shift_id;
-        $this->date     = Carbon::parse($plan->date)->format('Y-m-d');
-        $this->editing  = true;
+        $this->plan_id = $plan->id;
+        $this->date    = Carbon::parse($plan->date)->format('Y-m-d');
+        $this->editing = true;
         $this->dispatch('openModal');
     }
 
     protected function rules(): array
     {
         return [
-            'shift_id' => 'required|exists:shifts,id',
-            'date'     => 'required|date',
+            'date' => 'required|date',
         ];
     }
 
@@ -104,17 +85,7 @@ class PlanIndex extends Component
     {
         $this->validate();
 
-        $duplicate = Plan::where('shift_id', $this->shift_id)
-            ->whereDate('date', $this->date)
-            ->when($this->editing, fn($q) => $q->where('id', '!=', $this->plan_id))
-            ->exists();
-
-        if ($duplicate) {
-            $this->addError('shift_id', 'This shift already has a plan for the selected date.');
-            return;
-        }
-
-        $data = ['shift_id' => $this->shift_id, 'date' => $this->date];
+        $data = ['date' => $this->date];
 
         if ($this->editing) {
             Plan::findOrFail($this->plan_id)->update($data);
@@ -136,14 +107,10 @@ class PlanIndex extends Component
 
     public function render()
     {
-        $plansByDate = Plan::with('shift')
-            ->withCount('events')
-            ->leftJoin('shifts', 'shifts.id', '=', 'plans.shift_id')
-            ->select('plans.*')
-            ->whereYear('plans.date', $this->currentYear)
-            ->whereMonth('plans.date', $this->currentMonth)
-            ->orderBy('plans.date')
-            ->orderBy('shifts.from_time')
+        $plansByDate = Plan::withCount('events')
+            ->whereYear('date', $this->currentYear)
+            ->whereMonth('date', $this->currentMonth)
+            ->orderBy('date')
             ->get()
             ->groupBy(fn($p) => Carbon::parse($p->date)->format('Y-m-d'));
 

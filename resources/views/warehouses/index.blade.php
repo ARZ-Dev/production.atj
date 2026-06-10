@@ -28,8 +28,8 @@
                             <td>{{ $warehouse['id'] }}</td>
                             <td>{{ $warehouse['name'] }}</td>
                             <td>{{ $warehouse['shortname'] }}</td>
-                            <td>{{ $warehouse['department']['name'] }}</td>
-                            <td>{{ $warehouse['type']['name'] }}</td>
+                            <td>{{ $warehouse['department']['name'] ?? '—' }}</td>
+                            <td>{{ $warehouse['type']['name'] ?? '—' }}</td>
                             <td>
                                 <div class="d-flex flex-wrap gap-1">
                                     @forelse($warehouse['item_types'] as $itemType)

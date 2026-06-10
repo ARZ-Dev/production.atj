@@ -67,9 +67,9 @@ class WarehouseController extends Controller
         }
 
         $payload = [
-            'name' => $request->input('name'),
-            'shortname' => $request->input('shortname'),
-            'type_id' => $request->input('type_id'),
+            'name'          => $request->input('name'),
+            'shortname'     => $request->input('shortname'),
+            'type_id'       => $request->input('type_id'),
             'department_id' => $request->input('department_id'),
             'items_type_id' => $request->input('items_type_id', []),
         ];
@@ -155,10 +155,10 @@ class WarehouseController extends Controller
         }
 
         $data = [
-            'name' => $request->input('name'),
-            'shortname' => $request->input('shortname'),
-            'type_id' => $request->input('type_id'),
-            'department_id'      => $request->input('department_id'),
+            'name'          => $request->input('name'),
+            'shortname'     => $request->input('shortname'),
+            'type_id'       => $request->input('type_id'),
+            'department_id' => $request->input('department_id'),
             'items_type_id' => $request->input('items_type_id', []),
         ];
 

@@ -71,17 +71,11 @@
                             </div>
 
                             @foreach($dayPlans as $plan)
-                                @php $color = $colors[($plan->shift_id ?? 0) % count($colors)]; @endphp
+                                @php $color = $colors[$plan->id % count($colors)]; @endphp
                                 <div class="plan-card" style="border-left-color:{{ $color }}">
                                     <div class="plan-card-name" style="color:{{ $color }}">
-                                        {{ $plan->shift?->name ?? 'No Shift' }}
+                                        Plan #{{ $plan->id }}
                                     </div>
-                                    @if($plan->shift)
-                                    <div class="plan-card-time">
-                                        {{ \Carbon\Carbon::parse($plan->shift->from_time)->format('H:i') }}
-                                        – {{ \Carbon\Carbon::parse($plan->shift->to_time)->format('H:i') }}
-                                    </div>
-                                    @endif
                                     <div class="plan-card-foot">
                                         <span class="plan-card-evt">
                                             <i class="bi bi-card-list" style="font-size:10px"></i>
@@ -143,30 +137,6 @@
                                 id="plan_date" wire:model="date">
                             @error('date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-                        <div class="col-12">
-                            <label class="form-label" for="plan_shift">
-                                Shift <span class="text-danger">*</span>
-                            </label>
-                            <div wire:ignore>
-                                <select wire:model="shift_id" id="plan_shift"
-                                    class="selectpicker w-100"
-                                    title="Select shift…"
-                                    data-style="btn-default" data-live-search="true"
-                                    data-icon-base="ti" data-size="5"
-                                    data-tick-icon="ti-check text-white">
-                                    @foreach($shifts as $shift)
-                                    <option value="{{ $shift->id }}">
-                                        {{ $shift->name }}
-                                        ({{ \Carbon\Carbon::parse($shift->from_time)->format('H:i') }}
-                                        – {{ \Carbon\Carbon::parse($shift->to_time)->format('H:i') }})
-                                    </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @error('shift_id')
-                                <div class="text-danger small mt-1">{{ $message }}</div>
-                            @enderror
-                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -190,19 +160,12 @@
         $wire.on('openModal', () => {
             planModal.show();
             setTimeout(() => {
-                let sid = $wire.get('shift_id');
-                $('#plan_shift').selectpicker('val', sid ? String(sid) : '');
                 let d = $wire.get('date');
                 if (d) document.getElementById('plan_date').value = d;
             }, 250);
         });
 
         $wire.on('closeModal', () => planModal.hide());
-
-        $('.selectpicker').selectpicker();
-        $(document).on('change', '.selectpicker', function () {
-            $wire.set($(this).attr('wire:model'), $(this).val());
-        });
     </script>
     @endscript
 </div>
