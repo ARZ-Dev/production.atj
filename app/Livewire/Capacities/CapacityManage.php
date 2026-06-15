@@ -17,6 +17,7 @@ class CapacityManage extends Component
 
     public ?int  $selected_item_type_id = null;
     public array $capacityRows          = [];  // [item_id => capacity_value]
+    public bool  $typeLocked            = false;
 
     protected ApiService $api;
 
@@ -55,6 +56,7 @@ class CapacityManage extends Component
     {
         $this->items        = [];
         $this->capacityRows = [];
+        $this->typeLocked   = (bool) $value;
 
         if (!$value) {
             return;
@@ -81,6 +83,16 @@ class CapacityManage extends Component
         foreach ($this->items as $item) {
             $this->capacityRows[$item['id']] = $existing[$item['id']] ?? '';
         }
+    }
+
+    public function changeItemType(): void
+    {
+        $this->selected_item_type_id = null;
+        $this->items                 = [];
+        $this->capacityRows          = [];
+        $this->typeLocked            = false;
+
+        $this->dispatch('itemTypeReset');
     }
 
     protected function rules(): array

@@ -71,11 +71,8 @@ class EventTypeIndex extends Component
             EventType::create(['name' => $this->name]);
         }
 
-        $this->loadEventTypes();
-        $this->dispatch('closeModal');
-        $this->resetForm();
-
-        session()->flash('success', $this->editing ? 'Event Type updated successfully.' : 'Event Type created successfully.');
+        return redirect()->route('event-types')
+            ->with('success', $this->editing ? 'Event Type updated successfully.' : 'Event Type created successfully.');
     }
 
     #[On('delete')]
@@ -83,8 +80,8 @@ class EventTypeIndex extends Component
     {
         authorizeRequest('production.eventType-delete');
         EventType::findOrFail($id)->delete();
-        $this->loadEventTypes();
-        session()->flash('success', 'Event Type deleted successfully.');
+
+        return redirect()->route('event-types')->with('success', 'Event Type deleted successfully.');
     }
 
     public function render()

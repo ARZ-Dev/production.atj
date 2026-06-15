@@ -99,6 +99,9 @@
         $wire.on('openModal', () => eventTypeModal.show());
         $wire.on('closeModal', () => eventTypeModal.hide());
     </script>
-    @include('livewire.deleteConfirm')
+    @endscript
+
+    @script
+        @include('livewire.deleteConfirm')
     @endscript
 </div>
