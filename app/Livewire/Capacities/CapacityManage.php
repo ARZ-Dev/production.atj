@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Capacities;
 
-use App\Models\Capacity;
 use App\Services\ApiService;
 use Livewire\Component;
 
@@ -13,11 +12,9 @@ class CapacityManage extends Component
     public string $modelName = '';
 
     public array $itemTypes = [];
-    public array $items     = [];
+    public array $sections  = [];  // [ ['item_type_id', 'item_type_name', 'items', 'capacityRows'] ]
 
-    public ?int  $selected_item_type_id = null;
-    public array $capacityRows          = [];  // [item_id => capacity_value]
-    public bool  $typeLocked            = false;
+    public ?int $selected_item_type_id = null;
 
     protected ApiService $api;
 
@@ -36,6 +33,15 @@ class CapacityManage extends Component
         $modelClass      = $this->resolveModelClass();
         $model           = $modelClass::findOrFail($id);
         $this->modelName = $model->name;
+
+        $existingTypeIds = $model->capacities()
+            ->distinct()
+            ->pluck('item_type_id')
+            ->all();
+
+        foreach ($existingTypeIds as $typeId) {
+            $this->addSection((int) $typeId);
+        }
     }
 
     protected function resolveModelClass(): string
@@ -52,58 +58,73 @@ class CapacityManage extends Component
         return $this->resolveModelClass()::findOrFail($this->modelId);
     }
 
-    public function updatedSelectedItemTypeId(?int $value): void
+    public function availableItemTypes(): array
     {
-        $this->items        = [];
-        $this->capacityRows = [];
-        $this->typeLocked   = (bool) $value;
+        $used = collect($this->sections)->pluck('item_type_id')->all();
 
-        if (!$value) {
-            return;
-        }
+        return array_values(array_filter(
+            $this->itemTypes,
+            fn ($type) => !in_array($type['id'], $used)
+        ));
+    }
 
-        // Find type name for the API call
-        $type = collect($this->itemTypes)->firstWhere('id', $value);
+    protected function addSection(int $typeId): void
+    {
+        $type = collect($this->itemTypes)->firstWhere('id', $typeId);
+
         if (!$type) {
             return;
         }
 
-        $this->items = $this->api->get('/v1/items', [
+        $items = $this->api->get('/v1/items', [
             'item_type' => $type['name'],
             'is_active' => true,
         ])['data'] ?? [];
 
-        // Pre-fill existing capacities
         $existing = $this->resolveModel()
             ->capacities()
-            ->where('item_type_id', $value)
+            ->where('item_type_id', $typeId)
             ->pluck('capacity', 'item_id')
             ->toArray();
 
-        foreach ($this->items as $item) {
-            $this->capacityRows[$item['id']] = $existing[$item['id']] ?? '';
+        $capacityRows = [];
+        foreach ($items as $item) {
+            $capacityRows[$item['id']] = $existing[$item['id']] ?? '';
         }
+
+        $this->sections[] = [
+            'item_type_id'   => $typeId,
+            'item_type_name' => $type['name'],
+            'items'          => $items,
+            'capacityRows'   => $capacityRows,
+        ];
     }
 
-    public function changeItemType(): void
+    public function addItemType(): void
     {
-        $this->selected_item_type_id = null;
-        $this->items                 = [];
-        $this->capacityRows          = [];
-        $this->typeLocked            = false;
+        if (!$this->selected_item_type_id) {
+            return;
+        }
 
-        $this->dispatch('itemTypeReset');
+        if (collect($this->sections)->contains('item_type_id', $this->selected_item_type_id)) {
+            $this->selected_item_type_id = null;
+            return;
+        }
+
+        $this->addSection($this->selected_item_type_id);
+        $this->selected_item_type_id = null;
+
+        $this->dispatch('itemTypesUpdated', itemTypes: $this->availableItemTypes());
     }
 
     protected function rules(): array
     {
-        $rules = [
-            'selected_item_type_id' => 'required|integer',
-            'capacityRows'          => 'required|array',
-        ];
+        $rules = [];
 
-        foreach (array_keys($this->capacityRows) as $itemId) {
-            $rules["capacityRows.{$itemId}"] = 'nullable|numeric|min:0';
+        foreach ($this->sections as $index => $section) {
+            foreach (array_keys($section['capacityRows']) as $itemId) {
+                $rules["sections.{$index}.capacityRows.{$itemId}"] = 'nullable|numeric|min:0';
+            }
         }
 
         return $rules;
@@ -113,22 +134,24 @@ class CapacityManage extends Component
     {
         $this->validate();
 
-        $model      = $this->resolveModel();
-        $typeId     = $this->selected_item_type_id;
+        $model = $this->resolveModel();
 
-        // Delete rows for this item type first, then re-insert
-        $model->capacities()->where('item_type_id', $typeId)->delete();
+        foreach ($this->sections as $section) {
+            $typeId = $section['item_type_id'];
 
-        foreach ($this->capacityRows as $itemId => $capacity) {
-            if ($capacity === '' || $capacity === null) {
-                continue;
+            $model->capacities()->where('item_type_id', $typeId)->delete();
+
+            foreach ($section['capacityRows'] as $itemId => $capacity) {
+                if ($capacity === '' || $capacity === null) {
+                    continue;
+                }
+
+                $model->capacities()->create([
+                    'item_type_id' => $typeId,
+                    'item_id'      => $itemId,
+                    'capacity'     => $capacity,
+                ]);
             }
-
-            $model->capacities()->create([
-                'item_type_id' => $typeId,
-                'item_id'      => $itemId,
-                'capacity'     => $capacity,
-            ]);
         }
 
         session()->flash('success', 'Capacity saved successfully.');
