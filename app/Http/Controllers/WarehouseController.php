@@ -128,7 +128,7 @@ class WarehouseController extends Controller
             ->where('related_to_production', true)
             ->values()
             ->toArray();
-        $data['item_types'] = $this->api->get('/v1/warehouses/'.$id.'/item-types', ['module' => 'production'])['data'] ?? [];
+        $data['item_types'] = $this->api->get('/v1/warehouses/item-types', ['module' => 'production'])['data'] ?? [];
 
         return view('warehouses.create', $data);
     }
