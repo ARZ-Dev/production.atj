@@ -25,40 +25,39 @@
                 <div class="card-body">
 
                     {{-- Add Item Type --}}
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Add Item Type</label>
-                            <div wire:ignore>
-                                <select
-                                    id="cap_item_type"
-                                    class="selectpicker form-control"
-                                    title="Choose item type…"
-                                    data-style="btn-default"
-                                    data-live-search="true">
-                                    @foreach($this->availableItemTypes() as $type)
-                                    <option value="{{ $type['id'] }}">{{ $type['name'] }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6 d-flex align-items-end">
-                            <button type="button" class="btn btn-primary" wire:click="addItemType" @disabled(!$selected_item_type_id)>
-                                <i class="bi bi-plus-lg me-1"></i> Add
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Add Item Type</label>
+                        @if(empty($this->availableItemTypes()))
+                        <p class="text-muted small mb-0">All item types have been added.</p>
+                        @else
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach($this->availableItemTypes() as $type)
+                            <button type="button" wire:click="addItemType({{ $type['id'] }})"
+                                class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-plus-lg me-1"></i> {{ $type['name'] }}
                             </button>
+                            @endforeach
                         </div>
+                        @endif
                     </div>
 
                     {{-- Item type sections --}}
                     @if(empty($sections))
                     <div class="alert alert-secondary">
                         <i class="bi bi-arrow-up-circle me-2"></i>
-                        Select an item type above and click Add to set capacity values.
+                        Add an item type above to set capacity values.
                     </div>
                     @else
                     <form wire:submit.prevent="save">
                         @foreach($sections as $index => $section)
-                        <div class="mb-4" wire:key="cap-section-{{ $section['item_type_id'] }}">
-                            <h6 class="fw-semibold mb-2 text-capitalize">{{ $section['item_type_name'] }}</h6>
+                        <div class="card mb-3" wire:key="cap-section-{{ $section['item_type_id'] }}">
+                            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                <h6 class="fw-semibold mb-0 text-capitalize">{{ $section['item_type_name'] }}</h6>
+                                <button type="button" class="btn btn-light-danger icon-btn-sm" wire:click="removeItemType({{ $index }})" title="Remove">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            <div class="card-body">
 
                             @if(!empty($section['items']))
                             <div class="table-responsive">
@@ -97,6 +96,7 @@
                                 No items found for this type.
                             </div>
                             @endif
+                            </div>
                         </div>
                         @endforeach
 
@@ -113,24 +113,4 @@
             </div>
         </div>
     </div>
-
-    @script
-    <script>
-        $('.selectpicker').selectpicker();
-
-        $(document).on('change', '#cap_item_type', function () {
-            const val = parseInt($(this).val()) || null;
-            $wire.set('selected_item_type_id', val);
-        });
-
-        $wire.on('itemTypesUpdated', ({ itemTypes }) => {
-            const $sel = $('#cap_item_type');
-            $sel.empty();
-            (itemTypes || []).forEach(type => {
-                $sel.append($('<option>', { value: type.id, text: type.name }));
-            });
-            $sel.val('').selectpicker('refresh');
-        });
-    </script>
-    @endscript
 </div>
