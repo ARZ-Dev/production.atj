@@ -24,10 +24,10 @@
 
                 <div class="card-body">
 
-                    {{-- Step 1: Select Item Type --}}
+                    {{-- Add Item Type --}}
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Select Item Type</label>
+                            <label class="form-label fw-semibold">Add Item Type</label>
                             <div wire:ignore>
                                 <select
                                     id="cap_item_type"
@@ -35,57 +35,70 @@
                                     title="Choose item type…"
                                     data-style="btn-default"
                                     data-live-search="true">
-                                    @foreach($itemTypes as $type)
-                                    <option value="{{ $type['id'] }}"
-                                        {{ $selected_item_type_id == $type['id'] ? 'selected' : '' }}>
-                                        {{ $type['name'] }}
-                                    </option>
+                                    @foreach($this->availableItemTypes() as $type)
+                                    <option value="{{ $type['id'] }}">{{ $type['name'] }}</option>
                                     @endforeach
                                 </select>
                             </div>
                         </div>
-                        @if($typeLocked)
                         <div class="col-md-6 d-flex align-items-end">
-                            <button type="button" class="btn btn-light-secondary" wire:click="changeItemType">
-                                <i class="bi bi-arrow-left-right me-1"></i> Change Item Type
+                            <button type="button" class="btn btn-primary" wire:click="addItemType" @disabled(!$selected_item_type_id)>
+                                <i class="bi bi-plus-lg me-1"></i> Add
                             </button>
                         </div>
-                        @endif
                     </div>
 
-                    {{-- Step 2: Items table (shown after type selection) --}}
-                    @if(!empty($items))
+                    {{-- Item type sections --}}
+                    @if(empty($sections))
+                    <div class="alert alert-secondary">
+                        <i class="bi bi-arrow-up-circle me-2"></i>
+                        Select an item type above and click Add to set capacity values.
+                    </div>
+                    @else
                     <form wire:submit.prevent="save">
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width:60%">Item</th>
-                                        <th style="width:40%">Output / Hr</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($items as $item)
-                                    <tr>
-                                        <td class="align-middle">{{ $item['name'] }}</td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                class="form-control form-control-sm @error('capacityRows.'.$item['id']) is-invalid @enderror"
-                                                wire:model="capacityRows.{{ $item['id'] }}"
-                                                placeholder="0.00"
-                                            />
-                                            @error('capacityRows.'.$item['id'])
-                                                <div class="invalid-feedback">{{ $message }}</div>
-                                            @enderror
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                        @foreach($sections as $index => $section)
+                        <div class="mb-4" wire:key="cap-section-{{ $section['item_type_id'] }}">
+                            <h6 class="fw-semibold mb-2 text-capitalize">{{ $section['item_type_name'] }}</h6>
+
+                            @if(!empty($section['items']))
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width:60%">Item</th>
+                                            <th style="width:40%">Output / Hr</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($section['items'] as $item)
+                                        <tr>
+                                            <td class="align-middle">{{ $item['name'] }}</td>
+                                            <td>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    class="form-control form-control-sm @error('sections.'.$index.'.capacityRows.'.$item['id']) is-invalid @enderror"
+                                                    wire:model="sections.{{ $index }}.capacityRows.{{ $item['id'] }}"
+                                                    placeholder="0.00"
+                                                />
+                                                @error('sections.'.$index.'.capacityRows.'.$item['id'])
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @else
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                No items found for this type.
+                            </div>
+                            @endif
                         </div>
+                        @endforeach
 
                         <div class="d-flex justify-content-end mt-3">
                             <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
@@ -94,16 +107,6 @@
                             </button>
                         </div>
                     </form>
-                    @elseif($selected_item_type_id)
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        No items found for the selected type.
-                    </div>
-                    @else
-                    <div class="alert alert-secondary">
-                        <i class="bi bi-arrow-up-circle me-2"></i>
-                        Select an item type above to view and set capacity values.
-                    </div>
                     @endif
 
                 </div>
@@ -118,19 +121,15 @@
         $(document).on('change', '#cap_item_type', function () {
             const val = parseInt($(this).val()) || null;
             $wire.set('selected_item_type_id', val);
-
-            if (val) {
-                setTimeout(() => {
-                    $('#cap_item_type').prop('disabled', true).selectpicker('refresh');
-                }, 0);
-            }
         });
 
-        $wire.on('itemTypeReset', () => {
-            $('#cap_item_type')
-                .prop('disabled', false)
-                .val('')
-                .selectpicker('refresh');
+        $wire.on('itemTypesUpdated', ({ itemTypes }) => {
+            const $sel = $('#cap_item_type');
+            $sel.empty();
+            (itemTypes || []).forEach(type => {
+                $sel.append($('<option>', { value: type.id, text: type.name }));
+            });
+            $sel.val('').selectpicker('refresh');
         });
     </script>
     @endscript
