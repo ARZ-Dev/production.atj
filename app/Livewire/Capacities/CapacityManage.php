@@ -14,7 +14,7 @@ class CapacityManage extends Component
     public array $itemTypes = [];
     public array $sections  = [];  // [ ['item_type_id', 'item_type_name', 'items', 'capacityRows'] ]
 
-    public ?int $selected_item_type_id = null;
+    public array $removedTypeIds = [];
 
     protected ApiService $api;
 
@@ -100,21 +100,28 @@ class CapacityManage extends Component
         ];
     }
 
-    public function addItemType(): void
+    public function addItemType(int $typeId): void
     {
-        if (!$this->selected_item_type_id) {
+        if (collect($this->sections)->contains('item_type_id', $typeId)) {
             return;
         }
 
-        if (collect($this->sections)->contains('item_type_id', $this->selected_item_type_id)) {
-            $this->selected_item_type_id = null;
+        $this->addSection($typeId);
+        $this->removedTypeIds = array_values(array_diff($this->removedTypeIds, [$typeId]));
+    }
+
+    public function removeItemType(int $index): void
+    {
+        $section = $this->sections[$index] ?? null;
+
+        if (!$section) {
             return;
         }
 
-        $this->addSection($this->selected_item_type_id);
-        $this->selected_item_type_id = null;
+        $this->removedTypeIds[] = $section['item_type_id'];
 
-        $this->dispatch('itemTypesUpdated', itemTypes: $this->availableItemTypes());
+        unset($this->sections[$index]);
+        $this->sections = array_values($this->sections);
     }
 
     protected function rules(): array
@@ -136,6 +143,10 @@ class CapacityManage extends Component
 
         $model = $this->resolveModel();
 
+        foreach ($this->removedTypeIds as $typeId) {
+            $model->capacities()->where('item_type_id', $typeId)->delete();
+        }
+
         foreach ($this->sections as $section) {
             $typeId = $section['item_type_id'];
 
@@ -153,6 +164,8 @@ class CapacityManage extends Component
                 ]);
             }
         }
+
+        $this->removedTypeIds = [];
 
         session()->flash('success', 'Capacity saved successfully.');
     }
