@@ -245,6 +245,9 @@
             $wire.set('selectedLines', ($(this).val() || []).map(Number));
         });
     </script>
+    @endscript
+
+    @script
     @include('livewire.deleteConfirm')
     @endscript
 </div>

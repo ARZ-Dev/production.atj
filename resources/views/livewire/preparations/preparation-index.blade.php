@@ -139,7 +139,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Finished Good Warehouse <span class="text-danger">*</span></label>
+                            <label class="form-label">Semi Finished Good Warehouse <span class="text-danger">*</span></label>
                             <div wire:ignore>
                                 <select id="prep_fg_warehouse_id"
                                     class="selectpicker w-100 @error('fg_warehouse_id') is-invalid @enderror"
@@ -205,6 +205,9 @@
             $wire.set('fg_warehouse_id', parseInt($(this).val()) || null);
         });
     </script>
+    @endscript
+
+    @script
     @include('livewire.deleteConfirm')
     @endscript
 </div>
