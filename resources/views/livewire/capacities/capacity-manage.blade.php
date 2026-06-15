@@ -120,7 +120,9 @@
             $wire.set('selected_item_type_id', val);
 
             if (val) {
-                $(this).prop('disabled', true).selectpicker('refresh');
+                setTimeout(() => {
+                    $('#cap_item_type').prop('disabled', true).selectpicker('refresh');
+                }, 0);
             }
         });
 

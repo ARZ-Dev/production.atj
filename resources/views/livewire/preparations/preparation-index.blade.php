@@ -205,6 +205,9 @@
             $wire.set('fg_warehouse_id', parseInt($(this).val()) || null);
         });
     </script>
+    @endscript
+
+    @script
     @include('livewire.deleteConfirm')
     @endscript
 </div>
