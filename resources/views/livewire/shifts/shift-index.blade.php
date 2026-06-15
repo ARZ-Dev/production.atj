@@ -116,6 +116,9 @@
         $wire.on('openModal', () => shiftModal.show());
         $wire.on('closeModal', () => shiftModal.hide());
     </script>
-    @include('livewire.deleteConfirm')
+    @endscript
+
+    @script
+        @include('livewire.deleteConfirm')
     @endscript
 </div>

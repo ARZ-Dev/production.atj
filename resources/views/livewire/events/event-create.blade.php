@@ -57,7 +57,7 @@
             @endif
 
             @foreach($events as $index => $event)
-            <div class="ec-card" wire:key="ec-{{ $index }}"
+            <div class="ec-card" wire:key="ec-{{ $event['key'] }}"
                 x-data="{
                     fromTime: '{{ $event['from_time'] ?? '' }}',
                     get matchingShift() {

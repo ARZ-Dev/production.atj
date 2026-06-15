@@ -83,7 +83,27 @@ class WarehouseTypeController extends Controller
                 ->with('error', $result['message'] ?? 'Warehouse type not found.');
         }
 
-        $data['warehouse_type'] = $result['data'];
+        $warehouseType = $result['data'];
+
+        // Some classification fields (e.g. is_factory) may be missing from the
+        // single-item response. Backfill them from the list endpoint if needed.
+        $fields = [
+            'is_internal', 'is_factory', 'can_receive_transfer',
+            'can_receive_local_incoming_order', 'can_receive_international_incoming_order',
+            'can_receive_production', 'can_send_transfer', 'can_send_order',
+            'can_request_product', 'have_pos', 'can_distribute', 'can_return_distribute',
+        ];
+
+        if (count(array_intersect($fields, array_keys($warehouseType))) < count($fields)) {
+            $list = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
+            $match = collect($list)->firstWhere('id', $warehouseType['id'] ?? $id);
+
+            if ($match) {
+                $warehouseType = array_merge($match, $warehouseType);
+            }
+        }
+
+        $data['warehouse_type'] = $warehouseType;
         $data['route'] = route('warehouse-types.update', $id);
         $data['editing'] = true;
 

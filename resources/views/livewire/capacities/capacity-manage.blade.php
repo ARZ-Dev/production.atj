@@ -28,20 +28,29 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Select Item Type</label>
-                            <select
-                                id="cap_item_type"
-                                class="selectpicker form-control"
-                                title="Choose item type…"
-                                data-style="btn-default"
-                                data-live-search="true">
-                                @foreach($itemTypes as $type)
-                                <option value="{{ $type['id'] }}"
-                                    {{ $selected_item_type_id == $type['id'] ? 'selected' : '' }}>
-                                    {{ $type['name'] }}
-                                </option>
-                                @endforeach
-                            </select>
+                            <div wire:ignore>
+                                <select
+                                    id="cap_item_type"
+                                    class="selectpicker form-control"
+                                    title="Choose item type…"
+                                    data-style="btn-default"
+                                    data-live-search="true">
+                                    @foreach($itemTypes as $type)
+                                    <option value="{{ $type['id'] }}"
+                                        {{ $selected_item_type_id == $type['id'] ? 'selected' : '' }}>
+                                        {{ $type['name'] }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
+                        @if($typeLocked)
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="button" class="btn btn-light-secondary" wire:click="changeItemType">
+                                <i class="bi bi-arrow-left-right me-1"></i> Change Item Type
+                            </button>
+                        </div>
+                        @endif
                     </div>
 
                     {{-- Step 2: Items table (shown after type selection) --}}
@@ -107,7 +116,19 @@
         $('.selectpicker').selectpicker();
 
         $(document).on('change', '#cap_item_type', function () {
-            $wire.set('selected_item_type_id', parseInt($(this).val()) || null);
+            const val = parseInt($(this).val()) || null;
+            $wire.set('selected_item_type_id', val);
+
+            if (val) {
+                $(this).prop('disabled', true).selectpicker('refresh');
+            }
+        });
+
+        $wire.on('itemTypeReset', () => {
+            $('#cap_item_type')
+                .prop('disabled', false)
+                .val('')
+                .selectpicker('refresh');
         });
     </script>
     @endscript

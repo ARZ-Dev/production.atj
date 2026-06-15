@@ -51,6 +51,7 @@ class EventCreate extends Component
         foreach ($existing as $event) {
             $this->events[] = [
                 'id'            => $event->id,
+                'key'           => 'event-' . $event->id,
                 'event_type_id' => $event->event_type_id,
                 'from_time'     => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : '',
                 'to_time'       => $event->to_time   ? Carbon::parse($event->to_time)->format('H:i')   : '',
@@ -63,6 +64,7 @@ class EventCreate extends Component
     {
         $this->events[] = [
             'id'            => null,
+            'key'           => 'new-' . uniqid(),
             'event_type_id' => null,
             'from_time'     => '',
             'to_time'       => '',
