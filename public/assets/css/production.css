@@ -344,3 +344,79 @@
 .pb-card-body { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; opacity: .7; }
 .pb-card-duration { font-weight: 700; opacity: .9; }
 .pb-card-duration--pending { opacity: .4; font-weight: 500; font-style: italic; }
+
+/* ── Plan Board — view tabs ───────────────────────────────────── */
+.pb-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.pb-tab {
+    padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(130,130,180,.15);
+    background: transparent; font-size: 13px; font-weight: 600; opacity: .6;
+    cursor: pointer; transition: all .15s;
+}
+.pb-tab:hover { opacity: .9; background: rgba(130,130,180,.06); }
+.pb-tab.active { opacity: 1; background: rgba(129,140,248,.12); border-color: #818cf8; color: #818cf8; }
+
+/* ── Plan Board — calendar timeline ───────────────────────────── */
+.pbc-wrap { display: flex; gap: 16px; align-items: flex-start; }
+
+.pbc-tray {
+    flex: 0 0 220px;
+    background: rgba(129,140,248,.04); border: 1px dashed rgba(129,140,248,.3);
+    border-radius: 12px; padding: 14px;
+}
+.pbc-tray-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.pbc-tray-body { display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+.pbc-tray-body .pbc-card { position: static !important; left: auto !important; top: auto !important; width: 100%; }
+
+.pbc-grid {
+    --pbc-hour-w: 70px;
+    flex: 1; min-width: 0; overflow-x: auto;
+    display: grid; grid-template-columns: 140px repeat(24, var(--pbc-hour-w));
+    grid-auto-rows: auto;
+    border: 1px solid rgba(130,130,180,.1); border-radius: 12px;
+    background: var(--bs-card-bg, #fff);
+}
+.pbc-corner {
+    grid-column: 1; position: sticky; left: 0; z-index: 2;
+    background: inherit; border-bottom: 1px solid rgba(130,130,180,.1);
+    border-right: 1px solid rgba(130,130,180,.1);
+}
+.pbc-hour-row {
+    grid-column: 2 / -1; display: grid; grid-template-columns: repeat(24, var(--pbc-hour-w));
+    border-bottom: 1px solid rgba(130,130,180,.1);
+}
+.pbc-hour-cell {
+    padding: 8px 4px; font-size: 10px; font-weight: 700; opacity: .45;
+    text-align: center; border-right: 1px solid rgba(130,130,180,.06);
+}
+.pbc-row-label {
+    grid-column: 1; position: sticky; left: 0; z-index: 1;
+    background: inherit; display: flex; align-items: center;
+    padding: 8px 12px; font-size: 12px; font-weight: 700;
+    border-right: 1px solid rgba(130,130,180,.1); border-bottom: 1px solid rgba(130,130,180,.06);
+}
+.pbc-row-track {
+    grid-column: 2 / -1; position: relative;
+    border-bottom: 1px solid rgba(130,130,180,.06);
+    background-image: repeating-linear-gradient(
+        to right, rgba(130,130,180,.1) 0, rgba(130,130,180,.1) 1px,
+        transparent 1px, transparent var(--pbc-hour-w)
+    );
+}
+.pbc-empty { grid-column: 1 / -1; padding: 36px; text-align: center; opacity: .4; font-size: 13px; }
+
+.pbc-card {
+    position: absolute;
+    background: var(--bs-card-bg, #fff);
+    border: 1px solid rgba(129,140,248,.35); border-left: 3px solid #818cf8;
+    border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap;
+    cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.pbc-card:active { cursor: grabbing; }
+.pbc-card-type { color: #818cf8; overflow: hidden; text-overflow: ellipsis; }
+.pbc-card-time { opacity: .5; font-weight: 500; flex-shrink: 0; }
+
+@media (max-width: 900px) {
+    .pbc-wrap { flex-direction: column; }
+    .pbc-tray { flex: 1 1 auto; }
+}

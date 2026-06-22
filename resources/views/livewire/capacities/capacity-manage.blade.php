@@ -64,9 +64,8 @@
                                 <table class="table table-bordered table-hover">
                                     <thead class="table-light">
                                         <tr>
-                                            <th style="width:30%">Item</th>
-                                            <th style="width:20%">Entry Unit</th>
-                                            <th style="width:50%">Output / Hr per unit</th>
+                                            <th style="width:25%">Item</th>
+                                            <th style="width:75%">Output / Hr — enter in any unit</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -78,17 +77,6 @@
                                         @endphp
                                         <tr class="cap-item-row" data-units="{{ json_encode($units) }}">
                                             <td class="align-middle">{{ $item['name'] }}</td>
-                                            <td>
-                                                <select
-                                                    class="form-select form-select-sm cap-unit-select"
-                                                    wire:model="sections.{{ $index }}.capacityRows.{{ $item['id'] }}.unit_id">
-                                                    @foreach($units as $unit)
-                                                    <option value="{{ $unit['id'] }}" @selected($row['unit_id'] == $unit['id'])>
-                                                        {{ $unit['name'] }}{{ !empty($unit['basic']) ? ' (basic)' : '' }}
-                                                    </option>
-                                                    @endforeach
-                                                </select>
-                                            </td>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-2">
                                                     @foreach($units as $unit)
@@ -107,15 +95,16 @@
                                                             data-basic="{{ $isBasic ? 1 : 0 }}"
                                                             data-formula="{{ $formula }}"
                                                             value="{{ $display === '' ? '' : round($display, 4) }}"
-                                                            @disabled($row['unit_id'] != $unit['id'])
                                                             placeholder="0.0000"
                                                         />
-                                                        <small class="text-muted">{{ $unit['symbol'] ?? $unit['name'] }}</small>
+                                                        <small class="text-muted">{{ $unit['symbol'] ?? $unit['name'] }}{{ $isBasic ? ' (basic)' : '' }}</small>
                                                     </div>
                                                     @endforeach
                                                 </div>
                                                 <input type="hidden" class="cap-basic-value"
                                                     wire:model="sections.{{ $index }}.capacityRows.{{ $item['id'] }}.value">
+                                                <input type="hidden" class="cap-unit-id-value"
+                                                    wire:model="sections.{{ $index }}.capacityRows.{{ $item['id'] }}.unit_id">
                                                 @error('sections.'.$index.'.capacityRows.'.$item['id'].'.value')
                                                     <div class="text-danger small mt-1">{{ $message }}</div>
                                                 @enderror
@@ -153,46 +142,52 @@
     <script>
     (() => {
         // ── Capacity unit conversion ──────────────────────────────────────────
-        // basic_capacity = selected unit's basic flag ? entered value : entered value / formula
+        // All units for an item are always shown and editable. Whichever input
+        // the user types into becomes the source: its value is converted to the
+        // basic unit, then every other unit's input is recalculated from that.
+        // basic_capacity = source unit's basic flag ? entered value : entered value / formula
         // display(unit)  = unit's basic flag ? basic_capacity : basic_capacity * formula
-        const recalcCapacityRow = (row) => {
+        const recalcCapacityRow = (row, sourceInput) => {
             const units = JSON.parse(row.dataset.units || '[]');
             if (!units.length) return;
 
-            const select  = row.querySelector('.cap-unit-select');
-            const hidden  = row.querySelector('.cap-basic-value');
-            const inputs  = row.querySelectorAll('.cap-unit-value');
+            const hiddenValue  = row.querySelector('.cap-basic-value');
+            const hiddenUnitId = row.querySelector('.cap-unit-id-value');
+            const inputs       = row.querySelectorAll('.cap-unit-value');
 
-            const selectedId = parseInt(select.value);
-            const selectedUnit = units.find(u => u.id === selectedId);
-            if (!selectedUnit) return;
+            const sourceId   = parseInt(sourceInput.dataset.unitId);
+            const sourceUnit = units.find(u => u.id === sourceId);
+            if (!sourceUnit) return;
 
-            const activeInput = row.querySelector(`.cap-unit-value[data-unit-id="${selectedId}"]`);
-            const entered = activeInput ? parseFloat(activeInput.value) : NaN;
+            const entered = parseFloat(sourceInput.value);
 
             let basic;
             if (isNaN(entered)) {
-                basic = parseFloat(hidden.value) || 0;
+                basic = parseFloat(hiddenValue.value) || 0;
             } else {
-                const formula = parseFloat(selectedUnit.formula || 1) || 1;
-                basic = selectedUnit.basic ? entered : entered / formula;
+                const formula = parseFloat(sourceUnit.formula || 1) || 1;
+                basic = sourceUnit.basic ? entered : entered / formula;
             }
 
             inputs.forEach(input => {
+                if (input === sourceInput) return;
+
                 const unitId = parseInt(input.dataset.unitId);
                 const unit   = units.find(u => u.id === unitId);
                 if (!unit) return;
-
-                input.disabled = unitId !== selectedId;
 
                 const formula = parseFloat(unit.formula || 1) || 1;
                 const display = unit.basic ? basic : basic * formula;
                 input.value = isFinite(display) ? Math.round(display * 10000) / 10000 : '';
             });
 
-            if (parseFloat(hidden.value) !== basic) {
-                hidden.value = basic;
-                hidden.dispatchEvent(new Event('input', { bubbles: true }));
+            if (parseFloat(hiddenValue.value) !== basic) {
+                hiddenValue.value = basic;
+                hiddenValue.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (parseInt(hiddenUnitId.value) !== sourceId) {
+                hiddenUnitId.value = sourceId;
+                hiddenUnitId.dispatchEvent(new Event('input', { bubbles: true }));
             }
         };
 
@@ -201,9 +196,8 @@
                 if (row.dataset.capInit) return;
                 row.dataset.capInit = '1';
 
-                row.querySelector('.cap-unit-select')?.addEventListener('change', () => recalcCapacityRow(row));
                 row.querySelectorAll('.cap-unit-value').forEach(input => {
-                    input.addEventListener('input', () => recalcCapacityRow(row));
+                    input.addEventListener('input', () => recalcCapacityRow(row, input));
                 });
             });
         };

@@ -151,11 +151,27 @@ class EventCreate extends Component
 
     private function fetchRecipeTypesForItemType(int $itemTypeId): array
     {
-        return RecipeType::query()
-            ->whereJsonContains('item_type_ids', $itemTypeId)
+        // A recipe type is offered here if at least one of its recipes is
+        // expected to output ($recipe->item_type_id) the selected item type —
+        // not based on RecipeType::item_type_ids (that lists ingredient types).
+        $recipeTypeIds = Recipe::where('item_type_id', $itemTypeId)
+            ->whereNotNull('recipe_type_id')
+            ->distinct()
+            ->pluck('recipe_type_id');
+
+        return RecipeType::whereIn('id', $recipeTypeIds)
             ->orderBy('name')
             ->get()
             ->toArray();
+    }
+
+    private function calculateToTime(?string $fromTime, $durationMinutes): ?string
+    {
+        if (!$fromTime || !$durationMinutes) {
+            return null;
+        }
+
+        return Carbon::parse($fromTime)->addMinutes((int) $durationMinutes)->format('H:i');
     }
 
     private function fetchRecipes(int $recipeTypeId, int $itemId): array
@@ -188,10 +204,27 @@ class EventCreate extends Component
 
         if ($hasRecipe) {
             $this->events[$index]['duration'] = null;
+            $this->events[$index]['to_time']  = '';
             $this->itemTypesByRow[$index]     = $this->api->get('/v1/item-types')['data'] ?? [];
         } else {
             $this->events[$index]['duration'] = $eventType?->duration;
+            $this->events[$index]['to_time']  = $this->calculateToTime(
+                $this->events[$index]['from_time'] ?? null,
+                $eventType?->duration
+            ) ?? '';
             unset($this->itemTypesByRow[$index]);
+        }
+    }
+
+    public function onFromTimeChanged(int $index, $value): void
+    {
+        $this->events[$index]['from_time'] = $value;
+
+        if (empty($this->events[$index]['event_type_has_recipe'])) {
+            $this->events[$index]['to_time'] = $this->calculateToTime(
+                $value,
+                $this->events[$index]['duration'] ?? null
+            ) ?? '';
         }
     }
 

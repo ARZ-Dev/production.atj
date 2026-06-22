@@ -208,7 +208,8 @@
                             <div class="ec-field-label">From <span class="text-danger">*</span></div>
                             <input type="time"
                                 class="form-control form-control-sm @error('events.'.$index.'.from_time') is-invalid @enderror"
-                                wire:model.defer="events.{{ $index }}.from_time"
+                                wire:model="events.{{ $index }}.from_time"
+                                wire:change="onFromTimeChanged({{ $index }}, $event.target.value)"
                                 value="{{ $event['from_time'] ?? '' }}"
                                 @input="fromTime = $event.target.value">
                             @error('events.' . $index . '.from_time')
@@ -219,11 +220,17 @@
                         <div class="ec-time-sep"><i class="bi bi-arrow-right"></i></div>
 
                         <div>
-                            <div class="ec-field-label">To</div>
+                            <div class="ec-field-label">
+                                To
+                                @if(!($event['event_type_has_recipe'] ?? false))
+                                <span class="opacity-50">(auto)</span>
+                                @endif
+                            </div>
                             <input type="time"
                                 class="form-control form-control-sm @error('events.'.$index.'.to_time') is-invalid @enderror"
                                 wire:model.defer="events.{{ $index }}.to_time"
-                                value="{{ $event['to_time'] ?? '' }}">
+                                value="{{ $event['to_time'] ?? '' }}"
+                                @if(!($event['event_type_has_recipe'] ?? false)) disabled @endif>
                             @error('events.' . $index . '.to_time')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror

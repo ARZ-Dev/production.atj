@@ -41,6 +41,72 @@
     </div>
     @else
 
+    <div class="pb-tabs">
+        <button type="button" class="pb-tab {{ $boardView === 'calendar' ? 'active' : '' }}"
+            wire:click="setView('calendar')">
+            <i class="bi bi-calendar-week me-1"></i> Calendar
+        </button>
+        <button type="button" class="pb-tab {{ $boardView === 'kanban' ? 'active' : '' }}"
+            wire:click="setView('kanban')">
+            <i class="bi bi-kanban me-1"></i> Lines &amp; Preparations
+        </button>
+    </div>
+
+    @if($boardView === 'calendar')
+    <div class="pbc-wrap">
+        <div class="pbc-tray">
+            <div class="pbc-tray-head">
+                <i class="bi bi-inbox text-primary"></i>
+                <span class="pb-tray-title">Unscheduled</span>
+                <span class="badge bg-light-primary rounded-pill">{{ count($unscheduledEvents) }}</span>
+            </div>
+            <div class="pbc-tray-body pbc-drop" data-tray>
+                @forelse($unscheduledEvents as $event)
+                    @include('livewire.plans.partials._calendar-event-card', [
+                        'event' => $event,
+                        'track' => 0,
+                        'fromHour' => 0,
+                        'spanHours' => 1,
+                    ])
+                @empty
+                <div class="pb-empty-hint">All events are scheduled.</div>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="pbc-grid">
+            <div class="pbc-corner"></div>
+            <div class="pbc-hour-row">
+                @for($h = 0; $h < 24; $h++)
+                <div class="pbc-hour-cell">{{ sprintf('%02d:00', $h) }}</div>
+                @endfor
+            </div>
+
+            @php $calendarRows = $this->calendarRows(); @endphp
+            @forelse($calendarRows as $row)
+            @php $pl = $row['production_line']; $layout = $row['layout']; @endphp
+            <div class="pbc-row-label" wire:key="pbc-label-{{ $pl->id }}">{{ $pl->name }}</div>
+            <div class="pbc-row-track pbc-drop" data-production-line-id="{{ $pl->id }}"
+                wire:key="pbc-track-{{ $pl->id }}"
+                style="height: {{ max($layout['tracks'], 1) * 36 + 12 }}px;">
+                @foreach($layout['items'] as $item)
+                    @include('livewire.plans.partials._calendar-event-card', [
+                        'event' => $item['event'],
+                        'track' => $item['track'],
+                        'fromHour' => $item['fromHour'],
+                        'spanHours' => $item['spanHours'],
+                    ])
+                @endforeach
+            </div>
+            @empty
+            <div class="pbc-empty">
+                No production lines found for this factory.
+            </div>
+            @endforelse
+        </div>
+    </div>
+    @else
+
     <div class="pb-board">
 
         <div class="pb-tray">
@@ -103,9 +169,12 @@
 
     </div>
     @endif
+    @endif
 
     @script
     <script>
+    (() => {
+        // ── Kanban tab: lane-based drag (Sortable) ─────────────────────────────
         const initPlanBoard = () => {
             document.querySelectorAll('.pb-lane-drop').forEach(el => {
                 if (el.dataset.sortableInit) return;
@@ -132,11 +201,61 @@
             });
         };
 
-        initPlanBoard();
+        // ── Calendar tab: time + row drag (native HTML5 DnD) ───────────────────
+        const pxPerHour = (el) => {
+            const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-hour-w'));
+            return isFinite(v) && v > 0 ? v : 70;
+        };
+
+        const initCalendarDrag = () => {
+            document.querySelectorAll('.pbc-card[draggable="true"]').forEach(card => {
+                if (card.dataset.dragInit) return;
+                card.dataset.dragInit = '1';
+
+                card.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', card.dataset.eventId);
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+            });
+
+            document.querySelectorAll('.pbc-drop').forEach(drop => {
+                if (drop.dataset.dropInit) return;
+                drop.dataset.dropInit = '1';
+
+                drop.addEventListener('dragover', (e) => e.preventDefault());
+
+                drop.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const eventId = parseInt(e.dataTransfer.getData('text/plain'));
+                    if (!eventId) return;
+
+                    const productionLineId = drop.dataset.productionLineId
+                        ? parseInt(drop.dataset.productionLineId) : null;
+
+                    let hour = 0;
+                    if (productionLineId) {
+                        const rect = drop.getBoundingClientRect();
+                        const offsetX = e.clientX - rect.left + drop.scrollLeft;
+                        hour = Math.round(offsetX / pxPerHour(drop));
+                        hour = Math.max(0, Math.min(23, hour));
+                    }
+
+                    $wire.call('rescheduleEvent', eventId, productionLineId, hour);
+                });
+            });
+        };
+
+        const initAll = () => {
+            initPlanBoard();
+            initCalendarDrag();
+        };
+
+        initAll();
 
         Livewire.hook('morph.added', ({ el }) => {
-            if (el.nodeType === 1) initPlanBoard();
+            if (el.nodeType === 1) initAll();
         });
+    })();
     </script>
     @endscript
 </div>
