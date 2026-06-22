@@ -10,6 +10,8 @@ use App\Models\Preparation;
 use App\Models\ProductionLine;
 use App\Models\Recipe;
 use App\Services\ApiService;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class PlanBoard extends Component
@@ -19,6 +21,11 @@ class PlanBoard extends Component
     public $unplacedEvents = [];
     public array $placedEvents = []; // "{productionLineId}:{alias}:{placeableId}" => Event[]
     public ?string $factoryName = null;
+
+    public string $boardView = 'calendar'; // 'calendar' | 'kanban'
+
+    protected Collection $allEvents;
+    public $unscheduledEvents = []; // events with no production_line_id (calendar tray)
 
     protected ApiService $api;
 
@@ -40,8 +47,11 @@ class PlanBoard extends Component
             $warehouses = $this->api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
             $this->factoryName = collect($warehouses)->firstWhere('id', $this->plan->factory_id)['name'] ?? null;
         }
+    }
 
-        $this->loadEvents();
+    public function setView(string $view): void
+    {
+        $this->boardView = in_array($view, ['calendar', 'kanban'], true) ? $view : $this->boardView;
     }
 
     protected function loadEvents(): void
@@ -51,7 +61,10 @@ class PlanBoard extends Component
             ->orderBy('from_time')
             ->get();
 
-        $this->unplacedEvents = $events->whereNull('placeable_id')->values();
+        $this->allEvents = $events;
+
+        $this->unplacedEvents     = $events->whereNull('placeable_id')->values();
+        $this->unscheduledEvents  = $events->whereNull('production_line_id')->values();
 
         $placed = [];
         foreach ($events->whereNotNull('placeable_id') as $event) {
@@ -63,6 +76,112 @@ class PlanBoard extends Component
             $placed[$key][] = $event;
         }
         $this->placedEvents = $placed;
+    }
+
+    // ─── Calendar layout ──────────────────────────────────────────────────────
+
+    public function calendarRows(): array
+    {
+        $rows = [];
+
+        foreach ($this->productionLines as $pl) {
+            $rowEvents = $this->allEvents
+                ->where('production_line_id', $pl->id)
+                ->sortBy('from_time')
+                ->values();
+
+            $rows[] = [
+                'production_line' => $pl,
+                'layout'           => $this->layoutTracks($rowEvents),
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function layoutTracks(Collection $events): array
+    {
+        $items     = [];
+        $trackEnds = [];
+
+        foreach ($events as $event) {
+            $fromHour  = $this->eventFromHour($event);
+            $spanHours = $this->eventSpanHours($event);
+            $end       = $fromHour + $spanHours;
+
+            $track = null;
+            foreach ($trackEnds as $i => $endHour) {
+                if ($fromHour >= $endHour - 0.001) {
+                    $track          = $i;
+                    $trackEnds[$i]  = $end;
+                    break;
+                }
+            }
+            if ($track === null) {
+                $trackEnds[] = $end;
+                $track       = count($trackEnds) - 1;
+            }
+
+            $items[] = [
+                'event'     => $event,
+                'track'     => $track,
+                'fromHour'  => $fromHour,
+                'spanHours' => $spanHours,
+            ];
+        }
+
+        return ['tracks' => max(count($trackEnds), 1), 'items' => $items];
+    }
+
+    protected function eventFromHour(Event $event): float
+    {
+        if (!$event->from_time) {
+            return 0.0;
+        }
+
+        $from = Carbon::parse($event->from_time);
+
+        return $from->hour + $from->minute / 60;
+    }
+
+    protected function eventSpanHours(Event $event): float
+    {
+        if ($event->from_time && $event->to_time) {
+            $minutes = Carbon::parse($event->from_time)->diffInMinutes(Carbon::parse($event->to_time));
+
+            return max($minutes, 15) / 60;
+        }
+
+        $minutes = $event->calculated_duration ?: $event->planned_duration;
+
+        return $minutes ? max((float) $minutes, 15) / 60 : 1.0;
+    }
+
+    public function rescheduleEvent(int $eventId, ?int $productionLineId, int $hour): void
+    {
+        $event = Event::with('eventType')
+            ->where('plan_id', $this->plan->id)
+            ->findOrFail($eventId);
+
+        if ($productionLineId) {
+            $hour    = max(0, min(23, $hour));
+            $newFrom = sprintf('%02d:00:00', $hour);
+
+            if ($event->from_time && $event->to_time) {
+                $spanMinutes = Carbon::parse($event->from_time)->diffInMinutes(Carbon::parse($event->to_time));
+                $event->to_time = Carbon::parse($newFrom)->addMinutes($spanMinutes)->format('H:i:s');
+            }
+            $event->from_time = $newFrom;
+        }
+
+        if ((int) $event->production_line_id !== (int) $productionLineId) {
+            $event->production_line_id  = $productionLineId;
+            $event->placeable_type      = null;
+            $event->placeable_id        = null;
+            $event->calculated_duration = null;
+        }
+
+        $event->save();
     }
 
     public function laneKey($productionLineId, string $alias, $placeableId): string
@@ -106,8 +225,6 @@ class PlanBoard extends Component
         }
 
         $event->save();
-
-        $this->loadEvents();
     }
 
     protected function computeDuration(Event $event, string $placeableClass, int $placeableId): ?string
@@ -146,6 +263,8 @@ class PlanBoard extends Component
 
     public function render()
     {
+        $this->loadEvents();
+
         return view('livewire.plans.plan-board');
     }
 }

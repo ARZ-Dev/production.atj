@@ -90,13 +90,25 @@
                         @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 
-                    <div class="mb-3 form-check form-switch">
-                        <input type="checkbox" class="form-check-input" id="et_has_recipe"
-                            wire:model.live="has_recipe">
-                        <label for="et_has_recipe" class="form-check-label">With recipe</label>
+                    <div class="mb-3">
+                        <label class="form-label d-block">Duration source <span class="text-danger">*</span></label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="et_duration_mode" id="et_mode_recipe"
+                                wire:model.live="has_recipe" value="1" autocomplete="off">
+                            <label class="btn btn-outline-primary" for="et_mode_recipe">
+                                <i class="bi bi-droplet-half me-1"></i> Has Recipe
+                            </label>
+
+                            <input type="radio" class="btn-check" name="et_duration_mode" id="et_mode_fixed"
+                                wire:model.live="has_recipe" value="0" autocomplete="off">
+                            <label class="btn btn-outline-primary" for="et_mode_fixed">
+                                <i class="bi bi-clock me-1"></i> Fixed Duration
+                            </label>
+                        </div>
                         <div class="form-text">
-                            When enabled, duration is calculated per event from its recipe and the capacity of
-                            the preparation/line it's placed on. When disabled, set a fixed duration below.
+                            "Has Recipe" events calculate their duration per event from the recipe and the
+                            capacity of the preparation/line they're placed on. "Fixed Duration" events use the
+                            duration set below for every event of this type.
                         </div>
                     </div>
 
