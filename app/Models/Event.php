@@ -21,4 +21,24 @@ class Event extends Model
     {
         return $this->belongsTo(Plan::class);
     }
+
+    public function recipe()
+    {
+        return $this->belongsTo(Recipe::class);
+    }
+
+    public function recipeType()
+    {
+        return $this->belongsTo(RecipeType::class);
+    }
+
+    public function productionLine()
+    {
+        return $this->belongsTo(ProductionLine::class);
+    }
+
+    public function placeable()
+    {
+        return $this->morphTo();
+    }
 }

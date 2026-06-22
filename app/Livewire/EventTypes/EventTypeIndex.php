@@ -12,6 +12,8 @@ class EventTypeIndex extends Component
     public $name;
     public $event_type_id;
     public $editing = false;
+    public bool $has_recipe = false;
+    public $duration = null;
 
     public function mount()
     {
@@ -28,6 +30,8 @@ class EventTypeIndex extends Component
     {
         $this->event_type_id = null;
         $this->name = '';
+        $this->has_recipe = false;
+        $this->duration = null;
         $this->editing = false;
         $this->resetValidation();
     }
@@ -47,15 +51,26 @@ class EventTypeIndex extends Component
         $eventType = EventType::findOrFail($id);
         $this->event_type_id = $eventType->id;
         $this->name = $eventType->name;
+        $this->has_recipe = (bool) $eventType->has_recipe;
+        $this->duration = $eventType->duration;
         $this->editing = true;
 
         $this->dispatch('openModal');
+    }
+
+    public function updatedHasRecipe($value)
+    {
+        if ($value) {
+            $this->duration = null;
+        }
     }
 
     protected function rules()
     {
         return [
             'name' => 'required|string|max:255',
+            'has_recipe' => 'boolean',
+            'duration' => 'required_if:has_recipe,false|nullable|integer|min:1',
         ];
     }
 
@@ -63,12 +78,18 @@ class EventTypeIndex extends Component
     {
         $this->validate();
 
+        $data = [
+            'name' => $this->name,
+            'has_recipe' => $this->has_recipe,
+            'duration' => $this->has_recipe ? null : $this->duration,
+        ];
+
         if ($this->editing) {
             authorizeRequest('production.eventType-edit');
-            EventType::findOrFail($this->event_type_id)->update(['name' => $this->name]);
+            EventType::findOrFail($this->event_type_id)->update($data);
         } else {
             authorizeRequest('production.eventType-create');
-            EventType::create(['name' => $this->name]);
+            EventType::create($data);
         }
 
         return redirect()->route('event-types')

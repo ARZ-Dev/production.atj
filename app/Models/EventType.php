@@ -12,6 +12,10 @@ class EventType extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'has_recipe' => 'boolean',
+    ];
+
     public function events()
     {
         return $this->hasMany(Event::class);

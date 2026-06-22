@@ -7,8 +7,8 @@ use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\ItemRequests\ItemRequestCreate;
 use App\Livewire\ItemRequests\ItemRequestIndex;
 use App\Livewire\Lines\LineIndex;
+use App\Livewire\Plans\PlanBoard;
 use App\Livewire\Plans\PlanIndex;
-use App\Livewire\Plans\PlanView;
 use App\Livewire\Preparations\PreparationIndex;
 use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RecipeTypes\RecipeTypeCreate;
@@ -234,7 +234,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------
     Route::group(['prefix' => 'plans'], function () {
         Route::get('/', PlanIndex::class)->name('plans');
-        Route::get('/view/{id}', PlanView::class)->name('plans.view');
+        Route::get('/view/{id}', PlanBoard::class)->name('plans.view');
 
     });
 

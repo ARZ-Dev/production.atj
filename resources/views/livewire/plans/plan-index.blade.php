@@ -137,6 +137,37 @@
                                 id="plan_date" wire:model="date">
                             @error('date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
+
+                        <div class="col-12 col-md-6">
+                            <label for="plan_department" class="form-label">Department</label>
+                            <select id="plan_department" class="form-select"
+                                wire:model="department_id"
+                                wire:change="onDepartmentChange($event.target.value)">
+                                <option value="">— Select department —</option>
+                                @foreach($departments as $dept)
+                                <option value="{{ $dept['id'] }}" @selected($department_id == $dept['id'])>
+                                    {{ $dept['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Used to filter the factory list below.</div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label for="plan_factory" class="form-label">
+                                Factory <span class="text-danger">*</span>
+                            </label>
+                            <select id="plan_factory" class="form-select @error('factory_id') is-invalid @enderror"
+                                wire:model="factory_id">
+                                <option value="">— Select factory —</option>
+                                @foreach($factories as $factory)
+                                <option value="{{ $factory['id'] }}" @selected($factory_id == $factory['id'])>
+                                    {{ $factory['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                            @error('factory_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
