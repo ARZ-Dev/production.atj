@@ -106,7 +106,7 @@
 
     @script
     <script>
-        function initPlanBoard() {
+        const initPlanBoard = () => {
             document.querySelectorAll('.pb-lane-drop').forEach(el => {
                 if (el.dataset.sortableInit) return;
                 el.dataset.sortableInit = '1';
@@ -130,7 +130,7 @@
                     }
                 });
             });
-        }
+        };
 
         initPlanBoard();
 
