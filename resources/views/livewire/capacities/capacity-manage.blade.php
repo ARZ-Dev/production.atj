@@ -151,6 +151,7 @@
 
     @script
     <script>
+    (() => {
         // ── Capacity unit conversion ──────────────────────────────────────────
         // basic_capacity = selected unit's basic flag ? entered value : entered value / formula
         // display(unit)  = unit's basic flag ? basic_capacity : basic_capacity * formula
@@ -212,6 +213,7 @@
         Livewire.hook('morph.added', ({ el }) => {
             if (el.nodeType === 1) initCapacityRows(el);
         });
+    })();
     </script>
     @endscript
 </div>
