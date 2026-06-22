@@ -154,7 +154,7 @@
         // ── Capacity unit conversion ──────────────────────────────────────────
         // basic_capacity = selected unit's basic flag ? entered value : entered value / formula
         // display(unit)  = unit's basic flag ? basic_capacity : basic_capacity * formula
-        function recalcCapacityRow(row) {
+        const recalcCapacityRow = (row) => {
             const units = JSON.parse(row.dataset.units || '[]');
             if (!units.length) return;
 
@@ -193,9 +193,9 @@
                 hidden.value = basic;
                 hidden.dispatchEvent(new Event('input', { bubbles: true }));
             }
-        }
+        };
 
-        function initCapacityRows(root) {
+        const initCapacityRows = (root) => {
             root.querySelectorAll('.cap-item-row').forEach(row => {
                 if (row.dataset.capInit) return;
                 row.dataset.capInit = '1';
@@ -205,7 +205,7 @@
                     input.addEventListener('input', () => recalcCapacityRow(row));
                 });
             });
-        }
+        };
 
         initCapacityRows(document);
 
