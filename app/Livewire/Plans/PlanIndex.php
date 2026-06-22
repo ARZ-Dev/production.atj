@@ -3,6 +3,7 @@
 namespace App\Livewire\Plans;
 
 use App\Models\Plan;
+use App\Services\ApiService;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -15,12 +16,60 @@ class PlanIndex extends Component
     // Modal form fields
     public $plan_id;
     public $date;
+    public ?int $department_id = null;
+    public ?int $factory_id = null;
     public bool $editing = false;
 
-    public function mount()
+    public array $departments = [];
+    public array $factories   = [];
+
+    protected ApiService $api;
+
+    public function boot(ApiService $api): void
+    {
+        $this->api = $api;
+    }
+
+    public function mount(): void
     {
         $this->currentYear  = now()->year;
         $this->currentMonth = now()->month;
+
+        $this->departments = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+    }
+
+    public function onDepartmentChange(?int $deptId): void
+    {
+        $this->department_id = $deptId;
+        $this->factory_id    = null;
+        $this->factories     = $this->fetchFactoryWarehouses($deptId);
+    }
+
+    private function fetchFactoryWarehouses(?int $deptId): array
+    {
+        if (!$deptId) {
+            return [];
+        }
+
+        $all = $this->api->get('/v1/warehouses', [
+            'related_to_production' => true,
+            'department_id'         => $deptId,
+        ])['data'] ?? [];
+
+        return collect($all)
+            ->filter(fn($wh) => !empty($wh['type']['is_factory']))
+            ->values()
+            ->toArray();
+    }
+
+    private function fetchAllFactories(): array
+    {
+        $all = $this->api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
+
+        return collect($all)
+            ->filter(fn($wh) => !empty($wh['type']['is_factory']))
+            ->values()
+            ->toArray();
     }
 
     public function prevMonth(): void
@@ -45,9 +94,12 @@ class PlanIndex extends Component
 
     public function resetForm(): void
     {
-        $this->plan_id = null;
-        $this->date    = '';
-        $this->editing = false;
+        $this->plan_id      = null;
+        $this->date         = '';
+        $this->department_id = null;
+        $this->factory_id    = null;
+        $this->factories      = [];
+        $this->editing      = false;
         $this->resetValidation();
     }
 
@@ -68,16 +120,19 @@ class PlanIndex extends Component
     {
         $this->resetForm();
         $plan = Plan::findOrFail($id);
-        $this->plan_id = $plan->id;
-        $this->date    = Carbon::parse($plan->date)->format('Y-m-d');
-        $this->editing = true;
+        $this->plan_id   = $plan->id;
+        $this->date      = Carbon::parse($plan->date)->format('Y-m-d');
+        $this->factory_id = $plan->factory_id;
+        $this->factories = $this->fetchAllFactories();
+        $this->editing   = true;
         $this->dispatch('openModal');
     }
 
     protected function rules(): array
     {
         return [
-            'date' => 'required|date',
+            'date'       => 'required|date',
+            'factory_id' => 'required|integer',
         ];
     }
 
@@ -85,7 +140,7 @@ class PlanIndex extends Component
     {
         $this->validate();
 
-        $data = ['date' => $this->date];
+        $data = ['date' => $this->date, 'factory_id' => $this->factory_id];
 
         if ($this->editing) {
             Plan::findOrFail($this->plan_id)->update($data);

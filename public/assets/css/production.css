@@ -279,3 +279,68 @@
 }
 
 .ec-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+
+/* ── Plan Board — drag & drop layout ──────────────────────────── */
+.pb-board { display: flex; flex-direction: column; gap: 18px; }
+
+.pb-tray {
+    background: rgba(129,140,248,.04);
+    border: 1px dashed rgba(129,140,248,.3);
+    border-radius: 12px; padding: 14px;
+}
+.pb-tray-head, .pb-column-head, .pb-lane-head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 700; margin-bottom: 10px;
+}
+.pb-tray-title { font-size: 14px; }
+.pb-tray-body { display: flex; flex-wrap: wrap; gap: 10px; min-height: 60px; }
+
+.pb-columns {
+    display: flex; gap: 16px; overflow-x: auto; padding-bottom: 6px;
+}
+.pb-column {
+    flex: 0 0 280px; background: rgba(130,130,180,.04);
+    border: 1px solid rgba(130,130,180,.1); border-radius: 12px; padding: 14px;
+}
+.pb-column-head {
+    font-size: 14px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(130,130,180,.1); margin-bottom: 12px;
+}
+.pb-lane {
+    background: var(--bs-card-bg, #fff);
+    border: 1px solid rgba(130,130,180,.12); border-radius: 10px;
+    padding: 10px; margin-bottom: 10px;
+}
+.pb-lane:last-child { margin-bottom: 0; }
+.pb-lane-head { font-size: 12px; opacity: .8; margin-bottom: 8px; }
+.pb-lane-body { display: flex; flex-direction: column; gap: 8px; min-height: 50px; }
+
+.pb-empty-hint {
+    font-size: 11px; opacity: .35; text-align: center; padding: 10px 4px;
+    border: 1px dashed rgba(130,130,180,.18); border-radius: 8px;
+}
+.pb-empty {
+    flex: 1; text-align: center; padding: 48px 20px; border-radius: 10px;
+    border: 1px dashed rgba(130,130,180,.18);
+}
+.pb-empty i { font-size: 38px; opacity: .22; display: block; margin-bottom: 10px; }
+
+.pb-card {
+    background: var(--bs-card-bg, #fff);
+    border: 1px solid rgba(130,130,180,.16); border-radius: 9px;
+    padding: 9px 11px; cursor: grab;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    transition: box-shadow .15s, transform .1s;
+    width: 100%;
+}
+.pb-tray-body .pb-card { width: 220px; }
+.pb-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.pb-card.sortable-chosen { cursor: grabbing; }
+.pb-card.sortable-ghost { opacity: .4; }
+
+.pb-card-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.pb-card-type { font-size: 12px; font-weight: 700; color: #818cf8; }
+.pb-card-recipe-badge { font-size: 11px; color: #34d399; }
+.pb-card-body { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; opacity: .7; }
+.pb-card-duration { font-weight: 700; opacity: .9; }
+.pb-card-duration--pending { opacity: .4; font-weight: 500; font-style: italic; }

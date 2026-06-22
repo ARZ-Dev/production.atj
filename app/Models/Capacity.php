@@ -12,6 +12,7 @@ class Capacity extends Model
         'capacity'     => 'decimal:2',
         'item_type_id' => 'integer',
         'item_id'      => 'integer',
+        'item_unit_id' => 'integer',
     ];
 
     public function capacityable()

@@ -76,7 +76,8 @@
 
                     <select
                         class="form-select form-select-sm ec-type-select @error('events.'.$index.'.event_type_id') is-invalid @enderror"
-                        wire:model.defer="events.{{ $index }}.event_type_id">
+                        wire:model="events.{{ $index }}.event_type_id"
+                        wire:change="onEventTypeChanged({{ $index }}, $event.target.value)">
                         <option value="">— Select event type —</option>
                         @foreach($eventTypes as $type)
                         <option value="{{ $type->id }}"
@@ -105,6 +106,102 @@
                 @enderror
 
                 <div class="ec-card-body">
+
+                    @if(!empty($event['event_type_has_recipe']))
+                    <div class="row g-2 mb-2">
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Item Type <span class="text-danger">*</span></div>
+                            <select class="form-select form-select-sm @error('events.'.$index.'.item_type_id') is-invalid @enderror"
+                                wire:model="events.{{ $index }}.item_type_id"
+                                wire:change="onItemTypeChanged({{ $index }}, $event.target.value)">
+                                <option value="">— Select —</option>
+                                @foreach($itemTypesByRow[$index] ?? [] as $type)
+                                <option value="{{ $type['id'] }}" @selected((int)($event['item_type_id'] ?? 0) === $type['id'])>
+                                    {{ $type['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                            @error('events.' . $index . '.item_type_id')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Item <span class="text-danger">*</span></div>
+                            <select class="form-select form-select-sm @error('events.'.$index.'.item_id') is-invalid @enderror"
+                                wire:model="events.{{ $index }}.item_id"
+                                wire:change="onItemChanged({{ $index }}, $event.target.value)">
+                                <option value="">— Select —</option>
+                                @foreach($itemsByRow[$index] ?? [] as $item)
+                                <option value="{{ $item['id'] }}" @selected((int)($event['item_id'] ?? 0) === $item['id'])>
+                                    {{ $item['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                            @error('events.' . $index . '.item_id')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Recipe Type <span class="text-danger">*</span></div>
+                            <select class="form-select form-select-sm @error('events.'.$index.'.recipe_type_id') is-invalid @enderror"
+                                wire:model="events.{{ $index }}.recipe_type_id"
+                                wire:change="onRecipeTypeChanged({{ $index }}, $event.target.value)">
+                                <option value="">— Select —</option>
+                                @foreach($recipeTypesByRow[$index] ?? [] as $rt)
+                                <option value="{{ $rt['id'] }}" @selected((int)($event['recipe_type_id'] ?? 0) === $rt['id'])>
+                                    {{ $rt['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                            @error('events.' . $index . '.recipe_type_id')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Recipe <span class="text-danger">*</span></div>
+                            <select class="form-select form-select-sm @error('events.'.$index.'.recipe_id') is-invalid @enderror"
+                                wire:model="events.{{ $index }}.recipe_id"
+                                wire:change="onRecipeChanged({{ $index }}, $event.target.value)">
+                                <option value="">— Select —</option>
+                                @foreach($recipesByRow[$index] ?? [] as $recipe)
+                                <option value="{{ $recipe['id'] }}" @selected((int)($event['recipe_id'] ?? 0) === $recipe['id'])>
+                                    {{ $recipe['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                            @error('events.' . $index . '.recipe_id')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Batch Number <span class="text-danger">*</span></div>
+                            <input type="text"
+                                class="form-control form-control-sm @error('events.'.$index.'.batch_count') is-invalid @enderror"
+                                wire:model.defer="events.{{ $index }}.batch_count" placeholder="e.g. 1">
+                            @error('events.' . $index . '.batch_count')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Duration</div>
+                            <input type="text" class="form-control form-control-sm" disabled
+                                value="{{ $event['duration'] ? $event['duration'] . ' min' : 'Set after placement on a line' }}">
+                        </div>
+                    </div>
+                    @else
+                    <div class="row g-2 mb-2">
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Duration</div>
+                            <input type="text" class="form-control form-control-sm" disabled
+                                value="{{ $event['duration'] ? $event['duration'] . ' min' : '—' }}">
+                        </div>
+                    </div>
+                    @endif
 
                     <div class="ec-time-row">
                         <div>

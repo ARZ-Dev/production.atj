@@ -13,6 +13,7 @@ class CapacityManage extends Component
 
     public array $itemTypes = [];
     public array $sections  = [];  // [ ['item_type_id', 'item_type_name', 'items', 'capacityRows'] ]
+    public array $itemUnits = [];  // item_id => [ ['id','name','symbol','basic','formula'], ... ]
 
     public array $removedTypeIds = [];
 
@@ -84,12 +85,25 @@ class CapacityManage extends Component
         $existing = $this->resolveModel()
             ->capacities()
             ->where('item_type_id', $typeId)
-            ->pluck('capacity', 'item_id')
-            ->toArray();
+            ->get()
+            ->keyBy('item_id');
 
         $capacityRows = [];
         foreach ($items as $item) {
-            $capacityRows[$item['id']] = $existing[$item['id']] ?? '';
+            $itemId = $item['id'];
+
+            if (!isset($this->itemUnits[$itemId])) {
+                $this->itemUnits[$itemId] = $this->api->get("/v1/items/{$itemId}")['data']['units'] ?? [];
+            }
+
+            $units      = $this->itemUnits[$itemId];
+            $basicUnit  = collect($units)->firstWhere('basic', true);
+            $existingRow = $existing->get($itemId);
+
+            $capacityRows[$itemId] = [
+                'unit_id' => $existingRow->item_unit_id ?? ($basicUnit['id'] ?? ($units[0]['id'] ?? null)),
+                'value'   => $existingRow ? (string) $existingRow->capacity : '',
+            ];
         }
 
         $this->sections[] = [
@@ -130,7 +144,8 @@ class CapacityManage extends Component
 
         foreach ($this->sections as $index => $section) {
             foreach (array_keys($section['capacityRows']) as $itemId) {
-                $rules["sections.{$index}.capacityRows.{$itemId}"] = 'nullable|numeric|min:0';
+                $rules["sections.{$index}.capacityRows.{$itemId}.value"]   = 'nullable|numeric|min:0';
+                $rules["sections.{$index}.capacityRows.{$itemId}.unit_id"] = 'nullable|integer';
             }
         }
 
@@ -152,15 +167,18 @@ class CapacityManage extends Component
 
             $model->capacities()->where('item_type_id', $typeId)->delete();
 
-            foreach ($section['capacityRows'] as $itemId => $capacity) {
-                if ($capacity === '' || $capacity === null) {
+            foreach ($section['capacityRows'] as $itemId => $row) {
+                $value = $row['value'] ?? '';
+
+                if ($value === '' || $value === null) {
                     continue;
                 }
 
                 $model->capacities()->create([
                     'item_type_id' => $typeId,
                     'item_id'      => $itemId,
-                    'capacity'     => $capacity,
+                    'item_unit_id' => $row['unit_id'] ?? null,
+                    'capacity'     => $value,
                 ]);
             }
         }

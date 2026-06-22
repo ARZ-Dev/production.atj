@@ -24,6 +24,8 @@
                             <tr>
                                 <th>#</th>
                                 <th>Name</th>
+                                <th>With Recipe</th>
+                                <th>Duration</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -32,6 +34,14 @@
                             <tr>
                                 <td>{{ $eventType->id }}</td>
                                 <td>{{ $eventType->name }}</td>
+                                <td>
+                                    @if($eventType->has_recipe)
+                                        <span class="badge bg-success">Yes</span>
+                                    @else
+                                        <span class="badge bg-secondary">No</span>
+                                    @endif
+                                </td>
+                                <td>{{ $eventType->has_recipe ? '—' : ($eventType->duration ? $eventType->duration . ' min' : '—') }}</td>
                                 <td>
                                     @hasPermission('production.eventType-edit')
                                     <button type="button" wire:click="edit({{ $eventType->id }})"
@@ -79,6 +89,25 @@
                             id="et_name" wire:model="name" placeholder="e.g. Cleaning, Production, Maintenance">
                         @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
+
+                    <div class="mb-3 form-check form-switch">
+                        <input type="checkbox" class="form-check-input" id="et_has_recipe"
+                            wire:model.live="has_recipe">
+                        <label for="et_has_recipe" class="form-check-label">With recipe</label>
+                        <div class="form-text">
+                            When enabled, duration is calculated per event from its recipe and the capacity of
+                            the preparation/line it's placed on. When disabled, set a fixed duration below.
+                        </div>
+                    </div>
+
+                    @if(!$has_recipe)
+                    <div class="mb-3">
+                        <label for="et_duration" class="form-label">Duration (minutes) <span class="text-danger">*</span></label>
+                        <input type="number" min="1" class="form-control @error('duration') is-invalid @enderror"
+                            id="et_duration" wire:model="duration" placeholder="e.g. 30">
+                        @error('duration')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal"

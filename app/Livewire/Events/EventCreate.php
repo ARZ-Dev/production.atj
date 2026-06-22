@@ -5,7 +5,10 @@ namespace App\Livewire\Events;
 use App\Models\Event;
 use App\Models\EventType;
 use App\Models\Plan;
+use App\Models\Recipe;
+use App\Models\RecipeType;
 use App\Models\Shift;
+use App\Services\ApiService;
 use Carbon\Carbon;
 use Livewire\Component;
 
@@ -17,6 +20,19 @@ class EventCreate extends Component
     public $events = [];
     public $removedEventIds = [];
     public array $shifts = [];
+
+    // Per-row cascading option lists, keyed by row index.
+    public array $itemTypesByRow = [];
+    public array $itemsByRow = [];
+    public array $recipeTypesByRow = [];
+    public array $recipesByRow = [];
+
+    protected ApiService $api;
+
+    public function boot(ApiService $api): void
+    {
+        $this->api = $api;
+    }
 
     public function mount($planId): void
     {
@@ -49,26 +65,57 @@ class EventCreate extends Component
         }
 
         foreach ($existing as $event) {
+            $hasRecipe = (bool) ($event->eventType?->has_recipe);
+
             $this->events[] = [
-                'id'            => $event->id,
-                'key'           => 'event-' . $event->id,
-                'event_type_id' => $event->event_type_id,
-                'from_time'     => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : '',
-                'to_time'       => $event->to_time   ? Carbon::parse($event->to_time)->format('H:i')   : '',
-                'description'   => $event->description ?? '',
+                'id'                    => $event->id,
+                'key'                   => 'event-' . $event->id,
+                'event_type_id'         => $event->event_type_id,
+                'event_type_has_recipe' => $hasRecipe,
+                'item_type_id'          => $event->item_type_id,
+                'item_id'               => $event->item_id,
+                'recipe_type_id'        => $event->recipe_type_id,
+                'recipe_id'             => $event->recipe_id,
+                'batch_count'           => $event->batch_count ?? '',
+                'duration'              => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
+                'from_time'             => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : '',
+                'to_time'               => $event->to_time   ? Carbon::parse($event->to_time)->format('H:i')   : '',
+                'description'           => $event->description ?? '',
             ];
+
+            $index = count($this->events) - 1;
+
+            if ($hasRecipe) {
+                $this->itemTypesByRow[$index] = $this->api->get('/v1/item-types')['data'] ?? [];
+
+                if ($event->item_type_id) {
+                    $this->itemsByRow[$index]     = $this->fetchItemsForType((int) $event->item_type_id);
+                    $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType((int) $event->item_type_id);
+                }
+
+                if ($event->recipe_type_id && $event->item_id) {
+                    $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->recipe_type_id, (int) $event->item_id);
+                }
+            }
         }
     }
 
     public function addEventRow(): void
     {
         $this->events[] = [
-            'id'            => null,
-            'key'           => 'new-' . uniqid(),
-            'event_type_id' => null,
-            'from_time'     => '',
-            'to_time'       => '',
-            'description'   => '',
+            'id'                    => null,
+            'key'                   => 'new-' . uniqid(),
+            'event_type_id'         => null,
+            'event_type_has_recipe' => false,
+            'item_type_id'          => null,
+            'item_id'               => null,
+            'recipe_type_id'        => null,
+            'recipe_id'             => null,
+            'batch_count'           => '',
+            'duration'              => null,
+            'from_time'             => '',
+            'to_time'               => '',
+            'description'           => '',
         ];
     }
 
@@ -88,26 +135,156 @@ class EventCreate extends Component
         $this->events = array_values($this->events);
     }
 
+    // ─── Cascading option fetchers ───────────────────────────────────────────
+
+    private function fetchItemsForType(int $itemTypeId): array
+    {
+        $type     = collect($this->api->get('/v1/item-types')['data'] ?? [])->firstWhere('id', $itemTypeId);
+        $typeName = $type['name'] ?? null;
+
+        if (!$typeName) {
+            return [];
+        }
+
+        return $this->api->get('/v1/items', ['item_type' => $typeName, 'is_active' => true])['data'] ?? [];
+    }
+
+    private function fetchRecipeTypesForItemType(int $itemTypeId): array
+    {
+        return RecipeType::query()
+            ->whereJsonContains('item_type_ids', $itemTypeId)
+            ->orderBy('name')
+            ->get()
+            ->toArray();
+    }
+
+    private function fetchRecipes(int $recipeTypeId, int $itemId): array
+    {
+        return Recipe::where('recipe_type_id', $recipeTypeId)
+            ->where('item_id', $itemId)
+            ->where('status', true)
+            ->orderBy('name')
+            ->get()
+            ->toArray();
+    }
+
+    // ─── Cascade handlers (called explicitly via wire:change) ───────────────
+
+    public function onEventTypeChanged(int $index, $eventTypeId): void
+    {
+        $eventTypeId = $eventTypeId !== '' ? (int) $eventTypeId : null;
+        $eventType   = $eventTypeId ? EventType::find($eventTypeId) : null;
+        $hasRecipe   = (bool) ($eventType?->has_recipe);
+
+        $this->events[$index]['event_type_id']         = $eventTypeId;
+        $this->events[$index]['event_type_has_recipe']  = $hasRecipe;
+        $this->events[$index]['item_type_id']           = null;
+        $this->events[$index]['item_id']                = null;
+        $this->events[$index]['recipe_type_id']          = null;
+        $this->events[$index]['recipe_id']               = null;
+        $this->events[$index]['batch_count']             = '';
+
+        unset($this->itemsByRow[$index], $this->recipeTypesByRow[$index], $this->recipesByRow[$index]);
+
+        if ($hasRecipe) {
+            $this->events[$index]['duration'] = null;
+            $this->itemTypesByRow[$index]     = $this->api->get('/v1/item-types')['data'] ?? [];
+        } else {
+            $this->events[$index]['duration'] = $eventType?->duration;
+            unset($this->itemTypesByRow[$index]);
+        }
+    }
+
+    public function onItemTypeChanged(int $index, $itemTypeId): void
+    {
+        $itemTypeId = $itemTypeId !== '' ? (int) $itemTypeId : null;
+
+        $this->events[$index]['item_type_id']   = $itemTypeId;
+        $this->events[$index]['item_id']        = null;
+        $this->events[$index]['recipe_type_id'] = null;
+        $this->events[$index]['recipe_id']      = null;
+
+        unset($this->recipesByRow[$index]);
+
+        if ($itemTypeId) {
+            $this->itemsByRow[$index]       = $this->fetchItemsForType($itemTypeId);
+            $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType($itemTypeId);
+        } else {
+            unset($this->itemsByRow[$index], $this->recipeTypesByRow[$index]);
+        }
+    }
+
+    public function onItemChanged(int $index, $itemId): void
+    {
+        $itemId = $itemId !== '' ? (int) $itemId : null;
+
+        $this->events[$index]['item_id']    = $itemId;
+        $this->events[$index]['recipe_id']  = null;
+
+        $recipeTypeId = $this->events[$index]['recipe_type_id'] ?? null;
+
+        if ($recipeTypeId && $itemId) {
+            $this->recipesByRow[$index] = $this->fetchRecipes((int) $recipeTypeId, $itemId);
+        } else {
+            unset($this->recipesByRow[$index]);
+        }
+    }
+
+    public function onRecipeTypeChanged(int $index, $recipeTypeId): void
+    {
+        $recipeTypeId = $recipeTypeId !== '' ? (int) $recipeTypeId : null;
+
+        $this->events[$index]['recipe_type_id'] = $recipeTypeId;
+        $this->events[$index]['recipe_id']      = null;
+
+        $itemId = $this->events[$index]['item_id'] ?? null;
+
+        if ($recipeTypeId && $itemId) {
+            $this->recipesByRow[$index] = $this->fetchRecipes($recipeTypeId, (int) $itemId);
+        } else {
+            unset($this->recipesByRow[$index]);
+        }
+    }
+
+    public function onRecipeChanged(int $index, $recipeId): void
+    {
+        $this->events[$index]['recipe_id'] = $recipeId !== '' ? (int) $recipeId : null;
+    }
+
     protected function rules(): array
     {
         $rules = [];
 
         foreach ($this->events as $index => $event) {
+            $hasRecipe = !empty($event['event_type_has_recipe']);
+
             $rules["events.{$index}.event_type_id"] = 'required|exists:event_types,id';
             $rules["events.{$index}.from_time"]      = 'required|date_format:H:i';
             $rules["events.{$index}.to_time"]        = 'nullable|date_format:H:i';
             $rules["events.{$index}.description"]    = 'nullable|string|max:1000';
+
+            $requiredIfRecipe = $hasRecipe ? 'required' : 'nullable';
+            $rules["events.{$index}.item_type_id"]   = "{$requiredIfRecipe}|integer";
+            $rules["events.{$index}.item_id"]        = "{$requiredIfRecipe}|integer";
+            $rules["events.{$index}.recipe_type_id"] = "{$requiredIfRecipe}|integer|exists:recipe_types,id";
+            $rules["events.{$index}.recipe_id"]      = "{$requiredIfRecipe}|integer|exists:recipes,id";
+            $rules["events.{$index}.batch_count"]    = "{$requiredIfRecipe}|string|max:255";
         }
 
         return $rules;
     }
 
     protected $messages = [
-        'events.*.event_type_id.required' => 'Event type is required.',
-        'events.*.event_type_id.exists'   => 'Selected event type is invalid.',
-        'events.*.from_time.required'     => 'From time is required.',
-        'events.*.from_time.date_format'  => 'Invalid time format (H:i).',
-        'events.*.to_time.date_format'    => 'Invalid time format (H:i).',
+        'events.*.event_type_id.required'  => 'Event type is required.',
+        'events.*.event_type_id.exists'    => 'Selected event type is invalid.',
+        'events.*.from_time.required'      => 'From time is required.',
+        'events.*.from_time.date_format'   => 'Invalid time format (H:i).',
+        'events.*.to_time.date_format'     => 'Invalid time format (H:i).',
+        'events.*.item_type_id.required'   => 'Item type is required.',
+        'events.*.item_id.required'        => 'Item is required.',
+        'events.*.recipe_type_id.required' => 'Recipe type is required.',
+        'events.*.recipe_id.required'      => 'Recipe is required.',
+        'events.*.batch_count.required'    => 'Batch number is required.',
     ];
 
     private function validateShiftTimes(): bool
@@ -231,13 +408,21 @@ class EventCreate extends Component
             }
 
             foreach ($this->events as $event) {
+                $hasRecipe = !empty($event['event_type_has_recipe']);
+
                 $data = [
-                    'plan_id'       => $this->planId,
-                    'event_type_id' => $event['event_type_id'],
-                    'name'          => $typeNames[$event['event_type_id']] ?? '',
-                    'from_time'     => $event['from_time'],
-                    'to_time'       => $event['to_time'] ?: null,
-                    'description'   => $event['description'] ?: null,
+                    'plan_id'        => $this->planId,
+                    'event_type_id'  => $event['event_type_id'],
+                    'name'           => $typeNames[$event['event_type_id']] ?? '',
+                    'from_time'      => $event['from_time'],
+                    'to_time'        => $event['to_time'] ?: null,
+                    'description'    => $event['description'] ?: null,
+                    'item_type_id'   => $hasRecipe ? $event['item_type_id'] : null,
+                    'item_id'        => $hasRecipe ? $event['item_id'] : null,
+                    'recipe_type_id' => $hasRecipe ? $event['recipe_type_id'] : null,
+                    'recipe_id'      => $hasRecipe ? $event['recipe_id'] : null,
+                    'batch_count'    => $hasRecipe ? $event['batch_count'] : null,
+                    'planned_duration' => $hasRecipe ? null : $event['duration'],
                 ];
 
                 if (!empty($event['id'])) {
