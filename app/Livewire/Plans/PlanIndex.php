@@ -42,7 +42,9 @@ class PlanIndex extends Component
     {
         $this->department_id = $deptId;
         $this->factory_id    = null;
-        $this->factories     = $this->fetchFactoryWarehouses($deptId);
+
+        $factories = $this->fetchFactoryWarehouses($deptId);
+        $this->dispatch('planFactoriesReady', factories: $factories);
     }
 
     private function fetchFactoryWarehouses(?int $deptId): array
@@ -106,14 +108,14 @@ class PlanIndex extends Component
     public function create(): void
     {
         $this->resetForm();
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', factories: []);
     }
 
     public function createForDate(string $date): void
     {
         $this->resetForm();
         $this->date = $date;
-        $this->dispatch('openModal');
+        $this->dispatch('openModal', factories: []);
     }
 
     public function edit(int $id): void
@@ -123,9 +125,13 @@ class PlanIndex extends Component
         $this->plan_id   = $plan->id;
         $this->date      = Carbon::parse($plan->date)->format('Y-m-d');
         $this->factory_id = $plan->factory_id;
-        $this->factories = $this->fetchAllFactories();
         $this->editing   = true;
-        $this->dispatch('openModal');
+
+        $allFactories = $this->fetchAllFactories();
+        $matched = collect($allFactories)->firstWhere('id', $plan->factory_id);
+        $this->department_id = $matched['department_id'] ?? ($matched['department']['id'] ?? null);
+
+        $this->dispatch('openModal', factories: $this->fetchFactoryWarehouses($this->department_id));
     }
 
     protected function rules(): array

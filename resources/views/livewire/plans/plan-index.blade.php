@@ -140,16 +140,16 @@
 
                         <div class="col-12 col-md-6">
                             <label for="plan_department" class="form-label">Department</label>
-                            <select id="plan_department" class="form-select"
-                                wire:model="department_id"
-                                wire:change="onDepartmentChange($event.target.value)">
-                                <option value="">— Select department —</option>
-                                @foreach($departments as $dept)
-                                <option value="{{ $dept['id'] }}" @selected($department_id == $dept['id'])>
-                                    {{ $dept['name'] }}
-                                </option>
-                                @endforeach
-                            </select>
+                            <div wire:ignore>
+                                <select id="plan_department" class="selectpicker w-100" title="Select department…"
+                                    data-style="btn-default" data-live-search="true">
+                                    @foreach($departments as $dept)
+                                    <option value="{{ $dept['id'] }}" @selected($department_id == $dept['id'])>
+                                        {{ $dept['name'] }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
                             <div class="form-text">Used to filter the factory list below.</div>
                         </div>
 
@@ -157,15 +157,10 @@
                             <label for="plan_factory" class="form-label">
                                 Factory <span class="text-danger">*</span>
                             </label>
-                            <select id="plan_factory" class="form-select @error('factory_id') is-invalid @enderror"
-                                wire:model="factory_id">
-                                <option value="">— Select factory —</option>
-                                @foreach($factories as $factory)
-                                <option value="{{ $factory['id'] }}" @selected($factory_id == $factory['id'])>
-                                    {{ $factory['name'] }}
-                                </option>
-                                @endforeach
-                            </select>
+                            <div wire:ignore>
+                                <select id="plan_factory" class="selectpicker w-100 @error('factory_id') is-invalid @enderror"
+                                    title="Select factory…" data-style="btn-default" data-live-search="true"></select>
+                            </div>
                             @error('factory_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
@@ -188,15 +183,40 @@
     <script>
         const planModal = new bootstrap.Modal(document.getElementById('planModal'));
 
-        $wire.on('openModal', () => {
+        function buildPlanFactorySelect(factories, selectedId) {
+            const $sel = $('#plan_factory');
+            $sel.selectpicker('destroy');
+            $sel.empty();
+            (factories || []).forEach(f => {
+                $sel.append($('<option>', { value: f.id, text: f.name, selected: f.id == selectedId }));
+            });
+            $sel.selectpicker();
+        }
+
+        $wire.on('openModal', ({ factories }) => {
             planModal.show();
             setTimeout(() => {
                 let d = $wire.get('date');
                 if (d) document.getElementById('plan_date').value = d;
-            }, 250);
+
+                $('#plan_department').selectpicker('destroy').selectpicker();
+                $('#plan_department').selectpicker('val', String($wire.get('department_id') || ''));
+                buildPlanFactorySelect(factories, $wire.get('factory_id'));
+            }, 150);
+        });
+
+        $wire.on('planFactoriesReady', ({ factories }) => {
+            buildPlanFactorySelect(factories, null);
         });
 
         $wire.on('closeModal', () => planModal.hide());
+
+        $(document).on('change', '#plan_department', function () {
+            $wire.call('onDepartmentChange', parseInt($(this).val()) || null);
+        });
+        $(document).on('change', '#plan_factory', function () {
+            $wire.set('factory_id', parseInt($(this).val()) || null);
+        });
     </script>
     @endscript
 </div>
