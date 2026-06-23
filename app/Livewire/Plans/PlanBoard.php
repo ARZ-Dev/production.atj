@@ -250,11 +250,10 @@ class PlanBoard extends Component
         $units      = $this->api->get("/v1/items/{$event->item_id}")['data']['units'] ?? [];
         $recipeUnit = collect($units)->firstWhere('id', $recipe->item_unit_id);
 
-        $basicQty = $requiredQty;
-        if ($recipeUnit && empty($recipeUnit['basic'])) {
-            $formula  = (float) ($recipeUnit['formula'] ?? 1) ?: 1;
-            $basicQty = $requiredQty / $formula;
-        }
+        // formula = qty of basic units needed to make 1 of that unit
+        // (the basic unit's own formula is 1) — unit -> basic: multiply.
+        $formula  = (float) ($recipeUnit['formula'] ?? 1) ?: 1;
+        $basicQty = $requiredQty * $formula;
 
         $durationHours = $basicQty / (float) $capacity->capacity;
 

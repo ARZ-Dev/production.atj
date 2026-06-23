@@ -82,8 +82,10 @@
                                                     @foreach($units as $unit)
                                                     @php
                                                         $isBasic = !empty($unit['basic']);
+                                                        // formula = qty of basic units needed to make 1 of this unit
+                                                        // (basic unit's own formula is 1). basic -> unit: divide.
                                                         $formula = (float) ($unit['formula'] ?? 1) ?: 1;
-                                                        $display = $basicValue === null ? '' : ($isBasic ? $basicValue : $basicValue * $formula);
+                                                        $display = $basicValue === null ? '' : $basicValue / $formula;
                                                     @endphp
                                                     <div style="min-width:120px;">
                                                         <input
@@ -142,11 +144,11 @@
     <script>
     (() => {
         // ── Capacity unit conversion ──────────────────────────────────────────
-        // All units for an item are always shown and editable. Whichever input
-        // the user types into becomes the source: its value is converted to the
-        // basic unit, then every other unit's input is recalculated from that.
-        // basic_capacity = source unit's basic flag ? entered value : entered value / formula
-        // display(unit)  = unit's basic flag ? basic_capacity : basic_capacity * formula
+        // formula = qty of basic units needed to make 1 of that unit (the basic
+        // unit's own formula is 1). All units for an item are always shown and
+        // editable. Whichever input the user types into becomes the source:
+        // basic_capacity   = entered value * source unit's formula
+        // display(unit)    = basic_capacity / unit's formula
         const recalcCapacityRow = (row, sourceInput) => {
             const units = JSON.parse(row.dataset.units || '[]');
             if (!units.length) return;
@@ -166,7 +168,7 @@
                 basic = parseFloat(hiddenValue.value) || 0;
             } else {
                 const formula = parseFloat(sourceUnit.formula || 1) || 1;
-                basic = sourceUnit.basic ? entered : entered / formula;
+                basic = entered * formula;
             }
 
             inputs.forEach(input => {
@@ -177,7 +179,7 @@
                 if (!unit) return;
 
                 const formula = parseFloat(unit.formula || 1) || 1;
-                const display = unit.basic ? basic : basic * formula;
+                const display = basic / formula;
                 input.value = isFinite(display) ? Math.round(display * 10000) / 10000 : '';
             });
 
