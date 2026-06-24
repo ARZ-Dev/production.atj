@@ -27,6 +27,7 @@
                                 <th>Department</th>
                                 <th>RM Warehouse</th>
                                 <th>FG Warehouse</th>
+                                <th>Event Types</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -52,6 +53,17 @@
                                         $fgWh = collect($warehouses)->firstWhere('id', $prep->fg_warehouse_id);
                                     @endphp
                                     {{ $fgWh['name'] ?? '—' }}
+                                </td>
+                                <td>
+                                    @if($prep->eventTypes->count())
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach($prep->eventTypes as $et)
+                                            <span class="badge" style="background-color: {{ $et->color ?? '#818cf8' }}">{{ $et->name }}</span>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-muted small">—</span>
+                                    @endif
                                 </td>
                                 <td>
                                     <a href="{{ route('preparations.capacity', $prep->id) }}"
@@ -151,6 +163,27 @@
                             @error('fg_warehouse_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                         </div>
 
+                        <div class="col-12">
+                            <label class="form-label">Allowed Event Types <span class="text-danger">*</span></label>
+                            <div wire:ignore>
+                                <select id="prep_event_types"
+                                    class="selectpicker w-100 @error('selectedEventTypes') is-invalid @enderror"
+                                    multiple
+                                    title="Select event types…"
+                                    data-style="btn-default"
+                                    data-live-search="true"
+                                    data-actions-box="true">
+                                    @foreach($eventTypes as $et)
+                                    <option value="{{ $et->id }}"
+                                        @selected(in_array($et->id, $selectedEventTypes))>
+                                        {{ $et->name }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('selectedEventTypes')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                        </div>
+
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -187,6 +220,8 @@
                 $('#prep_department_id').selectpicker('val', String($wire.get('department_id') || ''));
                 buildPrepWarehouseSelect('#prep_rm_warehouse_id', warehouses, $wire.get('rm_warehouse_id'));
                 buildPrepWarehouseSelect('#prep_fg_warehouse_id', warehouses, $wire.get('fg_warehouse_id'));
+                $('#prep_event_types').selectpicker('destroy').selectpicker();
+                $('#prep_event_types').selectpicker('val', ($wire.get('selectedEventTypes') || []).map(String));
             }, 150);
         });
 
@@ -203,6 +238,9 @@
         });
         $(document).on('change', '#prep_fg_warehouse_id', function () {
             $wire.set('fg_warehouse_id', parseInt($(this).val()) || null);
+        });
+        $(document).on('change', '#prep_event_types', function () {
+            $wire.set('selectedEventTypes', ($(this).val() || []).map(Number));
         });
     </script>
     @endscript

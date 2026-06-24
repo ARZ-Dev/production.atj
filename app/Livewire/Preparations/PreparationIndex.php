@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Preparations;
 
+use App\Models\EventType;
 use App\Models\Preparation;
 use App\Services\ApiService;
 use Livewire\Attributes\On;
@@ -12,6 +13,7 @@ class PreparationIndex extends Component
     public $preparations = [];
     public $departments  = [];
     public $warehouses   = [];
+    public $eventTypes   = [];
 
     // Form fields
     public ?int    $preparation_id  = null;
@@ -19,6 +21,7 @@ class PreparationIndex extends Component
     public ?int    $department_id   = null;
     public ?int    $rm_warehouse_id = null;
     public ?int    $fg_warehouse_id = null;
+    public array   $selectedEventTypes = [];
     public bool    $editing         = false;
 
     protected ApiService $api;
@@ -40,12 +43,14 @@ class PreparationIndex extends Component
             ->values()
             ->toArray();
 
+        $this->eventTypes = EventType::orderBy('name')->get();
+
         $this->loadPreparations();
     }
 
     public function loadPreparations(): void
     {
-        $this->preparations = Preparation::orderBy('name')->get();
+        $this->preparations = Preparation::with('eventTypes')->orderBy('name')->get();
     }
 
     public function resetForm(): void
@@ -55,6 +60,7 @@ class PreparationIndex extends Component
         $this->department_id   = null;
         $this->rm_warehouse_id = null;
         $this->fg_warehouse_id = null;
+        $this->selectedEventTypes = [];
         $this->editing         = false;
         $this->resetValidation();
     }
@@ -71,12 +77,13 @@ class PreparationIndex extends Component
         authorizeRequest('production.preparation-edit');
         $this->resetForm();
 
-        $prep = Preparation::findOrFail($id);
+        $prep = Preparation::with('eventTypes')->findOrFail($id);
         $this->preparation_id  = $prep->id;
         $this->name            = $prep->name;
         $this->department_id   = $prep->department_id;
         $this->rm_warehouse_id = $prep->rm_warehouse_id;
         $this->fg_warehouse_id = $prep->fg_warehouse_id;
+        $this->selectedEventTypes = $prep->eventTypes->pluck('id')->toArray();
         $this->editing         = true;
 
         $this->dispatch('openModal', warehouses: $this->fetchInternalWarehouses($this->department_id));
@@ -112,6 +119,8 @@ class PreparationIndex extends Component
             'department_id'   => 'required|integer',
             'rm_warehouse_id' => 'required|integer',
             'fg_warehouse_id' => 'required|integer',
+            'selectedEventTypes'   => 'required|array|min:1',
+            'selectedEventTypes.*' => 'exists:event_types,id',
         ];
     }
 
@@ -128,13 +137,16 @@ class PreparationIndex extends Component
 
         if ($this->editing) {
             authorizeRequest('production.preparation-edit');
-            Preparation::findOrFail($this->preparation_id)->update($data);
+            $prep = Preparation::findOrFail($this->preparation_id);
+            $prep->update($data);
             $message = 'Preparation updated successfully.';
         } else {
             authorizeRequest('production.preparation-create');
-            Preparation::create($data);
+            $prep = Preparation::create($data);
             $message = 'Preparation created successfully.';
         }
+
+        $prep->eventTypes()->sync($this->selectedEventTypes);
 
         return redirect()->route('preparations')->with('success', $message);
     }
