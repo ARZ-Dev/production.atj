@@ -62,50 +62,67 @@
             </div>
         </div>
 
-        <div class="pbc-grid">
-            <div class="pbc-corner"></div>
-            <div class="pbc-hour-row">
-                @for($h = 0; $h < 24; $h++)
-                <div class="pbc-hour-cell">{{ sprintf('%02d:00', $h) }}</div>
-                @endfor
-            </div>
+        <div class="pbc-grid-wrap">
+            <button type="button" class="pbc-scroll-btn pbc-scroll-btn--left" aria-label="Scroll left">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button type="button" class="pbc-scroll-btn pbc-scroll-btn--right" aria-label="Scroll right">
+                <i class="bi bi-chevron-right"></i>
+            </button>
 
-            @php $laneRows = $this->laneRows(); @endphp
-            @forelse($laneRows as $row)
-            @php $pl = $row['production_line']; @endphp
-            <div class="pbc-group-header" wire:key="pbc-group-{{ $pl->id }}">
-                <i class="bi bi-diagram-3"></i> {{ $pl->name }}
-            </div>
+            <div class="pbc-grid">
+                <div class="pbc-corner"></div>
+                <div class="pbc-hour-row">
+                    @for($h = 0; $h < 24; $h++)
+                    <div class="pbc-hour-cell">{{ sprintf('%02d:00', $h) }}</div>
+                    @endfor
+                </div>
 
-            @forelse($row['lanes'] as $laneRow)
-            @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
-            <div class="pbc-row-label pbc-row-label--lane" wire:key="pbc-lane-label-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
-                <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }} me-1"></i>
-                {{ $lane['name'] }}
+                @php $laneRows = $this->laneRows(); @endphp
+                @forelse($laneRows as $row)
+                @php $pl = $row['production_line']; $laneCount = max(count($row['lanes']), 1); @endphp
+
+                @if(count($row['lanes']))
+                    @foreach($row['lanes'] as $i => $laneRow)
+                    @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
+                    @if($i === 0)
+                    <div class="pbc-pl-label" style="grid-row: span {{ $laneCount }};" wire:key="pbc-pl-{{ $pl->id }}">
+                        {{ $pl->name }}
+                    </div>
+                    @endif
+                    <div class="pbc-row-label" wire:key="pbc-lane-label-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
+                        <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }} me-1"></i>
+                        {{ $lane['name'] }}
+                    </div>
+                    <div class="pbc-row-track pbc-drop"
+                        data-production-line-id="{{ $pl->id }}"
+                        data-placeable-type="{{ $lane['type'] }}"
+                        data-placeable-id="{{ $lane['id'] }}"
+                        wire:key="pbc-lane-track-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}"
+                        style="height: {{ max($layout['tracks'], 1) * 48 + 12 }}px;">
+                        @foreach($layout['items'] as $item)
+                            @include('livewire.plans.partials._calendar-event-card', [
+                                'event' => $item['event'],
+                                'track' => $item['track'],
+                                'fromHour' => $item['fromHour'],
+                                'spanHours' => $item['spanHours'],
+                            ])
+                        @endforeach
+                    </div>
+                    @endforeach
+                @else
+                    <div class="pbc-pl-label" style="grid-row: span 1;" wire:key="pbc-pl-{{ $pl->id }}">
+                        {{ $pl->name }}
+                    </div>
+                    <div class="pbc-row-track-empty">No preparations or lines attached to this production line.</div>
+                @endif
+
+                @empty
+                <div class="pbc-empty">
+                    No production lines found for this factory.
+                </div>
+                @endforelse
             </div>
-            <div class="pbc-row-track pbc-drop"
-                data-production-line-id="{{ $pl->id }}"
-                data-placeable-type="{{ $lane['type'] }}"
-                data-placeable-id="{{ $lane['id'] }}"
-                wire:key="pbc-lane-track-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}"
-                style="height: {{ max($layout['tracks'], 1) * 36 + 12 }}px;">
-                @foreach($layout['items'] as $item)
-                    @include('livewire.plans.partials._calendar-event-card', [
-                        'event' => $item['event'],
-                        'track' => $item['track'],
-                        'fromHour' => $item['fromHour'],
-                        'spanHours' => $item['spanHours'],
-                    ])
-                @endforeach
-            </div>
-            @empty
-            <div class="pbc-row-track-empty">No preparations or lines attached to this production line.</div>
-            @endforelse
-            @empty
-            <div class="pbc-empty">
-                No production lines found for this factory.
-            </div>
-            @endforelse
         </div>
     </div>
     @endif
@@ -185,10 +202,29 @@
             });
         };
 
-        initCalendarDrag();
+        const initScrollButtons = () => {
+            document.querySelectorAll('.pbc-scroll-btn').forEach(btn => {
+                if (btn.dataset.scrollInit) return;
+                btn.dataset.scrollInit = '1';
+
+                btn.addEventListener('click', () => {
+                    const grid = btn.closest('.pbc-grid-wrap')?.querySelector('.pbc-grid');
+                    if (!grid) return;
+                    const dir = btn.classList.contains('pbc-scroll-btn--left') ? -1 : 1;
+                    grid.scrollBy({ left: dir * 240, behavior: 'smooth' });
+                });
+            });
+        };
+
+        const initAll = () => {
+            initCalendarDrag();
+            initScrollButtons();
+        };
+
+        initAll();
 
         Livewire.hook('morph.added', ({ el }) => {
-            if (el.nodeType === 1) initCalendarDrag();
+            if (el.nodeType === 1) initAll();
         });
     })();
     </script>
