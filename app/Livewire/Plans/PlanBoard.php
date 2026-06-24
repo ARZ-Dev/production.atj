@@ -20,6 +20,7 @@ class PlanBoard extends Component
     public $productionLines = [];
     public $unplacedEvents = [];
     public ?string $factoryName = null;
+    public ?array $selectedEvent = null;
 
     protected Collection $allEvents;
 
@@ -209,6 +210,49 @@ class PlanBoard extends Component
         $event->placeable_id        = null;
         $event->calculated_duration = null;
         $event->save();
+    }
+
+    public function showEventDetails(int $eventId): void
+    {
+        $event = Event::with(['eventType', 'recipe', 'recipeType'])
+            ->where('plan_id', $this->plan->id)
+            ->findOrFail($eventId);
+
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
+
+        $placeableName = null;
+        if ($event->placeable_type && $event->placeable_id) {
+            $placeableName = $event->placeable_type::find($event->placeable_id)?->name;
+        }
+
+        $productionLineName = $event->production_line_id
+            ? ProductionLine::find($event->production_line_id)?->name
+            : null;
+
+        $itemName = null;
+        if ($event->item_id) {
+            $itemName = $this->api->get("/v1/items/{$event->item_id}")['data']['name'] ?? null;
+        }
+
+        $this->selectedEvent = [
+            'type_name'            => $event->eventType?->name ?? 'No type',
+            'color'                => $event->eventType?->color ?? '#818cf8',
+            'has_recipe'           => $hasRecipe,
+            'from_time'            => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : null,
+            'to_time'              => $event->to_time ? Carbon::parse($event->to_time)->format('H:i') : null,
+            'duration'             => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
+            'batch_count'          => $event->batch_count,
+            'item_name'            => $itemName,
+            'recipe_type_name'     => $event->recipeType?->name,
+            'recipe_name'          => $event->recipe?->name,
+            'production_line_name' => $productionLineName,
+            'placeable_kind'       => $event->placeable_type === Preparation::class ? 'Preparation' : ($event->placeable_type === Line::class ? 'Line' : null),
+            'placeable_name'       => $placeableName,
+            'description'          => $event->description,
+            'status'               => $event->status,
+        ];
+
+        $this->dispatch('openEventModal');
     }
 
     protected function classForAlias(string $alias): ?string
