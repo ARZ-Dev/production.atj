@@ -301,18 +301,6 @@
 
 .pbc-grid-wrap { position: relative; flex: 1; min-width: 0; }
 
-.pbc-scroll-btn {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    width: 32px; height: 32px; border-radius: 50%; border: none;
-    background: rgba(40,40,65,.55); color: #fff; font-size: 13px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; z-index: 6; box-shadow: 0 2px 8px rgba(0,0,0,.18);
-    transition: background .15s;
-}
-.pbc-scroll-btn:hover { background: rgba(40,40,65,.85); }
-.pbc-scroll-btn--left  { left: -4px; }
-.pbc-scroll-btn--right { right: -4px; }
-
 .pbc-grid {
     --pbc-hour-w: 70px;
     --pbc-band-w: calc(var(--pbc-hour-w) * 8);

@@ -63,13 +63,6 @@
         </div>
 
         <div class="pbc-grid-wrap">
-            <button type="button" class="pbc-scroll-btn pbc-scroll-btn--left" aria-label="Scroll left">
-                <i class="bi bi-chevron-left"></i>
-            </button>
-            <button type="button" class="pbc-scroll-btn pbc-scroll-btn--right" aria-label="Scroll right">
-                <i class="bi bi-chevron-right"></i>
-            </button>
-
             <div class="pbc-grid">
                 <div class="pbc-corner"></div>
                 <div class="pbc-hour-row">
@@ -127,11 +120,92 @@
     </div>
     @endif
 
+    <!-- Event Details Modal -->
+    <div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsModalLabel" aria-hidden="true" wire:ignore.self>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventDetailsModalLabel">
+                        @if($selectedEvent)
+                        <span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background-color: {{ $selectedEvent['color'] }}"></span>
+                        {{ $selectedEvent['type_name'] }}
+                        @else
+                        Event Details
+                        @endif
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                @if($selectedEvent)
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="pvc-body-label">Time</div>
+                            <div>{{ $selectedEvent['from_time'] ?? '—' }}{{ $selectedEvent['to_time'] ? ' – '.$selectedEvent['to_time'] : '' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Duration</div>
+                            <div>{{ $selectedEvent['duration'] ? $selectedEvent['duration'].' min' : '—' }}</div>
+                        </div>
+
+                        @if($selectedEvent['has_recipe'])
+                        <div class="col-6">
+                            <div class="pvc-body-label">Batch Count</div>
+                            <div>{{ $selectedEvent['batch_count'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Item</div>
+                            <div>{{ $selectedEvent['item_name'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Recipe Type</div>
+                            <div>{{ $selectedEvent['recipe_type_name'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Recipe</div>
+                            <div>{{ $selectedEvent['recipe_name'] ?? '—' }}</div>
+                        </div>
+                        @endif
+
+                        <div class="col-6">
+                            <div class="pvc-body-label">Production Line</div>
+                            <div>{{ $selectedEvent['production_line_name'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">{{ $selectedEvent['placeable_kind'] ?? 'Lane' }}</div>
+                            <div>{{ $selectedEvent['placeable_name'] ?? '—' }}</div>
+                        </div>
+
+                        @if($selectedEvent['status'])
+                        <div class="col-6">
+                            <div class="pvc-body-label">Status</div>
+                            <div>{{ $selectedEvent['status'] }}</div>
+                        </div>
+                        @endif
+
+                        @if($selectedEvent['description'])
+                        <div class="col-12">
+                            <div class="pvc-body-label">Description</div>
+                            <div>{{ $selectedEvent['description'] }}</div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @endif
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="pbToastHost" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
 
     @script
     <script>
     (() => {
+        const eventDetailsModal = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
+        $wire.on('openEventModal', () => eventDetailsModal.show());
+
         const pxPerHour = (el) => {
             const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-hour-w'));
             return isFinite(v) && v > 0 ? v : 70;
@@ -202,23 +276,8 @@
             });
         };
 
-        const initScrollButtons = () => {
-            document.querySelectorAll('.pbc-scroll-btn').forEach(btn => {
-                if (btn.dataset.scrollInit) return;
-                btn.dataset.scrollInit = '1';
-
-                btn.addEventListener('click', () => {
-                    const grid = btn.closest('.pbc-grid-wrap')?.querySelector('.pbc-grid');
-                    if (!grid) return;
-                    const dir = btn.classList.contains('pbc-scroll-btn--left') ? -1 : 1;
-                    grid.scrollBy({ left: dir * 240, behavior: 'smooth' });
-                });
-            });
-        };
-
         const initAll = () => {
             initCalendarDrag();
-            initScrollButtons();
         };
 
         initAll();
