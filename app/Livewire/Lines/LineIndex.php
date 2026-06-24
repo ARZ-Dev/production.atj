@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lines;
 
+use App\Models\EventType;
 use App\Models\Line;
 use App\Services\ApiService;
 use Livewire\Attributes\On;
@@ -12,6 +13,7 @@ class LineIndex extends Component
     public $lines       = [];
     public $departments = [];
     public $warehouses  = [];
+    public $eventTypes  = [];
 
     // Form fields
     public ?int   $line_id         = null;
@@ -19,6 +21,7 @@ class LineIndex extends Component
     public ?int   $department_id   = null;
     public ?int   $sfg_warehouse_id = null;
     public ?int   $fg_warehouse_id  = null;
+    public array  $selectedEventTypes = [];
     public bool   $editing          = false;
 
     protected ApiService $api;
@@ -40,12 +43,14 @@ class LineIndex extends Component
             ->values()
             ->toArray();
 
+        $this->eventTypes = EventType::orderBy('name')->get();
+
         $this->loadLines();
     }
 
     public function loadLines(): void
     {
-        $this->lines = Line::orderBy('name')->get();
+        $this->lines = Line::with('eventTypes')->orderBy('name')->get();
     }
 
     public function resetForm(): void
@@ -55,6 +60,7 @@ class LineIndex extends Component
         $this->department_id    = null;
         $this->sfg_warehouse_id = null;
         $this->fg_warehouse_id  = null;
+        $this->selectedEventTypes = [];
         $this->editing          = false;
         $this->resetValidation();
     }
@@ -71,12 +77,13 @@ class LineIndex extends Component
         authorizeRequest('production.line-edit');
         $this->resetForm();
 
-        $line = Line::findOrFail($id);
+        $line = Line::with('eventTypes')->findOrFail($id);
         $this->line_id          = $line->id;
         $this->name             = $line->name;
         $this->department_id    = $line->department_id;
         $this->sfg_warehouse_id = $line->sfg_warehouse_id;
         $this->fg_warehouse_id  = $line->fg_warehouse_id;
+        $this->selectedEventTypes = $line->eventTypes->pluck('id')->toArray();
         $this->editing          = true;
 
         $this->dispatch('openModal', warehouses: $this->fetchInternalWarehouses($this->department_id));
@@ -112,6 +119,8 @@ class LineIndex extends Component
             'department_id'    => 'required|integer',
             'sfg_warehouse_id' => 'required|integer',
             'fg_warehouse_id'  => 'required|integer',
+            'selectedEventTypes'   => 'required|array|min:1',
+            'selectedEventTypes.*' => 'exists:event_types,id',
         ];
     }
 
@@ -128,13 +137,16 @@ class LineIndex extends Component
 
         if ($this->editing) {
             authorizeRequest('production.line-edit');
-            Line::findOrFail($this->line_id)->update($data);
+            $line = Line::findOrFail($this->line_id);
+            $line->update($data);
             $message = 'Line updated successfully.';
         } else {
             authorizeRequest('production.line-create');
-            Line::create($data);
+            $line = Line::create($data);
             $message = 'Line created successfully.';
         }
+
+        $line->eventTypes()->sync($this->selectedEventTypes);
 
         return redirect()->route('lines')->with('success', $message);
     }

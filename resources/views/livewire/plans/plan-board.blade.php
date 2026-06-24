@@ -41,27 +41,15 @@
     </div>
     @else
 
-    <div class="pb-tabs">
-        <button type="button" class="pb-tab {{ $boardView === 'calendar' ? 'active' : '' }}"
-            wire:click="setView('calendar')">
-            <i class="bi bi-calendar-week me-1"></i> Calendar
-        </button>
-        <button type="button" class="pb-tab {{ $boardView === 'kanban' ? 'active' : '' }}"
-            wire:click="setView('kanban')">
-            <i class="bi bi-kanban me-1"></i> Lines &amp; Preparations
-        </button>
-    </div>
-
-    @if($boardView === 'calendar')
     <div class="pbc-wrap">
         <div class="pbc-tray">
             <div class="pbc-tray-head">
                 <i class="bi bi-inbox text-primary"></i>
-                <span class="pb-tray-title">Unscheduled</span>
-                <span class="badge bg-light-primary rounded-pill">{{ count($unscheduledEvents) }}</span>
+                <span class="pb-tray-title">Unplaced Events</span>
+                <span class="badge bg-light-primary rounded-pill">{{ count($unplacedEvents) }}</span>
             </div>
             <div class="pbc-tray-body pbc-drop" data-tray>
-                @forelse($unscheduledEvents as $event)
+                @forelse($unplacedEvents as $event)
                     @include('livewire.plans.partials._calendar-event-card', [
                         'event' => $event,
                         'track' => 0,
@@ -69,7 +57,7 @@
                         'spanHours' => 1,
                     ])
                 @empty
-                <div class="pb-empty-hint">All events are scheduled.</div>
+                <div class="pb-empty-hint">All events are placed.</div>
                 @endforelse
             </div>
         </div>
@@ -82,12 +70,24 @@
                 @endfor
             </div>
 
-            @php $calendarRows = $this->calendarRows(); @endphp
-            @forelse($calendarRows as $row)
-            @php $pl = $row['production_line']; $layout = $row['layout']; @endphp
-            <div class="pbc-row-label" wire:key="pbc-label-{{ $pl->id }}">{{ $pl->name }}</div>
-            <div class="pbc-row-track pbc-drop" data-production-line-id="{{ $pl->id }}"
-                wire:key="pbc-track-{{ $pl->id }}"
+            @php $laneRows = $this->laneRows(); @endphp
+            @forelse($laneRows as $row)
+            @php $pl = $row['production_line']; @endphp
+            <div class="pbc-group-header" wire:key="pbc-group-{{ $pl->id }}">
+                <i class="bi bi-diagram-3"></i> {{ $pl->name }}
+            </div>
+
+            @forelse($row['lanes'] as $laneRow)
+            @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
+            <div class="pbc-row-label pbc-row-label--lane" wire:key="pbc-lane-label-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
+                <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }} me-1"></i>
+                {{ $lane['name'] }}
+            </div>
+            <div class="pbc-row-track pbc-drop"
+                data-production-line-id="{{ $pl->id }}"
+                data-placeable-type="{{ $lane['type'] }}"
+                data-placeable-id="{{ $lane['id'] }}"
+                wire:key="pbc-lane-track-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}"
                 style="height: {{ max($layout['tracks'], 1) * 36 + 12 }}px;">
                 @foreach($layout['items'] as $item)
                     @include('livewire.plans.partials._calendar-event-card', [
@@ -99,113 +99,44 @@
                 @endforeach
             </div>
             @empty
+            <div class="pbc-row-track-empty">No preparations or lines attached to this production line.</div>
+            @endforelse
+            @empty
             <div class="pbc-empty">
                 No production lines found for this factory.
             </div>
             @endforelse
         </div>
     </div>
-    @else
-
-    <div class="pb-board">
-
-        <div class="pb-tray">
-            <div class="pb-tray-head">
-                <i class="bi bi-inbox text-primary"></i>
-                <span class="pb-tray-title">Unplaced Events</span>
-                <span class="badge bg-light-primary rounded-pill">{{ count($unplacedEvents) }}</span>
-            </div>
-            <div class="pb-tray-body pb-lane-drop" data-lane-tray>
-                @forelse($unplacedEvents as $event)
-                    @include('livewire.plans.partials._event-card', ['event' => $event])
-                @empty
-                <div class="pb-empty-hint">All events are placed.</div>
-                @endforelse
-            </div>
-        </div>
-
-        <div class="pb-columns">
-            @forelse($productionLines as $pl)
-            @php
-                $lanes = collect($pl->preparations->map(fn($p) => ['type' => 'preparation', 'id' => $p->id, 'name' => $p->name]))
-                    ->concat($pl->lines->map(fn($l) => ['type' => 'line', 'id' => $l->id, 'name' => $l->name]));
-            @endphp
-            <div class="pb-column" wire:key="pb-pl-{{ $pl->id }}">
-                <div class="pb-column-head">{{ $pl->name }}</div>
-
-                @forelse($lanes as $lane)
-                @php
-                    $laneKey = $this->laneKey($pl->id, $lane['type'], $lane['id']);
-                    $laneEvents = $placedEvents[$laneKey] ?? [];
-                @endphp
-                <div class="pb-lane" wire:key="pb-lane-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
-                    <div class="pb-lane-head">
-                        <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }}"></i>
-                        {{ $lane['name'] }}
-                    </div>
-                    <div class="pb-lane-body pb-lane-drop"
-                        data-production-line-id="{{ $pl->id }}"
-                        data-placeable-type="{{ $lane['type'] }}"
-                        data-placeable-id="{{ $lane['id'] }}">
-                        @forelse($laneEvents as $event)
-                            @include('livewire.plans.partials._event-card', ['event' => $event])
-                        @empty
-                        <div class="pb-empty-hint">Drop here</div>
-                        @endforelse
-                    </div>
-                </div>
-                @empty
-                <div class="pb-empty-hint">No preparations or lines attached to this production line.</div>
-                @endforelse
-            </div>
-            @empty
-            <div class="pb-empty">
-                <i class="bi bi-diagram-3"></i>
-                <p class="mb-1 fw-semibold" style="opacity:.55">No production lines found</p>
-                <p class="small mb-0" style="opacity:.35">This factory has no production lines set up yet.</p>
-            </div>
-            @endforelse
-        </div>
-
-    </div>
     @endif
-    @endif
+
+    <div id="pbToastHost" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
 
     @script
     <script>
     (() => {
-        // ── Kanban tab: lane-based drag (Sortable) ─────────────────────────────
-        const initPlanBoard = () => {
-            document.querySelectorAll('.pb-lane-drop').forEach(el => {
-                if (el.dataset.sortableInit) return;
-                el.dataset.sortableInit = '1';
-
-                new Sortable(el, {
-                    group: 'plan-board',
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen',
-                    onEnd: function (evt) {
-                        const eventId = parseInt(evt.item.dataset.eventId);
-                        const target  = evt.to;
-
-                        const productionLineId = target.dataset.productionLineId
-                            ? parseInt(target.dataset.productionLineId) : null;
-                        const placeableType = target.dataset.placeableType || null;
-                        const placeableId   = target.dataset.placeableId
-                            ? parseInt(target.dataset.placeableId) : null;
-
-                        $wire.call('placeEvent', eventId, productionLineId, placeableType, placeableId);
-                    }
-                });
-            });
-        };
-
-        // ── Calendar tab: time + row drag (native HTML5 DnD) ───────────────────
         const pxPerHour = (el) => {
             const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-hour-w'));
             return isFinite(v) && v > 0 ? v : 70;
         };
+
+        const showRejectedToast = (message) => {
+            const host = document.getElementById('pbToastHost');
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast align-items-center text-bg-danger border-0';
+            toastEl.setAttribute('role', 'alert');
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>`;
+            host.appendChild(toastEl);
+            const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+            toast.show();
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        };
+
+        $wire.on('dropRejected', ({ message }) => showRejectedToast(message));
 
         const initCalendarDrag = () => {
             document.querySelectorAll('.pbc-card[draggable="true"]').forEach(card => {
@@ -231,29 +162,33 @@
 
                     const productionLineId = drop.dataset.productionLineId
                         ? parseInt(drop.dataset.productionLineId) : null;
+                    const placeableType = drop.dataset.placeableType || null;
+                    const placeableId   = drop.dataset.placeableId
+                        ? parseInt(drop.dataset.placeableId) : null;
 
-                    let hour = 0;
-                    if (productionLineId) {
-                        const rect = drop.getBoundingClientRect();
-                        const offsetX = e.clientX - rect.left + drop.scrollLeft;
-                        hour = Math.round(offsetX / pxPerHour(drop));
-                        hour = Math.max(0, Math.min(23, hour));
+                    if (drop.hasAttribute('data-tray')) {
+                        $wire.call('unplaceEvent', eventId);
+                        return;
                     }
 
-                    $wire.call('rescheduleEvent', eventId, productionLineId, hour);
+                    if (!productionLineId || !placeableType || !placeableId) {
+                        return;
+                    }
+
+                    const rect = drop.getBoundingClientRect();
+                    const offsetX = e.clientX - rect.left + drop.scrollLeft;
+                    let hour = Math.round(offsetX / pxPerHour(drop));
+                    hour = Math.max(0, Math.min(23, hour));
+
+                    $wire.call('dropEvent', eventId, productionLineId, placeableType, placeableId, hour);
                 });
             });
         };
 
-        const initAll = () => {
-            initPlanBoard();
-            initCalendarDrag();
-        };
-
-        initAll();
+        initCalendarDrag();
 
         Livewire.hook('morph.added', ({ el }) => {
-            if (el.nodeType === 1) initAll();
+            if (el.nodeType === 1) initCalendarDrag();
         });
     })();
     </script>

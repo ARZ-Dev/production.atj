@@ -14,6 +14,7 @@ class EventTypeIndex extends Component
     public $editing = false;
     public bool $has_recipe = false;
     public $duration = null;
+    public string $color = '#818cf8';
 
     public function mount()
     {
@@ -32,6 +33,7 @@ class EventTypeIndex extends Component
         $this->name = '';
         $this->has_recipe = false;
         $this->duration = null;
+        $this->color = '#818cf8';
         $this->editing = false;
         $this->resetValidation();
     }
@@ -53,6 +55,7 @@ class EventTypeIndex extends Component
         $this->name = $eventType->name;
         $this->has_recipe = (bool) $eventType->has_recipe;
         $this->duration = $eventType->duration;
+        $this->color = $eventType->color ?? '#818cf8';
         $this->editing = true;
 
         $this->dispatch('openModal');
@@ -71,6 +74,7 @@ class EventTypeIndex extends Component
             'name' => 'required|string|max:255',
             'has_recipe' => 'boolean',
             'duration' => 'required_if:has_recipe,false|nullable|integer|min:1',
+            'color' => 'required|string|max:7',
         ];
     }
 
@@ -82,6 +86,7 @@ class EventTypeIndex extends Component
             'name' => $this->name,
             'has_recipe' => $this->has_recipe,
             'duration' => $this->has_recipe ? null : $this->duration,
+            'color' => $this->color,
         ];
 
         if ($this->editing) {
