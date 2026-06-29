@@ -137,7 +137,9 @@
                         <div class="ec-field-label">Batch Number <span class="text-danger">*</span></div>
                         <input type="text"
                             class="form-control form-control-sm @error('events.'.$index.'.batch_count') is-invalid @enderror"
-                            wire:model.defer="events.{{ $index }}.batch_count" placeholder="e.g. 1">
+                            wire:model.defer="events.{{ $index }}.batch_count"
+                            wire:change="onBatchCountChanged({{ $index }}, $event.target.value)"
+                            placeholder="e.g. 1">
                         @error('events.' . $index . '.batch_count')
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
@@ -146,7 +148,7 @@
                     <div class="col-6 col-md-3">
                         <div class="ec-field-label">Duration</div>
                         <input type="text" class="form-control form-control-sm" disabled
-                            value="{{ $event['duration'] ? $event['duration'] . ' min' : 'Calculated from batch & line capacity' }}">
+                            value="{{ $event['duration'] ? $event['duration'] . ' min' . ($event['placeable_type'] ? '' : ' (estimate)') : 'Set recipe, item & batch' }}">
                     </div>
                 </div>
                 @else
