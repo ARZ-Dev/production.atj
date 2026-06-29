@@ -2,16 +2,16 @@
 
 namespace App\Livewire\Plans;
 
-use App\Models\Capacity;
 use App\Models\Event;
 use App\Models\Line;
 use App\Models\Plan;
 use App\Models\Preparation;
 use App\Models\ProductionLine;
-use App\Models\Recipe;
 use App\Services\ApiService;
+use App\Services\RecipeDurationService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PlanBoard extends Component
@@ -25,10 +25,12 @@ class PlanBoard extends Component
     protected Collection $allEvents;
 
     protected ApiService $api;
+    protected RecipeDurationService $durationService;
 
-    public function boot(ApiService $api): void
+    public function boot(ApiService $api, RecipeDurationService $durationService): void
     {
-        $this->api = $api;
+        $this->api             = $api;
+        $this->durationService = $durationService;
     }
 
     public function mount($id): void
@@ -44,6 +46,13 @@ class PlanBoard extends Component
             $warehouses = $this->api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
             $this->factoryName = collect($warehouses)->firstWhere('id', $this->plan->factory_id)['name'] ?? null;
         }
+    }
+
+    #[On('eventsSaved')]
+    public function refreshEvents(): void
+    {
+        // Events were created/edited in the modal — re-render to pick them up.
+        // loadEvents() runs again on every render(), so there's nothing else to do here.
     }
 
     protected function loadEvents(): void
@@ -176,12 +185,6 @@ class PlanBoard extends Component
         $hour    = max(0, min(23, $hour));
         $newFrom = sprintf('%02d:00:00', $hour);
 
-        if ($event->from_time && $event->to_time) {
-            $spanMinutes     = Carbon::parse($event->from_time)->diffInMinutes(Carbon::parse($event->to_time));
-            $event->to_time  = Carbon::parse($newFrom)->addMinutes($spanMinutes)->format('H:i:s');
-        }
-        $event->from_time = $newFrom;
-
         $laneChanged = (int) $event->production_line_id !== $productionLineId
             || $event->placeable_type !== $placeableClass
             || (int) $event->placeable_id !== $placeableId;
@@ -190,13 +193,20 @@ class PlanBoard extends Component
         $event->placeable_type     = $placeableClass;
         $event->placeable_id       = $placeableId;
 
-        if ($laneChanged) {
-            $event->calculated_duration = null;
+        $hasRecipe = (bool) $event->eventType?->has_recipe;
 
-            if ($event->eventType?->has_recipe && $event->recipe_id && $event->item_id) {
-                $event->calculated_duration = $this->computeDuration($event, $placeableClass, $placeableId);
-            }
+        if ($hasRecipe && $laneChanged) {
+            $event->calculated_duration = ($event->recipe_id && $event->item_id)
+                ? $this->durationService->compute($event, $placeableClass, $placeableId)
+                : null;
         }
+
+        $event->from_time = $newFrom;
+
+        $durationMinutes = $hasRecipe ? $event->calculated_duration : $event->planned_duration;
+        $event->to_time   = $durationMinutes
+            ? Carbon::parse($newFrom)->addMinutes((int) $durationMinutes)->format('H:i:s')
+            : null;
 
         $event->save();
     }
@@ -262,39 +272,6 @@ class PlanBoard extends Component
             'line' => Line::class,
             default => null,
         };
-    }
-
-    protected function computeDuration(Event $event, string $placeableClass, int $placeableId): ?string
-    {
-        $recipe = Recipe::find($event->recipe_id);
-
-        if (!$recipe || !$recipe->quantity_per_batch) {
-            return null;
-        }
-
-        $capacity = Capacity::where('capacityable_type', $placeableClass)
-            ->where('capacityable_id', $placeableId)
-            ->where('item_id', $event->item_id)
-            ->first();
-
-        if (!$capacity || (float) $capacity->capacity <= 0) {
-            return null;
-        }
-
-        $batchCount  = (float) ($event->batch_count ?: 1);
-        $requiredQty = (float) $recipe->quantity_per_batch * $batchCount;
-
-        $units      = $this->api->get("/v1/items/{$event->item_id}")['data']['units'] ?? [];
-        $recipeUnit = collect($units)->firstWhere('id', $recipe->item_unit_id);
-
-        // formula = qty of basic units needed to make 1 of that unit
-        // (the basic unit's own formula is 1) — unit -> basic: multiply.
-        $formula  = (float) ($recipeUnit['formula'] ?? 1) ?: 1;
-        $basicQty = $requiredQty * $formula;
-
-        $durationHours = $basicQty / (float) $capacity->capacity;
-
-        return (string) round($durationHours * 60);
     }
 
     public function render()

@@ -24,9 +24,9 @@
         </div>
         <div class="d-flex gap-2 flex-shrink-0">
             @hasPermission('production.event-create')
-            <a href="{{ route('events.create', $plan->id) }}" class="btn btn-primary btn-sm">
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#eventCreateModal">
                 <i class="bi bi-pencil-square me-1"></i> Edit Events
-            </a>
+            </button>
             @endhasPermission
             <a href="{{ route('plans') }}" class="btn btn-light btn-sm">
                 <i class="bi bi-arrow-left me-1"></i> Back
@@ -198,6 +198,25 @@
         </div>
     </div>
 
+    @hasPermission('production.event-create')
+    <!-- Event Create/Edit Modal -->
+    <div class="modal fade" id="eventCreateModal" tabindex="-1" aria-labelledby="eventCreateModalLabel" aria-hidden="true" wire:ignore.self>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventCreateModalLabel">
+                        <i class="bi bi-list-task text-primary me-2"></i>Events — Plan #{{ $plan->id }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @livewire('events.event-create', ['planId' => $plan->id], key('event-create-' . $plan->id))
+                </div>
+            </div>
+        </div>
+    </div>
+    @endhasPermission
+
     <div id="pbToastHost" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
 
     @script
@@ -205,6 +224,12 @@
     (() => {
         const eventDetailsModal = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
         $wire.on('openEventModal', () => eventDetailsModal.show());
+
+        const eventCreateModalEl = document.getElementById('eventCreateModal');
+        if (eventCreateModalEl) {
+            const eventCreateModal = bootstrap.Modal.getOrCreateInstance(eventCreateModalEl);
+            $wire.on('eventsSaved', () => eventCreateModal.hide());
+        }
 
         const pxPerHour = (el) => {
             const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-hour-w'));

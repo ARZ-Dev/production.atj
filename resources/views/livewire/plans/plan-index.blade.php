@@ -85,7 +85,7 @@
                                             <a href="{{ route('plans.view', $plan->id) }}"
                                                class="pca-btn v" title="View"><i class="bi bi-eye"></i></a>
                                             @hasPermission('production.event-create')
-                                            <a href="{{ route('events.create', $plan->id) }}"
+                                            <a href="{{ route('plans.view', $plan->id) }}"
                                                class="pca-btn e" title="Events"><i class="bi bi-list-task"></i></a>
                                             @endhasPermission
                                             @hasPermission('production.plan-edit')
