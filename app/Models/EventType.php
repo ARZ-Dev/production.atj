@@ -20,4 +20,14 @@ class EventType extends Model
     {
         return $this->hasMany(Event::class);
     }
+
+    public function lines()
+    {
+        return $this->belongsToMany(Line::class, 'event_type_line');
+    }
+
+    public function preparations()
+    {
+        return $this->belongsToMany(Preparation::class, 'event_type_preparation');
+    }
 }

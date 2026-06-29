@@ -5,6 +5,7 @@ namespace App\Livewire\Plans;
 use App\Models\Plan;
 use App\Services\ApiService;
 use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -138,9 +139,20 @@ class PlanIndex extends Component
     {
         return [
             'date'       => 'required|date',
-            'factory_id' => 'required|integer',
+            'factory_id' => [
+                'required',
+                'integer',
+                Rule::unique('plans', 'factory_id')
+                    ->where('date', $this->date)
+                    ->whereNull('deleted_at')
+                    ->ignore($this->plan_id),
+            ],
         ];
     }
+
+    protected $messages = [
+        'factory_id.unique' => 'A plan already exists for this factory on this date.',
+    ];
 
     public function submit(): void
     {

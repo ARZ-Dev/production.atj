@@ -16,4 +16,9 @@ class Preparation extends Model
     {
         return $this->morphMany(Capacity::class, 'capacityable');
     }
+
+    public function eventTypes()
+    {
+        return $this->belongsToMany(EventType::class, 'event_type_preparation');
+    }
 }

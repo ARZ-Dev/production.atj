@@ -41,27 +41,15 @@
     </div>
     @else
 
-    <div class="pb-tabs">
-        <button type="button" class="pb-tab {{ $boardView === 'calendar' ? 'active' : '' }}"
-            wire:click="setView('calendar')">
-            <i class="bi bi-calendar-week me-1"></i> Calendar
-        </button>
-        <button type="button" class="pb-tab {{ $boardView === 'kanban' ? 'active' : '' }}"
-            wire:click="setView('kanban')">
-            <i class="bi bi-kanban me-1"></i> Lines &amp; Preparations
-        </button>
-    </div>
-
-    @if($boardView === 'calendar')
     <div class="pbc-wrap">
         <div class="pbc-tray">
             <div class="pbc-tray-head">
                 <i class="bi bi-inbox text-primary"></i>
-                <span class="pb-tray-title">Unscheduled</span>
-                <span class="badge bg-light-primary rounded-pill">{{ count($unscheduledEvents) }}</span>
+                <span class="pb-tray-title">Unplaced Events</span>
+                <span class="badge bg-light-primary rounded-pill">{{ count($unplacedEvents) }}</span>
             </div>
             <div class="pbc-tray-body pbc-drop" data-tray>
-                @forelse($unscheduledEvents as $event)
+                @forelse($unplacedEvents as $event)
                     @include('livewire.plans.partials._calendar-event-card', [
                         'event' => $event,
                         'track' => 0,
@@ -69,143 +57,177 @@
                         'spanHours' => 1,
                     ])
                 @empty
-                <div class="pb-empty-hint">All events are scheduled.</div>
-                @endforelse
-            </div>
-        </div>
-
-        <div class="pbc-grid">
-            <div class="pbc-corner"></div>
-            <div class="pbc-hour-row">
-                @for($h = 0; $h < 24; $h++)
-                <div class="pbc-hour-cell">{{ sprintf('%02d:00', $h) }}</div>
-                @endfor
-            </div>
-
-            @php $calendarRows = $this->calendarRows(); @endphp
-            @forelse($calendarRows as $row)
-            @php $pl = $row['production_line']; $layout = $row['layout']; @endphp
-            <div class="pbc-row-label" wire:key="pbc-label-{{ $pl->id }}">{{ $pl->name }}</div>
-            <div class="pbc-row-track pbc-drop" data-production-line-id="{{ $pl->id }}"
-                wire:key="pbc-track-{{ $pl->id }}"
-                style="height: {{ max($layout['tracks'], 1) * 36 + 12 }}px;">
-                @foreach($layout['items'] as $item)
-                    @include('livewire.plans.partials._calendar-event-card', [
-                        'event' => $item['event'],
-                        'track' => $item['track'],
-                        'fromHour' => $item['fromHour'],
-                        'spanHours' => $item['spanHours'],
-                    ])
-                @endforeach
-            </div>
-            @empty
-            <div class="pbc-empty">
-                No production lines found for this factory.
-            </div>
-            @endforelse
-        </div>
-    </div>
-    @else
-
-    <div class="pb-board">
-
-        <div class="pb-tray">
-            <div class="pb-tray-head">
-                <i class="bi bi-inbox text-primary"></i>
-                <span class="pb-tray-title">Unplaced Events</span>
-                <span class="badge bg-light-primary rounded-pill">{{ count($unplacedEvents) }}</span>
-            </div>
-            <div class="pb-tray-body pb-lane-drop" data-lane-tray>
-                @forelse($unplacedEvents as $event)
-                    @include('livewire.plans.partials._event-card', ['event' => $event])
-                @empty
                 <div class="pb-empty-hint">All events are placed.</div>
                 @endforelse
             </div>
         </div>
 
-        <div class="pb-columns">
-            @forelse($productionLines as $pl)
-            @php
-                $lanes = collect($pl->preparations->map(fn($p) => ['type' => 'preparation', 'id' => $p->id, 'name' => $p->name]))
-                    ->concat($pl->lines->map(fn($l) => ['type' => 'line', 'id' => $l->id, 'name' => $l->name]));
-            @endphp
-            <div class="pb-column" wire:key="pb-pl-{{ $pl->id }}">
-                <div class="pb-column-head">{{ $pl->name }}</div>
+        <div class="pbc-grid-wrap">
+            <div class="pbc-grid">
+                <div class="pbc-corner"></div>
+                <div class="pbc-hour-row">
+                    @for($h = 0; $h < 24; $h++)
+                    <div class="pbc-hour-cell">{{ sprintf('%02d:00', $h) }}</div>
+                    @endfor
+                </div>
 
-                @forelse($lanes as $lane)
-                @php
-                    $laneKey = $this->laneKey($pl->id, $lane['type'], $lane['id']);
-                    $laneEvents = $placedEvents[$laneKey] ?? [];
-                @endphp
-                <div class="pb-lane" wire:key="pb-lane-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
-                    <div class="pb-lane-head">
-                        <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }}"></i>
+                @php $laneRows = $this->laneRows(); @endphp
+                @forelse($laneRows as $row)
+                @php $pl = $row['production_line']; $laneCount = max(count($row['lanes']), 1); @endphp
+
+                @if(count($row['lanes']))
+                    @foreach($row['lanes'] as $i => $laneRow)
+                    @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
+                    @if($i === 0)
+                    <div class="pbc-pl-label" style="grid-row: span {{ $laneCount }};" wire:key="pbc-pl-{{ $pl->id }}">
+                        {{ $pl->name }}
+                    </div>
+                    @endif
+                    <div class="pbc-row-label" wire:key="pbc-lane-label-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
+                        <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }} me-1"></i>
                         {{ $lane['name'] }}
                     </div>
-                    <div class="pb-lane-body pb-lane-drop"
+                    <div class="pbc-row-track pbc-drop"
                         data-production-line-id="{{ $pl->id }}"
                         data-placeable-type="{{ $lane['type'] }}"
-                        data-placeable-id="{{ $lane['id'] }}">
-                        @forelse($laneEvents as $event)
-                            @include('livewire.plans.partials._event-card', ['event' => $event])
-                        @empty
-                        <div class="pb-empty-hint">Drop here</div>
-                        @endforelse
+                        data-placeable-id="{{ $lane['id'] }}"
+                        wire:key="pbc-lane-track-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}"
+                        style="height: {{ max($layout['tracks'], 1) * 48 + 12 }}px;">
+                        @foreach($layout['items'] as $item)
+                            @include('livewire.plans.partials._calendar-event-card', [
+                                'event' => $item['event'],
+                                'track' => $item['track'],
+                                'fromHour' => $item['fromHour'],
+                                'spanHours' => $item['spanHours'],
+                            ])
+                        @endforeach
                     </div>
-                </div>
+                    @endforeach
+                @else
+                    <div class="pbc-pl-label" style="grid-row: span 1;" wire:key="pbc-pl-{{ $pl->id }}">
+                        {{ $pl->name }}
+                    </div>
+                    <div class="pbc-row-track-empty">No preparations or lines attached to this production line.</div>
+                @endif
+
                 @empty
-                <div class="pb-empty-hint">No preparations or lines attached to this production line.</div>
+                <div class="pbc-empty">
+                    No production lines found for this factory.
+                </div>
                 @endforelse
             </div>
-            @empty
-            <div class="pb-empty">
-                <i class="bi bi-diagram-3"></i>
-                <p class="mb-1 fw-semibold" style="opacity:.55">No production lines found</p>
-                <p class="small mb-0" style="opacity:.35">This factory has no production lines set up yet.</p>
-            </div>
-            @endforelse
         </div>
-
     </div>
     @endif
-    @endif
+
+    <!-- Event Details Modal -->
+    <div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsModalLabel" aria-hidden="true" wire:ignore.self>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventDetailsModalLabel">
+                        @if($selectedEvent)
+                        <span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background-color: {{ $selectedEvent['color'] }}"></span>
+                        {{ $selectedEvent['type_name'] }}
+                        @else
+                        Event Details
+                        @endif
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                @if($selectedEvent)
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="pvc-body-label">Time</div>
+                            <div>{{ $selectedEvent['from_time'] ?? '—' }}{{ $selectedEvent['to_time'] ? ' – '.$selectedEvent['to_time'] : '' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Duration</div>
+                            <div>{{ $selectedEvent['duration'] ? $selectedEvent['duration'].' min' : '—' }}</div>
+                        </div>
+
+                        @if($selectedEvent['has_recipe'])
+                        <div class="col-6">
+                            <div class="pvc-body-label">Batch Count</div>
+                            <div>{{ $selectedEvent['batch_count'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Item</div>
+                            <div>{{ $selectedEvent['item_name'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Recipe Type</div>
+                            <div>{{ $selectedEvent['recipe_type_name'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">Recipe</div>
+                            <div>{{ $selectedEvent['recipe_name'] ?? '—' }}</div>
+                        </div>
+                        @endif
+
+                        <div class="col-6">
+                            <div class="pvc-body-label">Production Line</div>
+                            <div>{{ $selectedEvent['production_line_name'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="pvc-body-label">{{ $selectedEvent['placeable_kind'] ?? 'Lane' }}</div>
+                            <div>{{ $selectedEvent['placeable_name'] ?? '—' }}</div>
+                        </div>
+
+                        @if($selectedEvent['status'])
+                        <div class="col-6">
+                            <div class="pvc-body-label">Status</div>
+                            <div>{{ $selectedEvent['status'] }}</div>
+                        </div>
+                        @endif
+
+                        @if($selectedEvent['description'])
+                        <div class="col-12">
+                            <div class="pvc-body-label">Description</div>
+                            <div>{{ $selectedEvent['description'] }}</div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @endif
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pbToastHost" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
 
     @script
     <script>
     (() => {
-        // ── Kanban tab: lane-based drag (Sortable) ─────────────────────────────
-        const initPlanBoard = () => {
-            document.querySelectorAll('.pb-lane-drop').forEach(el => {
-                if (el.dataset.sortableInit) return;
-                el.dataset.sortableInit = '1';
+        const eventDetailsModal = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
+        $wire.on('openEventModal', () => eventDetailsModal.show());
 
-                new Sortable(el, {
-                    group: 'plan-board',
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen',
-                    onEnd: function (evt) {
-                        const eventId = parseInt(evt.item.dataset.eventId);
-                        const target  = evt.to;
-
-                        const productionLineId = target.dataset.productionLineId
-                            ? parseInt(target.dataset.productionLineId) : null;
-                        const placeableType = target.dataset.placeableType || null;
-                        const placeableId   = target.dataset.placeableId
-                            ? parseInt(target.dataset.placeableId) : null;
-
-                        $wire.call('placeEvent', eventId, productionLineId, placeableType, placeableId);
-                    }
-                });
-            });
-        };
-
-        // ── Calendar tab: time + row drag (native HTML5 DnD) ───────────────────
         const pxPerHour = (el) => {
             const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-hour-w'));
             return isFinite(v) && v > 0 ? v : 70;
         };
+
+        const showRejectedToast = (message) => {
+            const host = document.getElementById('pbToastHost');
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast align-items-center text-bg-danger border-0';
+            toastEl.setAttribute('role', 'alert');
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>`;
+            host.appendChild(toastEl);
+            const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+            toast.show();
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        };
+
+        $wire.on('dropRejected', ({ message }) => showRejectedToast(message));
 
         const initCalendarDrag = () => {
             document.querySelectorAll('.pbc-card[draggable="true"]').forEach(card => {
@@ -231,22 +253,30 @@
 
                     const productionLineId = drop.dataset.productionLineId
                         ? parseInt(drop.dataset.productionLineId) : null;
+                    const placeableType = drop.dataset.placeableType || null;
+                    const placeableId   = drop.dataset.placeableId
+                        ? parseInt(drop.dataset.placeableId) : null;
 
-                    let hour = 0;
-                    if (productionLineId) {
-                        const rect = drop.getBoundingClientRect();
-                        const offsetX = e.clientX - rect.left + drop.scrollLeft;
-                        hour = Math.round(offsetX / pxPerHour(drop));
-                        hour = Math.max(0, Math.min(23, hour));
+                    if (drop.hasAttribute('data-tray')) {
+                        $wire.call('unplaceEvent', eventId);
+                        return;
                     }
 
-                    $wire.call('rescheduleEvent', eventId, productionLineId, hour);
+                    if (!productionLineId || !placeableType || !placeableId) {
+                        return;
+                    }
+
+                    const rect = drop.getBoundingClientRect();
+                    const offsetX = e.clientX - rect.left + drop.scrollLeft;
+                    let hour = Math.round(offsetX / pxPerHour(drop));
+                    hour = Math.max(0, Math.min(23, hour));
+
+                    $wire.call('dropEvent', eventId, productionLineId, placeableType, placeableId, hour);
                 });
             });
         };
 
         const initAll = () => {
-            initPlanBoard();
             initCalendarDrag();
         };
 

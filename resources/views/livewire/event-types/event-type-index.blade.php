@@ -23,6 +23,7 @@
                         <thead>
                             <tr>
                                 <th>#</th>
+                                <th>Color</th>
                                 <th>Name</th>
                                 <th>With Recipe</th>
                                 <th>Duration</th>
@@ -33,6 +34,9 @@
                             @foreach($eventTypes as $eventType)
                             <tr>
                                 <td>{{ $eventType->id }}</td>
+                                <td>
+                                    <span class="d-inline-block rounded-circle" style="width:16px;height:16px;background-color:{{ $eventType->color ?? '#818cf8' }};border:1px solid rgba(0,0,0,.15)"></span>
+                                </td>
                                 <td>{{ $eventType->name }}</td>
                                 <td>
                                     @if($eventType->has_recipe)
@@ -88,6 +92,13 @@
                         <input type="text" class="form-control @error('name') is-invalid @enderror"
                             id="et_name" wire:model="name" placeholder="e.g. Cleaning, Production, Maintenance">
                         @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="et_color" class="form-label">Color <span class="text-danger">*</span></label>
+                        <input type="color" class="form-control form-control-color @error('color') is-invalid @enderror"
+                            id="et_color" wire:model="color" title="Choose the color used for this event type's events">
+                        @error('color')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 
                     <div class="mb-3">

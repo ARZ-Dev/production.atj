@@ -19,13 +19,10 @@ class PlanBoard extends Component
     public Plan $plan;
     public $productionLines = [];
     public $unplacedEvents = [];
-    public array $placedEvents = []; // "{productionLineId}:{alias}:{placeableId}" => Event[]
     public ?string $factoryName = null;
-
-    public string $boardView = 'calendar'; // 'calendar' | 'kanban'
+    public ?array $selectedEvent = null;
 
     protected Collection $allEvents;
-    public $unscheduledEvents = []; // events with no production_line_id (calendar tray)
 
     protected ApiService $api;
 
@@ -38,7 +35,7 @@ class PlanBoard extends Component
     {
         $this->plan = Plan::findOrFail($id);
 
-        $this->productionLines = ProductionLine::with('preparations', 'lines')
+        $this->productionLines = ProductionLine::with('preparations.eventTypes', 'lines.eventTypes')
             ->where('factory_id', $this->plan->factory_id)
             ->orderBy('name')
             ->get();
@@ -47,11 +44,6 @@ class PlanBoard extends Component
             $warehouses = $this->api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
             $this->factoryName = collect($warehouses)->firstWhere('id', $this->plan->factory_id)['name'] ?? null;
         }
-    }
-
-    public function setView(string $view): void
-    {
-        $this->boardView = in_array($view, ['calendar', 'kanban'], true) ? $view : $this->boardView;
     }
 
     protected function loadEvents(): void
@@ -63,36 +55,40 @@ class PlanBoard extends Component
 
         $this->allEvents = $events;
 
-        $this->unplacedEvents     = $events->whereNull('placeable_id')->values();
-        $this->unscheduledEvents  = $events->whereNull('production_line_id')->values();
-
-        $placed = [];
-        foreach ($events->whereNotNull('placeable_id') as $event) {
-            $alias = $this->aliasForClass($event->placeable_type);
-            if (!$alias) {
-                continue;
-            }
-            $key = $this->laneKey($event->production_line_id, $alias, $event->placeable_id);
-            $placed[$key][] = $event;
-        }
-        $this->placedEvents = $placed;
+        $this->unplacedEvents = $events->whereNull('placeable_id')->values();
     }
 
     // ─── Calendar layout ──────────────────────────────────────────────────────
 
-    public function calendarRows(): array
+    public function laneRows(): array
     {
         $rows = [];
 
         foreach ($this->productionLines as $pl) {
-            $rowEvents = $this->allEvents
-                ->where('production_line_id', $pl->id)
-                ->sortBy('from_time')
+            $lanes = collect($pl->preparations->map(fn($p) => ['type' => 'preparation', 'id' => $p->id, 'name' => $p->name]))
+                ->concat($pl->lines->map(fn($l) => ['type' => 'line', 'id' => $l->id, 'name' => $l->name]))
                 ->values();
+
+            $laneRows = [];
+            foreach ($lanes as $lane) {
+                $placeableClass = $this->classForAlias($lane['type']);
+
+                $laneEvents = $this->allEvents
+                    ->where('production_line_id', $pl->id)
+                    ->where('placeable_type', $placeableClass)
+                    ->where('placeable_id', $lane['id'])
+                    ->sortBy('from_time')
+                    ->values();
+
+                $laneRows[] = [
+                    'lane'   => $lane,
+                    'layout' => $this->layoutTracks($laneEvents),
+                ];
+            }
 
             $rows[] = [
                 'production_line' => $pl,
-                'layout'           => $this->layoutTracks($rowEvents),
+                'lanes'           => $laneRows,
             ];
         }
 
@@ -157,45 +153,106 @@ class PlanBoard extends Component
         return $minutes ? max((float) $minutes, 15) / 60 : 1.0;
     }
 
-    public function rescheduleEvent(int $eventId, ?int $productionLineId, int $hour): void
+    public function dropEvent(int $eventId, int $productionLineId, string $placeableAlias, int $placeableId, int $hour): void
     {
         $event = Event::with('eventType')
             ->where('plan_id', $this->plan->id)
             ->findOrFail($eventId);
 
-        if ($productionLineId) {
-            $hour    = max(0, min(23, $hour));
-            $newFrom = sprintf('%02d:00:00', $hour);
+        $placeableClass = $this->classForAlias($placeableAlias);
 
-            if ($event->from_time && $event->to_time) {
-                $spanMinutes = Carbon::parse($event->from_time)->diffInMinutes(Carbon::parse($event->to_time));
-                $event->to_time = Carbon::parse($newFrom)->addMinutes($spanMinutes)->format('H:i:s');
-            }
-            $event->from_time = $newFrom;
+        if (!$placeableClass) {
+            return;
         }
 
-        if ((int) $event->production_line_id !== (int) $productionLineId) {
-            $event->production_line_id  = $productionLineId;
-            $event->placeable_type      = null;
-            $event->placeable_id        = null;
+        $target = $placeableClass::find($placeableId);
+
+        if (!$target || !$event->event_type_id || !$target->eventTypes()->where('event_types.id', $event->event_type_id)->exists()) {
+            $this->dispatch('dropRejected', message: "\"{$event->eventType?->name}\" is not an allowed event type on \"" . ($target->name ?? 'this lane') . '".');
+
+            return;
+        }
+
+        $hour    = max(0, min(23, $hour));
+        $newFrom = sprintf('%02d:00:00', $hour);
+
+        if ($event->from_time && $event->to_time) {
+            $spanMinutes     = Carbon::parse($event->from_time)->diffInMinutes(Carbon::parse($event->to_time));
+            $event->to_time  = Carbon::parse($newFrom)->addMinutes($spanMinutes)->format('H:i:s');
+        }
+        $event->from_time = $newFrom;
+
+        $laneChanged = (int) $event->production_line_id !== $productionLineId
+            || $event->placeable_type !== $placeableClass
+            || (int) $event->placeable_id !== $placeableId;
+
+        $event->production_line_id = $productionLineId;
+        $event->placeable_type     = $placeableClass;
+        $event->placeable_id       = $placeableId;
+
+        if ($laneChanged) {
             $event->calculated_duration = null;
+
+            if ($event->eventType?->has_recipe && $event->recipe_id && $event->item_id) {
+                $event->calculated_duration = $this->computeDuration($event, $placeableClass, $placeableId);
+            }
         }
 
         $event->save();
     }
 
-    public function laneKey($productionLineId, string $alias, $placeableId): string
+    public function unplaceEvent(int $eventId): void
     {
-        return "{$productionLineId}:{$alias}:{$placeableId}";
+        $event = Event::where('plan_id', $this->plan->id)->findOrFail($eventId);
+
+        $event->production_line_id  = null;
+        $event->placeable_type      = null;
+        $event->placeable_id        = null;
+        $event->calculated_duration = null;
+        $event->save();
     }
 
-    protected function aliasForClass(?string $class): ?string
+    public function showEventDetails(int $eventId): void
     {
-        return match ($class) {
-            Preparation::class => 'preparation',
-            Line::class => 'line',
-            default => null,
-        };
+        $event = Event::with(['eventType', 'recipe', 'recipeType'])
+            ->where('plan_id', $this->plan->id)
+            ->findOrFail($eventId);
+
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
+
+        $placeableName = null;
+        if ($event->placeable_type && $event->placeable_id) {
+            $placeableName = $event->placeable_type::find($event->placeable_id)?->name;
+        }
+
+        $productionLineName = $event->production_line_id
+            ? ProductionLine::find($event->production_line_id)?->name
+            : null;
+
+        $itemName = null;
+        if ($event->item_id) {
+            $itemName = $this->api->get("/v1/items/{$event->item_id}")['data']['name'] ?? null;
+        }
+
+        $this->selectedEvent = [
+            'type_name'            => $event->eventType?->name ?? 'No type',
+            'color'                => $event->eventType?->color ?? '#818cf8',
+            'has_recipe'           => $hasRecipe,
+            'from_time'            => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : null,
+            'to_time'              => $event->to_time ? Carbon::parse($event->to_time)->format('H:i') : null,
+            'duration'             => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
+            'batch_count'          => $event->batch_count,
+            'item_name'            => $itemName,
+            'recipe_type_name'     => $event->recipeType?->name,
+            'recipe_name'          => $event->recipe?->name,
+            'production_line_name' => $productionLineName,
+            'placeable_kind'       => $event->placeable_type === Preparation::class ? 'Preparation' : ($event->placeable_type === Line::class ? 'Line' : null),
+            'placeable_name'       => $placeableName,
+            'description'          => $event->description,
+            'status'               => $event->status,
+        ];
+
+        $this->dispatch('openEventModal');
     }
 
     protected function classForAlias(string $alias): ?string
@@ -205,26 +262,6 @@ class PlanBoard extends Component
             'line' => Line::class,
             default => null,
         };
-    }
-
-    public function placeEvent(int $eventId, ?int $productionLineId, ?string $placeableAlias, ?int $placeableId): void
-    {
-        $event = Event::with('eventType')
-            ->where('plan_id', $this->plan->id)
-            ->findOrFail($eventId);
-
-        $placeableClass = $placeableAlias ? $this->classForAlias($placeableAlias) : null;
-
-        $event->production_line_id = $placeableClass ? $productionLineId : null;
-        $event->placeable_type     = $placeableClass;
-        $event->placeable_id       = $placeableClass ? $placeableId : null;
-        $event->calculated_duration = null;
-
-        if ($placeableClass && $event->eventType?->has_recipe && $event->recipe_id && $event->item_id) {
-            $event->calculated_duration = $this->computeDuration($event, $placeableClass, $placeableId);
-        }
-
-        $event->save();
     }
 
     protected function computeDuration(Event $event, string $placeableClass, int $placeableId): ?string
