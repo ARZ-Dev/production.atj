@@ -2,7 +2,6 @@
 
 use App\Livewire\Capacities\CapacityManage;
 use App\Livewire\DashboardView;
-use App\Livewire\Events\EventCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\ItemRequests\ItemRequestCreate;
 use App\Livewire\ItemRequests\ItemRequestIndex;
@@ -238,16 +237,6 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     });
 
-
-    // |--------------------------------------------------------------------------
-    // | Events
-    // |--------------------------------------------------------------------------
-    Route::group(['prefix' => 'events'], function () {
-        // Route::get('/', EventIndex::class)->name('events');
-        Route::get('{planId}/create', EventCreate::class)->name('events.create');
-        // Route::get('/edit/{id}', EventCreate::class)->name('events.edit');
-        // Route::get('/view/{id}', EventCreate::class)->name('events.view');
-    });
 
     // |--------------------------------------------------------------------------
     // | Preparations
