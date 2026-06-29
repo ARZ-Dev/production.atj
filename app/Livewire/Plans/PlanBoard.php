@@ -11,7 +11,6 @@ use App\Services\ApiService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PlanBoard extends Component
@@ -46,13 +45,6 @@ class PlanBoard extends Component
             $warehouses = $this->api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
             $this->factoryName = collect($warehouses)->firstWhere('id', $this->plan->factory_id)['name'] ?? null;
         }
-    }
-
-    #[On('eventsSaved')]
-    public function refreshEvents(): void
-    {
-        // Events were created/edited in the modal — re-render to pick them up.
-        // loadEvents() runs again on every render(), so there's nothing else to do here.
     }
 
     protected function loadEvents(): void
@@ -245,6 +237,7 @@ class PlanBoard extends Component
         }
 
         $this->selectedEvent = [
+            'id'                   => $event->id,
             'type_name'            => $event->eventType?->name ?? 'No type',
             'color'                => $event->eventType?->color ?? '#818cf8',
             'has_recipe'           => $hasRecipe,

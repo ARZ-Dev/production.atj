@@ -47,7 +47,7 @@
                 </span>
                 @endif
 
-                @if(count($events) > 1)
+                @if(!$editingEventId && count($events) > 1)
                 <button type="button" class="ec-remove-btn"
                     wire:click="removeEventRow({{ $index }})">
                     <i class="bi bi-x"></i>
@@ -175,9 +175,11 @@
         </div>
         @endforeach
 
+        @unless($editingEventId)
         <button type="button" class="ec-add-card" wire:click="addEventRow">
             <i class="bi bi-plus-circle"></i> Add event
         </button>
+        @endunless
     </div>
 
     @if(!empty($events))
@@ -188,7 +190,7 @@
             <span wire:loading wire:target="submit"
                 class="spinner-border spinner-border-sm me-1"></span>
             <i class="bi bi-check-lg me-1" wire:loading.remove wire:target="submit"></i>
-            Save Events
+            {{ count($events) > 1 ? 'Save Events' : 'Save Event' }}
         </button>
     </div>
     @endif

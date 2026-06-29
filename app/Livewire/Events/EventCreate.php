@@ -10,6 +10,7 @@ use App\Models\RecipeType;
 use App\Services\ApiService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class EventCreate extends Component
@@ -19,6 +20,7 @@ class EventCreate extends Component
     public $eventTypes = [];
     public $events = [];
     public $removedEventIds = [];
+    public ?int $editingEventId = null;
 
     // Per-row cascading option lists, keyed by row index.
     public array $itemTypesByRow = [];
@@ -43,61 +45,88 @@ class EventCreate extends Component
         $this->plan       = Plan::with('shift')->findOrFail($planId);
         $this->eventTypes = EventType::orderBy('name')->get();
 
-        $this->loadExistingEvents();
+        $this->openForCreate();
     }
 
-    public function loadExistingEvents(): void
+    #[On('openForCreate')]
+    public function openForCreate(): void
     {
-        $existing = Event::where('plan_id', $this->planId)->get();
+        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipeTypesByRow', 'recipesByRow');
+        $this->editingEventId = null;
+        $this->addEventRow();
+        $this->resetValidation();
+    }
 
-        if ($existing->isEmpty()) {
+    #[On('openForEdit')]
+    public function openForEdit(int $eventId): void
+    {
+        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipeTypesByRow', 'recipesByRow');
+        $this->editingEventId = $eventId;
+
+        $event = Event::where('plan_id', $this->planId)->find($eventId);
+
+        if (!$event) {
+            $this->editingEventId = null;
             $this->addEventRow();
             return;
         }
 
-        foreach ($existing as $event) {
-            $hasRecipe = (bool) ($event->eventType?->has_recipe);
+        $this->events[] = $this->buildRowFromEvent($event);
 
-            $this->events[] = [
-                'id'                    => $event->id,
-                'key'                   => 'event-' . $event->id,
-                'event_type_id'         => $event->event_type_id,
-                'event_type_has_recipe' => $hasRecipe,
-                'item_type_id'          => $event->item_type_id,
-                'item_id'               => $event->item_id,
-                'recipe_type_id'        => $event->recipe_type_id,
-                'recipe_id'             => $event->recipe_id,
-                'batch_count'           => $event->batch_count ?? '',
-                'duration'              => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
-                'placeable_type'        => $event->placeable_type,
-                'placeable_id'          => $event->placeable_id,
-                'production_line_id'    => $event->production_line_id,
-                'from_time_raw'         => $event->from_time,
-                'scheduled_label'       => $event->from_time
-                    ? Carbon::parse($event->from_time)->format('H:i') . ($event->to_time ? ' – ' . Carbon::parse($event->to_time)->format('H:i') : '')
-                    : null,
-                'description'           => $event->description ?? '',
-            ];
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
+        if ($hasRecipe) {
+            $this->loadCascadeOptionsForRow(0, $event);
+        }
 
-            $index = count($this->events) - 1;
+        $this->resetValidation();
+    }
 
-            if ($hasRecipe) {
-                $this->itemTypesByRow[$index] = $this->api->get('/v1/item-types')['data'] ?? [];
+    private function buildRowFromEvent(Event $event): array
+    {
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
 
-                if ($event->item_type_id) {
-                    $this->itemsByRow[$index]     = $this->fetchItemsForType((int) $event->item_type_id);
-                    $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType((int) $event->item_type_id);
-                }
+        return [
+            'id'                    => $event->id,
+            'key'                   => 'event-' . $event->id,
+            'event_type_id'         => $event->event_type_id,
+            'event_type_has_recipe' => $hasRecipe,
+            'item_type_id'          => $event->item_type_id,
+            'item_id'               => $event->item_id,
+            'recipe_type_id'        => $event->recipe_type_id,
+            'recipe_id'             => $event->recipe_id,
+            'batch_count'           => $event->batch_count ?? '',
+            'duration'              => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
+            'placeable_type'        => $event->placeable_type,
+            'placeable_id'          => $event->placeable_id,
+            'production_line_id'    => $event->production_line_id,
+            'from_time_raw'         => $event->from_time,
+            'scheduled_label'       => $event->from_time
+                ? Carbon::parse($event->from_time)->format('H:i') . ($event->to_time ? ' – ' . Carbon::parse($event->to_time)->format('H:i') : '')
+                : null,
+            'description'           => $event->description ?? '',
+        ];
+    }
 
-                if ($event->recipe_type_id && $event->item_id) {
-                    $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->recipe_type_id, (int) $event->item_id);
-                }
-            }
+    private function loadCascadeOptionsForRow(int $index, Event $event): void
+    {
+        $this->itemTypesByRow[$index] = $this->api->get('/v1/item-types')['data'] ?? [];
+
+        if ($event->item_type_id) {
+            $this->itemsByRow[$index]       = $this->fetchItemsForType((int) $event->item_type_id);
+            $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType((int) $event->item_type_id);
+        }
+
+        if ($event->recipe_type_id && $event->item_id) {
+            $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->recipe_type_id, (int) $event->item_id);
         }
     }
 
     public function addEventRow(): void
     {
+        if ($this->editingEventId !== null) {
+            return;
+        }
+
         $this->events[] = [
             'id'                    => null,
             'key'                   => 'new-' . uniqid(),
@@ -120,6 +149,10 @@ class EventCreate extends Component
 
     public function removeEventRow(int $index): void
     {
+        if ($this->editingEventId !== null) {
+            return;
+        }
+
         $event = $this->events[$index] ?? null;
 
         if (!$event) {
@@ -367,7 +400,8 @@ class EventCreate extends Component
             \DB::commit();
             $this->removedEventIds = [];
 
-            $this->dispatch('eventsSaved');
+            // Full page reload so the plan board re-renders with the saved event(s).
+            $this->redirect(route('plans.view', $this->planId));
 
         } catch (\Exception $e) {
             \DB::rollBack();
