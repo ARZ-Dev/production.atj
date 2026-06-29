@@ -76,6 +76,12 @@ class EventCreate extends Component
         $hasRecipe = (bool) ($event->eventType?->has_recipe);
         if ($hasRecipe) {
             $this->loadCascadeOptionsForRow(0, $event);
+
+            // Not placed on a line yet — show a live estimate instead of
+            // the persisted (still-null) calculated_duration.
+            if (!$event->placeable_type) {
+                $this->recalculateDuration(0);
+            }
         }
 
         $this->resetValidation();
@@ -242,6 +248,7 @@ class EventCreate extends Component
         $this->events[$index]['item_id']        = null;
         $this->events[$index]['recipe_type_id'] = null;
         $this->events[$index]['recipe_id']      = null;
+        $this->events[$index]['duration']       = null;
 
         unset($this->recipesByRow[$index]);
 
@@ -267,6 +274,8 @@ class EventCreate extends Component
         } else {
             unset($this->recipesByRow[$index]);
         }
+
+        $this->recalculateDuration($index);
     }
 
     public function onRecipeTypeChanged(int $index, $recipeTypeId): void
@@ -283,11 +292,45 @@ class EventCreate extends Component
         } else {
             unset($this->recipesByRow[$index]);
         }
+
+        $this->recalculateDuration($index);
     }
 
     public function onRecipeChanged(int $index, $recipeId): void
     {
         $this->events[$index]['recipe_id'] = $recipeId !== '' ? (int) $recipeId : null;
+
+        $this->recalculateDuration($index);
+    }
+
+    public function onBatchCountChanged(int $index, $batchCount): void
+    {
+        $this->events[$index]['batch_count'] = $batchCount;
+
+        $this->recalculateDuration($index);
+    }
+
+    /**
+     * Preview a recipe event's duration as soon as recipe, item and batch
+     * count are known — using any capacity defined for that item as an
+     * estimate, since the event isn't placed on a specific line/preparation
+     * yet. It's recalculated against the actual line once dropped on the
+     * calendar (see PlanBoard::dropEvent).
+     */
+    private function recalculateDuration(int $index): void
+    {
+        $event = $this->events[$index] ?? null;
+
+        if (!$event || empty($event['event_type_has_recipe'])) {
+            return;
+        }
+
+        if (!$event['recipe_id'] || !$event['item_id']) {
+            $this->events[$index]['duration'] = null;
+            return;
+        }
+
+        $this->events[$index]['duration'] = $this->durationService->computeEstimate(Event::make($event));
     }
 
     protected function rules(): array

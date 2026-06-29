@@ -22,16 +22,32 @@ class RecipeDurationService
      */
     public function compute(Event $event, string $placeableClass, int $placeableId): ?string
     {
+        return $this->computeUsing($event, Capacity::where('capacityable_type', $placeableClass)
+            ->where('capacityable_id', $placeableId)
+            ->where('item_id', $event->item_id));
+    }
+
+    /**
+     * Same calculation, but before the event has been placed on a specific
+     * line/preparation — used to preview duration as soon as recipe, item
+     * and batch are picked. Takes the first capacity defined for that item
+     * on any line/preparation as an estimate; this gets recalculated against
+     * the actual line once the event is dropped on the calendar.
+     */
+    public function computeEstimate(Event $event): ?string
+    {
+        return $this->computeUsing($event, Capacity::where('item_id', $event->item_id));
+    }
+
+    private function computeUsing(Event $event, $capacityQuery): ?string
+    {
         $recipe = Recipe::find($event->recipe_id);
 
         if (!$recipe || !$recipe->quantity_per_batch) {
             return null;
         }
 
-        $capacity = Capacity::where('capacityable_type', $placeableClass)
-            ->where('capacityable_id', $placeableId)
-            ->where('item_id', $event->item_id)
-            ->first();
+        $capacity = $capacityQuery->first();
 
         if (!$capacity || (float) $capacity->capacity <= 0) {
             return null;
