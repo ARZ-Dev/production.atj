@@ -288,16 +288,15 @@
 }
 
 /* ── Plan Board — calendar timeline ───────────────────────────── */
-.pbc-wrap { display: flex; gap: 16px; align-items: flex-start; }
+.pbc-wrap { display: flex; flex-direction: column; gap: 16px; }
 
 .pbc-tray {
-    flex: 0 0 220px;
     background: rgba(129,140,248,.04); border: 1px dashed rgba(129,140,248,.3);
     border-radius: 12px; padding: 14px;
 }
 .pbc-tray-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; margin-bottom: 10px; }
-.pbc-tray-body { display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
-.pbc-tray-body .pbc-card { position: static !important; left: auto !important; top: auto !important; width: 100%; }
+.pbc-tray-body { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; min-height: 60px; }
+.pbc-tray-body .pbc-card { position: static !important; left: auto !important; top: auto !important; width: auto; }
 
 .pbc-grid-wrap { position: relative; flex: 1; min-width: 0; }
 
@@ -364,8 +363,9 @@
 .pbc-card {
     position: absolute;
     min-width: 86px;
-    background: var(--bs-card-bg, #fff);
-    border: 1px solid rgba(130,130,180,.2); border-left: 4px solid #818cf8;
+    background: #818cf8;
+    color: #fff;
+    border: 1px solid rgba(0,0,0,.08);
     border-radius: 6px; padding: 4px 8px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 1px; text-align: center; overflow: hidden;
@@ -376,9 +376,4 @@
     font-size: 11px; font-weight: 700;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
-.pbc-card-duration { font-size: 10px; font-weight: 600; opacity: .6; white-space: nowrap; }
-
-@media (max-width: 900px) {
-    .pbc-wrap { flex-direction: column; }
-    .pbc-tray { flex: 1 1 auto; }
-}
+.pbc-card-duration { font-size: 10px; font-weight: 600; opacity: .85; white-space: nowrap; }
