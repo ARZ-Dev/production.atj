@@ -24,8 +24,8 @@
         </div>
         <div class="d-flex gap-2 flex-shrink-0">
             @hasPermission('production.event-create')
-            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#eventCreateModal">
-                <i class="bi bi-pencil-square me-1"></i> Edit Events
+            <button type="button" id="addEventBtn" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i> Add Event
             </button>
             @endhasPermission
             <a href="{{ route('plans') }}" class="btn btn-light btn-sm">
@@ -192,6 +192,13 @@
                 </div>
                 @endif
                 <div class="modal-footer">
+                    @hasPermission('production.event-create')
+                    @if($selectedEvent)
+                    <button type="button" id="editEventBtn" class="btn btn-primary" data-event-id="{{ $selectedEvent['id'] }}">
+                        <i class="bi bi-pencil-square me-1"></i> Edit
+                    </button>
+                    @endif
+                    @endhasPermission
                     <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -205,7 +212,8 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="eventCreateModalLabel">
-                        <i class="bi bi-list-task text-primary me-2"></i>Events — Plan #{{ $plan->id }}
+                        <i class="bi bi-list-task text-primary me-2"></i>
+                        <span id="eventCreateModalTitleText">Add Event</span> — Plan #{{ $plan->id }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -226,10 +234,29 @@
         $wire.on('openEventModal', () => eventDetailsModal.show());
 
         const eventCreateModalEl = document.getElementById('eventCreateModal');
-        if (eventCreateModalEl) {
-            const eventCreateModal = bootstrap.Modal.getOrCreateInstance(eventCreateModalEl);
-            $wire.on('eventsSaved', () => eventCreateModal.hide());
-        }
+        const eventCreateModalTitleText = document.getElementById('eventCreateModalTitleText');
+        const eventCreateModal = eventCreateModalEl
+            ? bootstrap.Modal.getOrCreateInstance(eventCreateModalEl)
+            : null;
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#addEventBtn')) {
+                Livewire.dispatchTo('events.event-create', 'openForCreate');
+                if (eventCreateModalTitleText) eventCreateModalTitleText.textContent = 'Add Event';
+                eventCreateModal?.show();
+                return;
+            }
+
+            const editBtn = e.target.closest('#editEventBtn');
+            if (editBtn) {
+                const eventId = parseInt(editBtn.dataset.eventId);
+                if (!eventId) return;
+                Livewire.dispatchTo('events.event-create', 'openForEdit', { eventId });
+                if (eventCreateModalTitleText) eventCreateModalTitleText.textContent = 'Edit Event';
+                eventDetailsModal.hide();
+                eventCreateModal?.show();
+            }
+        });
 
         const pxPerHour = (el) => {
             const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-hour-w'));
