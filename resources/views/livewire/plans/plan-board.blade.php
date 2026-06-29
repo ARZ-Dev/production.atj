@@ -28,6 +28,11 @@
                 <i class="bi bi-plus-circle me-1"></i> Add Event
             </button>
             @endhasPermission
+            <button type="button" class="btn btn-success btn-sm" wire:click="exportExcel" wire:loading.attr="disabled" wire:target="exportExcel">
+                <span wire:loading wire:target="exportExcel" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-file-earmark-excel me-1" wire:loading.remove wire:target="exportExcel"></i>
+                Export Excel
+            </button>
             <a href="{{ route('plans') }}" class="btn btn-light btn-sm">
                 <i class="bi bi-arrow-left me-1"></i> Back
             </a>
@@ -194,6 +199,11 @@
                 <div class="modal-footer">
                     @hasPermission('production.event-create')
                     @if($selectedEvent)
+                    <button type="button" class="btn btn-danger me-auto"
+                        wire:click="deleteEvent({{ $selectedEvent['id'] }})"
+                        wire:confirm="Delete this event? This cannot be undone.">
+                        <i class="bi bi-trash me-1"></i> Delete
+                    </button>
                     <button type="button" id="editEventBtn" class="btn btn-primary" data-event-id="{{ $selectedEvent['id'] }}">
                         <i class="bi bi-pencil-square me-1"></i> Edit
                     </button>
@@ -232,6 +242,7 @@
     (() => {
         const eventDetailsModal = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
         $wire.on('openEventModal', () => eventDetailsModal.show());
+        $wire.on('closeEventDetailsModal', () => eventDetailsModal.hide());
 
         const eventCreateModalEl = document.getElementById('eventCreateModal');
         const eventCreateModalTitleText = document.getElementById('eventCreateModalTitleText');

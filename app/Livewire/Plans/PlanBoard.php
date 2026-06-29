@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Plans;
 
+use App\Exports\PlanEventsExport;
 use App\Models\Event;
 use App\Models\Line;
 use App\Models\Plan;
@@ -12,6 +13,7 @@ use App\Services\RecipeDurationService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PlanBoard extends Component
 {
@@ -256,6 +258,22 @@ class PlanBoard extends Component
         ];
 
         $this->dispatch('openEventModal');
+    }
+
+    public function deleteEvent(int $eventId): void
+    {
+        Event::where('plan_id', $this->plan->id)->where('id', $eventId)->delete();
+
+        $this->selectedEvent = null;
+        $this->dispatch('closeEventDetailsModal');
+    }
+
+    public function exportExcel()
+    {
+        return Excel::download(
+            new PlanEventsExport($this->plan->id),
+            "plan-{$this->plan->id}-events.xlsx"
+        );
     }
 
     protected function classForAlias(string $alias): ?string
