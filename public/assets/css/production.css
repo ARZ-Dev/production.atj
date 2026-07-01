@@ -301,7 +301,8 @@
 .pbc-grid-wrap { position: relative; flex: 1; min-width: 0; }
 
 .pbc-grid {
-    --pbc-hour-w: 70px;
+    --pbc-slot-w: 46px;                          /* one 15-minute column */
+    --pbc-hour-w: calc(var(--pbc-slot-w) * 4);
     --pbc-band-w: calc(var(--pbc-hour-w) * 8);
     width: 100%; overflow-x: auto;
     display: grid; grid-template-columns: 64px 130px repeat(24, var(--pbc-hour-w));
@@ -315,7 +316,7 @@
     border-right: 1px solid rgba(130,130,180,.18);
 }
 .pbc-hour-row {
-    grid-column: 3 / -1; display: grid; grid-template-columns: repeat(24, var(--pbc-hour-w));
+    grid-column: 3 / -1; display: grid; grid-template-columns: repeat(96, var(--pbc-slot-w));
     border-bottom: 1px solid rgba(130,130,180,.18);
     background-image: repeating-linear-gradient(
         to right,
@@ -325,9 +326,15 @@
     );
 }
 .pbc-hour-cell {
-    padding: 8px 4px; font-size: 10px; font-weight: 700; opacity: .5;
-    text-align: center; border-right: 1px solid rgba(130,130,180,.12);
+    padding: 7px 0 6px; font-size: 10px; font-weight: 600;
+    white-space: nowrap; display: flex; justify-content: flex-start; align-items: flex-start;
+    border-left: 1px solid rgba(130,130,180,.12);   /* the gridline the label marks */
 }
+.pbc-hour-cell.is-hour { border-left-color: rgba(130,130,180,.32); }
+/* Center the label on the cell's left edge so it sits on the line, not inside the cell. */
+.pbc-hour-cell > span { transform: translateX(-50%); padding: 0 3px; opacity: .5; }
+.pbc-hour-cell.is-hour > span { opacity: .85; font-weight: 800; }
+.pbc-hour-cell:first-child > span { display: none; }   /* hide 00:00 label */
 
 .pbc-pl-label {
     grid-column: 1; position: sticky; left: 0; z-index: 2;
@@ -346,7 +353,10 @@
     grid-column: 3 / -1; position: relative;
     border-bottom: 1px solid rgba(130,130,180,.12);
     background-image:
-        repeating-linear-gradient(to right, rgba(130,130,180,.14) 0, rgba(130,130,180,.14) 1px, transparent 1px, transparent var(--pbc-hour-w)),
+        /* hour lines (stronger) */
+        repeating-linear-gradient(to right, rgba(130,130,180,.24) 0, rgba(130,130,180,.24) 1px, transparent 1px, transparent var(--pbc-hour-w)),
+        /* 15-minute lines (light) */
+        repeating-linear-gradient(to right, rgba(130,130,180,.10) 0, rgba(130,130,180,.10) 1px, transparent 1px, transparent var(--pbc-slot-w)),
         repeating-linear-gradient(
             to right,
             rgba(251,191,36,.06) 0, rgba(251,191,36,.06) var(--pbc-band-w),
@@ -362,11 +372,11 @@
 
 .pbc-card {
     position: absolute;
-    min-width: 86px;
+    min-width: var(--pbc-slot-w);
     background: #818cf8;
     color: #fff;
     border: 1px solid rgba(0,0,0,.08);
-    border-radius: 6px; padding: 4px 8px;
+    border-radius: 6px; padding: 4px 6px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 1px; text-align: center; overflow: hidden;
     cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,.08);

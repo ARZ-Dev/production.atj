@@ -71,8 +71,9 @@
             <div class="pbc-grid">
                 <div class="pbc-corner"></div>
                 <div class="pbc-hour-row">
-                    @for($h = 0; $h < 24; $h++)
-                    <div class="pbc-hour-cell">{{ sprintf('%02d:00', $h) }}</div>
+                    @for($slot = 0; $slot < 96; $slot++)
+                    @php $mins = $slot * 15; @endphp
+                    <div class="pbc-hour-cell {{ $mins % 60 === 0 ? 'is-hour' : '' }}"><span>{{ sprintf('%02d:%02d', intdiv($mins, 60), $mins % 60) }}</span></div>
                     @endfor
                 </div>
 
@@ -269,9 +270,9 @@
             }
         });
 
-        const pxPerHour = (el) => {
-            const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-hour-w'));
-            return isFinite(v) && v > 0 ? v : 70;
+        const pxPerSlot = (el) => {
+            const v = parseFloat(getComputedStyle(el).getPropertyValue('--pbc-slot-w'));
+            return isFinite(v) && v > 0 ? v : 46;
         };
 
         const showRejectedToast = (message) => {
@@ -331,10 +332,11 @@
 
                     const rect = drop.getBoundingClientRect();
                     const offsetX = e.clientX - rect.left + drop.scrollLeft;
-                    let hour = Math.round(offsetX / pxPerHour(drop));
-                    hour = Math.max(0, Math.min(23, hour));
+                    const slotW = pxPerSlot(drop);
+                    let slot = Math.round(offsetX / slotW);
+                    slot = Math.max(0, Math.min(95, slot));
 
-                    $wire.call('dropEvent', eventId, productionLineId, placeableType, placeableId, hour);
+                    $wire.call('dropEvent', eventId, productionLineId, placeableType, placeableId, slot);
                 });
             });
         };
