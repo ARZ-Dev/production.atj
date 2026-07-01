@@ -156,7 +156,7 @@ class PlanBoard extends Component
         return $minutes ? max((float) $minutes, 15) / 60 : 1.0;
     }
 
-    public function dropEvent(int $eventId, int $productionLineId, string $placeableAlias, int $placeableId, int $hour): void
+    public function dropEvent(int $eventId, int $productionLineId, string $placeableAlias, int $placeableId, int $slot): void
     {
         $event = Event::with('eventType')
             ->where('plan_id', $this->plan->id)
@@ -176,8 +176,11 @@ class PlanBoard extends Component
             return;
         }
 
-        $hour    = max(0, min(23, $hour));
-        $newFrom = sprintf('%02d:00:00', $hour);
+        // The board is divided into 15-minute slots (96 per day); the drop
+        // reports which slot the card landed on.
+        $slot    = max(0, min(95, $slot));
+        $minutes = $slot * 15;
+        $newFrom = sprintf('%02d:%02d:00', intdiv($minutes, 60), $minutes % 60);
 
         $laneChanged = (int) $event->production_line_id !== $productionLineId
             || $event->placeable_type !== $placeableClass
