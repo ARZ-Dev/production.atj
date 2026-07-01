@@ -28,6 +28,30 @@
         @endhasPermission
     </div>
 
+    {{-- Monthly plans configured for the viewed month --}}
+    <div class="month-plan-strip">
+        <span class="month-plan-strip-label">
+            <i class="bi bi-calendar2-week me-1"></i> Monthly plans
+        </span>
+        @forelse($monthPlans as $mp)
+            <span class="month-plan-chip" title="{{ $mp->plans_count }} plan(s)">
+                <i class="bi bi-building"></i>
+                <span class="mpc-name">{{ $mp->display_name }}</span>
+                <span class="mpc-count">{{ $mp->plans_count }}</span>
+                @hasPermission('production.plan-delete')
+                <button type="button" class="mpc-del js-delete-month-plan"
+                    data-id="{{ $mp->id }}"
+                    data-name="{{ $mp->display_name }}"
+                    title="Delete monthly plan">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+                @endhasPermission
+            </span>
+        @empty
+            <span class="month-plan-empty">No monthly plans yet for this month.</span>
+        @endforelse
+    </div>
+
     <div class="card mb-0">
         <div class="card-body p-0">
             <div class="cal-wrap">
@@ -71,10 +95,13 @@
                             </div>
 
                             @foreach($dayPlans as $plan)
-                                @php $color = $colors[$plan->id % count($colors)]; @endphp
+                                @php
+                                    $color = $colors[$plan->id % count($colors)];
+                                    $planName = $plan->monthPlan?->display_name ?: 'Plan #' . $plan->id;
+                                @endphp
                                 <div class="plan-card" style="border-left-color:{{ $color }}">
-                                    <div class="plan-card-name" style="color:{{ $color }}">
-                                        Plan #{{ $plan->id }}
+                                    <div class="plan-card-name" style="color:{{ $color }}" title="{{ $planName }}">
+                                        {{ $planName }}
                                     </div>
                                     <div class="plan-card-foot">
                                         <span class="plan-card-evt">
@@ -128,16 +155,6 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label for="plan_date" class="form-label">
-                                Date <span class="text-danger">*</span>
-                            </label>
-                            <input type="date"
-                                class="form-control @error('date') is-invalid @enderror"
-                                id="plan_date" wire:model="date">
-                            @error('date')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
                         <div class="col-12 col-md-6">
                             <label for="plan_department" class="form-label">Department</label>
                             <div wire:ignore>
@@ -150,7 +167,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="form-text">Used to filter the factory list below.</div>
+                            <div class="form-text">Used to filter the factory list.</div>
                         </div>
 
                         <div class="col-12 col-md-6">
@@ -161,7 +178,63 @@
                                 <select id="plan_factory" class="selectpicker w-100 @error('factory_id') is-invalid @enderror"
                                     title="Select factory…" data-style="btn-default" data-live-search="true"></select>
                             </div>
-                            @error('factory_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @error('factory_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                        </div>
+
+                        {{-- Month-plan gate: a monthly plan must exist for the
+                             selected factory before daily plans can be added. --}}
+                        <div class="col-12">
+                            @if(!$factory_id)
+                                <div class="mp-gate mp-gate-muted">
+                                    <i class="bi bi-arrow-up-circle"></i>
+                                    <span>Select a factory to continue.</span>
+                                </div>
+                            @elseif(!$monthPlanReady)
+                                <div class="mp-gate mp-gate-warn">
+                                    <div class="mp-gate-head">
+                                        <i class="bi bi-exclamation-triangle-fill"></i>
+                                        <div>
+                                            <strong>No monthly plan for {{ \Carbon\Carbon::createFromDate($currentYear, $currentMonth, 1)->format('F Y') }}</strong>
+                                            <div class="mp-gate-sub">
+                                                {{ $selectedFactoryName ?? 'This factory' }} needs a monthly plan
+                                                before you can add daily plans.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-warning btn-sm mt-2"
+                                        wire:click="createMonthPlan" wire:loading.attr="disabled" wire:target="createMonthPlan">
+                                        <span wire:loading wire:target="createMonthPlan"
+                                            class="spinner-border spinner-border-sm me-1"></span>
+                                        <i class="bi bi-calendar2-plus me-1"></i>
+                                        Create monthly plan
+                                    </button>
+                                </div>
+                            @else
+                                <div class="mp-gate mp-gate-ok">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    <span>
+                                        Monthly plan ready for
+                                        <strong>{{ $selectedFactoryName ?? 'this factory' }}</strong>
+                                        — {{ \Carbon\Carbon::createFromDate($currentYear, $currentMonth, 1)->format('F Y') }}.
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="col-12">
+                            <label for="plan_date" class="form-label">
+                                Date <span class="text-danger">*</span>
+                            </label>
+                            <input type="date"
+                                class="form-control @error('date') is-invalid @enderror"
+                                id="plan_date" wire:model="date" value="{{ $date }}"
+                                min="{{ $startOfMonth->format('Y-m-d') }}"
+                                max="{{ $startOfMonth->copy()->endOfMonth()->format('Y-m-d') }}"
+                                @disabled(!$monthPlanReady)>
+                            @error('date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @unless($monthPlanReady)
+                            <div class="form-text">Available once a monthly plan exists.</div>
+                            @endunless
                         </div>
                     </div>
                 </div>
@@ -169,7 +242,8 @@
                     <button type="button" class="btn btn-light-secondary"
                         data-bs-dismiss="modal" wire:click="resetForm">Cancel</button>
                     <button type="button" class="btn btn-primary"
-                        wire:click="submit" wire:loading.attr="disabled">
+                        wire:click="submit" wire:loading.attr="disabled" wire:target="submit"
+                        @disabled(!$monthPlanReady)>
                         <span wire:loading wire:target="submit"
                             class="spinner-border spinner-border-sm me-1"></span>
                         {{ $editing ? 'Update' : 'Create' }}
@@ -211,11 +285,47 @@
 
         $wire.on('closeModal', () => planModal.hide());
 
+        $wire.on('monthPlanCreated', ({ factory, period }) => {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'Monthly plan created',
+                text: `You can now add plans for ${factory} in ${period}.`,
+                showConfirmButton: false,
+                timer: 3500,
+                timerProgressBar: true,
+            });
+        });
+
         $(document).on('change', '#plan_department', function () {
             $wire.call('onDepartmentChange', parseInt($(this).val()) || null);
         });
         $(document).on('change', '#plan_factory', function () {
-            $wire.set('factory_id', parseInt($(this).val()) || null);
+            const id   = parseInt($(this).val()) || null;
+            const name = $(this).find('option:selected').text() || null;
+            $wire.call('onFactoryChange', id, name);
+        });
+
+        $(document).on('click', '.js-delete-month-plan', function () {
+            const id   = $(this).data('id');
+            const name = $(this).data('name');
+            Swal.fire({
+                title: 'Delete monthly plan?',
+                html: `This removes the monthly plan for <strong>${name}</strong> and <u>all its daily plans</u> for this month. This cannot be undone.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, delete it!',
+                customClass: {
+                    confirmButton: 'btn btn-danger me-3',
+                    cancelButton: 'btn btn-label-secondary'
+                },
+                buttonsStyling: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $wire.dispatch('deleteMonthPlan', { id: id });
+                }
+            });
         });
     </script>
     @endscript
