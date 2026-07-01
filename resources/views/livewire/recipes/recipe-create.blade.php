@@ -440,8 +440,6 @@
                 });
             });
         });
-            $('.selectpicker').selectpicker();
-        });
 
         // ── After Livewire round-trip: re-init non-wire:ignore unit pickers ───
         // Livewire.hook('commit', ({ succeed }) => {
