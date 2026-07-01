@@ -21,7 +21,6 @@ class WarehouseController extends Controller
     {
         $data = [];
         $data['warehouses'] = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
-
         return view('warehouses.index', $data);
     }
 
@@ -35,12 +34,12 @@ class WarehouseController extends Controller
         $data['route'] = route('warehouses.store');
         $data['editing'] = false;
         $data['warehouse_types'] = $this->api->get('/v1/warehouse-types', ['module' => 'production'])['data'] ?? [];
-        $data['departments'] = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+        $data['departments'] = $this->api->get('/v1/departments', ['filter' => 'production'])['data'] ?? [];
         $data['departments'] = collect($data['departments'])
-            ->where('related_to_production', true)
             ->values()
             ->toArray();
         $data['item_types'] = $this->api->get('/v1/warehouses/item-types', ['module' => 'production'])['data'] ?? [];
+        
         return view('warehouses.create', $data);
         
     }

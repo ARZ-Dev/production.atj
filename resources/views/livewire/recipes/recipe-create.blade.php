@@ -160,7 +160,7 @@
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Status</label>
                                 <div class="form-check form-switch mt-1">
-                                    <input class="form-check-input" type="checkbox" id="status" wire:model="status">
+                                    <input class="form-check-input" type="checkbox" id="recipe-status" wire:model="status">
                                     <label class="form-check-label" for="status">
                                         {{ $status ? 'Active' : 'Inactive' }}
                                     </label>
@@ -215,7 +215,8 @@
                                             </label>
                                             <div wire:ignore>
                                                 <select id="section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                    class="selectpicker w-100 section-item-select" title="Select Item"
+                                                        wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_id"
+                                                    class="selectpicker w-100 section-item-select section-items-{{ $sectionIndex }}" title="Select Item"
                                                     data-style="btn-default" data-live-search="true" data-icon-base="ti"
                                                     data-size="5" data-tick-icon="ti-check text-white"
                                                     data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
@@ -439,13 +440,26 @@
                 });
             });
         });
+            $('.selectpicker').selectpicker();
+        });
+
+        // ── After Livewire round-trip: re-init non-wire:ignore unit pickers ───
+        // Livewire.hook('commit', ({ succeed }) => {
+        //     succeed(() => {
+        //         $nextTick(() => {
+        //             $('[id^="section_unit_"], #header_unit').each(function () {
+        //                 $(this).selectpicker('destroy').selectpicker();
+        //             });
+        //         });
+        //     });
+        // });
 
         // ── Recipe type changed: reset output item type picker ────────────────
-        $wire.on('recipe-type-changed', () => {
-            $nextTick(() => {
-                $('#output_item_type').val('').selectpicker('refresh');
-            });
-        });
+        // $wire.on('recipe-type-changed', () => {
+        //     $nextTick(() => {
+        //         $('#output_item_type').val('').selectpicker('refresh');
+        //     });
+        // });
 
         // ── Output item type changed: update header item picker options ────────
         $wire.on('output-type-changed', ({ headerItems }) => {
@@ -457,15 +471,15 @@
         });
 
         // ── After row removed from a section: re-sync picker values ──────────
-        $wire.on('section-rows-removed', ({ sectionIndex, rows }) => {
-            $nextTick(() => {
-                rows.forEach(function (itemId, i) {
-                    $(`#section_item_${sectionIndex}_${i}`)
-                        .val(itemId ? String(itemId) : '')
-                        .selectpicker('refresh');
-                });
-            });
-        });
+        // $wire.on('section-rows-removed', ({ sectionIndex, rows }) => {
+        //     $nextTick(() => {
+        //         rows.forEach(function (itemId, i) {
+        //             $(`#section_item_${sectionIndex}_${i}`)
+        //                 .val(itemId ? String(itemId) : '')
+        //                 .selectpicker('refresh');
+        //         });
+        //     });
+        // });
 
         // ── Sync wire:ignore selectpickers to Livewire via wire:model attr ────
         $(document).on('change', '.selectpicker', function () {
@@ -485,6 +499,18 @@
             if (typeof setOptions === 'function') {
                 setOptions($('#header_unit'), headerUnits);
             }
+        });
+
+        $wire.on('setSectionsItems', function (params) {
+            let sectionItems = params[0];
+
+            // loop over section items and update each section's item picker options
+            for (const [sectionIndex, items] of Object.entries(sectionItems)) {
+                $(`.section-items-${sectionIndex}`).each(function () {
+                    setOptions($(`.section-items-${sectionIndex}`), items);
+                });
+            }
+
         });
 
         // ── Section item change: load units for that row ──────────────────────
