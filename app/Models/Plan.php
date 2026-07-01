@@ -17,6 +17,11 @@ class Plan extends Model
         return $this->belongsTo(Shift::class);
     }
 
+    public function monthPlan()
+    {
+        return $this->belongsTo(MonthPlan::class);
+    }
+
     public function events()
     {
         return $this->hasMany(Event::class);
