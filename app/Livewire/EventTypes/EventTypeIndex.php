@@ -96,6 +96,8 @@ class EventTypeIndex extends Component
 
     public function submit()
     {
+        \Log::info('EventTypeIndex::submit incoming', ['item_type_ids' => $this->item_type_ids, 'type' => gettype($this->item_type_ids)]);
+
         $this->validate();
 
         $data = [
@@ -106,12 +108,17 @@ class EventTypeIndex extends Component
             'item_type_ids' => array_map('intval', $this->item_type_ids ?? []),
         ];
 
+        \Log::info('EventTypeIndex::submit data payload', $data);
+
         if ($this->editing) {
             authorizeRequest('production.eventType-edit');
-            EventType::findOrFail($this->event_type_id)->update($data);
+            $et = EventType::findOrFail($this->event_type_id);
+            $et->update($data);
+            \Log::info('EventTypeIndex::submit after update', ['id' => $et->id, 'fresh_item_type_ids' => $et->fresh()->item_type_ids]);
         } else {
             authorizeRequest('production.eventType-create');
-            EventType::create($data);
+            $et = EventType::create($data);
+            \Log::info('EventTypeIndex::submit after create', ['id' => $et->id, 'fresh_item_type_ids' => $et->fresh()->item_type_ids]);
         }
 
         return redirect()->route('event-types')

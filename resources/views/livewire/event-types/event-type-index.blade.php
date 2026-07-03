@@ -167,7 +167,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal"
                         wire:click="resetForm">Cancel</button>
-                    <button type="button" class="btn btn-primary" wire:click="submit" wire:loading.attr="disabled">
+                    <button type="button" id="et_submit_btn" class="btn btn-primary" wire:loading.attr="disabled" wire:target="submit">
                         <span wire:loading wire:target="submit" class="spinner-border spinner-border-sm me-1"></span>
                         {{ $editing ? 'Update' : 'Create' }}
                     </button>
@@ -182,23 +182,37 @@
 
         $('#et_item_type_ids').selectpicker();
 
-        // Delegated on document so the sync survives any future rebind of
-        // the widget (e.g. if the options list stops being static).
+        // Delegated on document: the widget is destroyed & rebuilt every
+        // time the modal opens (see below — needed because it's initialized
+        // while the modal is still display:none, which leaves bootstrap-select's
+        // menu malformed until it's rebuilt once visible). That destroy()
+        // call internally does `$element.off('.bs.select')`, which would
+        // silently strip a handler bound directly on the element with the
+        // same namespace (e.g. `.on('changed.bs.select', ...)`). Binding on
+        // `document` instead keeps the sync alive across every rebuild.
         $(document).on('changed.bs.select', '#et_item_type_ids', function () {
             @this.set('item_type_ids', $(this).val());
         });
 
-        // The option list is static (same item types for create & edit) —
-        // only the selected values differ, so just update the value; no
-        // need to destroy/reinit the widget (which would also strip any
-        // handler bound directly on it via the same `.bs.select` namespace).
         $wire.on('openModal', () => {
             eventTypeModal.show();
             setTimeout(() => {
+                $('#et_item_type_ids').selectpicker('destroy').selectpicker();
                 $('#et_item_type_ids').selectpicker('val', ($wire.get('item_type_ids') || []).map(String));
             }, 150);
         });
         $wire.on('closeModal', () => eventTypeModal.hide());
+
+        // Belt-and-suspenders: rather than trust every intermediate
+        // `changed.bs.select` event to have landed (and survived any widget
+        // rebuild) before this point, read the widget's current selection
+        // directly off the DOM at the moment Save is clicked and push it in
+        // right before submitting.
+        $(document).on('click', '#et_submit_btn', function () {
+            const selected = ($('#et_item_type_ids').val() || []).map(v => parseInt(v));
+            $wire.set('item_type_ids', selected, false);
+            $wire.call('submit');
+        });
 
         Livewire.hook('morph.added', ({ el }) => {
             $(el).find('.selectpicker').selectpicker();
