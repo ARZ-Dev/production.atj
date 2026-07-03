@@ -42,7 +42,12 @@ class PlanIndex extends Component
         $this->currentYear  = now()->year;
         $this->currentMonth = now()->month;
 
-        $this->departments = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+        $departments = $this->api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+
+        $this->departments = collect($departments)
+            ->filter(fn($dept) => !empty($dept['related_to_production']))
+            ->values()
+            ->toArray();
     }
 
     public function onDepartmentChange(?int $deptId): void
