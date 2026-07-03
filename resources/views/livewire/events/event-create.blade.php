@@ -154,6 +154,22 @@
                 @else
                 <div class="row g-2 mb-2">
                     <div class="col-6 col-md-3">
+                        <div class="ec-field-label">Item Type</div>
+                        <select class="form-select form-select-sm @error('events.'.$index.'.item_type_id') is-invalid @enderror"
+                            wire:model="events.{{ $index }}.item_type_id">
+                            <option value="">— Select —</option>
+                            @foreach($itemTypesByRow[$index] ?? [] as $type)
+                            <option value="{{ $type['id'] }}" @selected((int)($event['item_type_id'] ?? 0) === $type['id'])>
+                                {{ $type['name'] }}
+                            </option>
+                            @endforeach
+                        </select>
+                        @error('events.' . $index . '.item_type_id')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="col-6 col-md-3">
                         <div class="ec-field-label">Duration</div>
                         <input type="text" class="form-control form-control-sm" disabled
                             value="{{ $event['duration'] ? $event['duration'] . ' min' : '—' }}">

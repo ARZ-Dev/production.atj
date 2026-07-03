@@ -452,12 +452,14 @@
         //     });
         // });
 
-        // ── Recipe type changed: reset output item type picker ────────────────
-        // $wire.on('recipe-type-changed', () => {
-        //     $nextTick(() => {
-        //         $('#output_item_type').val('').selectpicker('refresh');
-        //     });
-        // });
+        // ── Recipe type changed: rebuild output item type picker options ──────
+        $wire.on('output-item-types-changed', ({ itemTypes }) => {
+            $nextTick(() => {
+                if (typeof setOptions === 'function') {
+                    setOptions($('#output_item_type'), itemTypes);
+                }
+            });
+        });
 
         // ── Output item type changed: update header item picker options ────────
         $wire.on('output-type-changed', ({ headerItems }) => {

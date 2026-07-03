@@ -115,14 +115,18 @@ class RecipeCreate extends Component
     // ─── Build dynamic sections from recipe type's item_type_ids ─────────────
     protected function buildSections(int $recipeTypeId, $existingInputs = null, $existingSideProducts = null): void
     {
-        $recipeType      = RecipeType::find($recipeTypeId);
-        $itemTypeIds     = $recipeType->item_type_ids ?? [];
-        $sideItemTypeIds = $recipeType->side_item_type_ids ?? [];
+        $recipeType        = RecipeType::find($recipeTypeId);
+        $itemTypeIds       = $recipeType->item_type_ids ?? [];
+        $sideItemTypeIds   = $recipeType->side_item_type_ids ?? [];
+        $outputItemTypeIds = $recipeType->output_item_type_ids ?? [];
 
         $allItemTypes = $this->api->get('/v1/item-types')['data'] ?? [];
         $itemTypeMap  = collect($allItemTypes)->keyBy('id');
 
-        $this->itemTypes = $allItemTypes;
+        $this->itemTypes = collect($allItemTypes)
+            ->filter(fn($type) => in_array($type['id'], $outputItemTypeIds))
+            ->values()
+            ->toArray();
 
         [$this->sections, $this->sectionItems] = $this->buildSectionGroup(
             $itemTypeIds,
@@ -213,6 +217,8 @@ class RecipeCreate extends Component
 
             $this->dispatch('setSectionsItems', $this->sectionItems);
         }
+
+        $this->dispatch('output-item-types-changed', itemTypes: $this->itemTypes);
     }
 
     public function updatedOutputItemTypeId($value): void

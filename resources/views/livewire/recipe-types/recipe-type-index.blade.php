@@ -20,6 +20,7 @@
                                     <th>Name</th>
                                     <th>Item Types</th>
                                     <th>Side Product Item Types</th>
+                                    <th>Output Item Types</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -43,6 +44,14 @@
                                                 ->implode(', ');
                                         @endphp
                                         {{ $sideNames ?: '—' }}
+                                    </td>
+                                    <td>
+                                        @php
+                                            $outputNames = collect((array) $type->output_item_type_ids)
+                                                ->map(fn($id) => $itemTypesMap[$id] ?? "ID:$id")
+                                                ->implode(', ');
+                                        @endphp
+                                        {{ $outputNames ?: '—' }}
                                     </td>
 
                                     <td>

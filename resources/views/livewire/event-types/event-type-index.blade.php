@@ -27,6 +27,7 @@
                                 <th>Name</th>
                                 <th>With Recipe</th>
                                 <th>Duration</th>
+                                <th>Item Types</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -46,6 +47,14 @@
                                     @endif
                                 </td>
                                 <td>{{ $eventType->has_recipe ? '—' : ($eventType->duration ? $eventType->duration . ' min' : '—') }}</td>
+                                <td>
+                                    @php
+                                        $etItemTypeNames = collect((array) $eventType->item_type_ids)
+                                            ->map(fn($id) => $itemTypesMap[$id] ?? "ID:$id")
+                                            ->implode(', ');
+                                    @endphp
+                                    {{ $etItemTypeNames ?: '—' }}
+                                </td>
                                 <td>
                                     @hasPermission('production.eventType-edit')
                                     <button type="button" wire:click="edit({{ $eventType->id }})"
@@ -131,6 +140,29 @@
                         @error('duration')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     @endif
+
+                    <div class="mb-3">
+                        <div wire:ignore>
+                            <label for="et_item_type_ids" class="form-label">Item Types</label>
+                            <select id="et_item_type_ids" multiple
+                                    class="selectpicker w-100"
+                                    title="Select Item Types"
+                                    data-style="btn-default"
+                                    data-live-search="true"
+                                    data-icon-base="ti"
+                                    data-size="5"
+                                    data-tick-icon="ti-check text-white">
+                                @foreach($itemTypes as $itemType)
+                                    <option value="{{ $itemType['id'] }}"
+                                        @selected(in_array($itemType['id'], (array) $item_type_ids))>
+                                        {{ $itemType['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-text">Restricts which item types can be selected for events of this type.</div>
+                        @error('item_type_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal"
@@ -148,8 +180,23 @@
     <script>
         const eventTypeModal = new bootstrap.Modal(document.getElementById('eventTypeModal'));
 
-        $wire.on('openModal', () => eventTypeModal.show());
+        $('#et_item_type_ids').selectpicker();
+        $('#et_item_type_ids').on('changed.bs.select', function () {
+            @this.set('item_type_ids', $(this).val());
+        });
+
+        $wire.on('openModal', () => {
+            eventTypeModal.show();
+            setTimeout(() => {
+                $('#et_item_type_ids').selectpicker('destroy').selectpicker();
+                $('#et_item_type_ids').selectpicker('val', ($wire.get('item_type_ids') || []).map(String));
+            }, 150);
+        });
         $wire.on('closeModal', () => eventTypeModal.hide());
+
+        Livewire.hook('morph.added', ({ el }) => {
+            $(el).find('.selectpicker').selectpicker();
+        });
     </script>
     @endscript
 

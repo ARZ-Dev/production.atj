@@ -15,6 +15,7 @@ class RecipeTypeCreate extends Component
     public $name;
     public $item_type_ids = [];
     public $side_item_type_ids = [];
+    public $output_item_type_ids = [];
     public $itemTypes = [];
 
     public bool $editing = false;
@@ -45,6 +46,7 @@ class RecipeTypeCreate extends Component
             $this->name = $type['name'] ?? '';
             $this->item_type_ids = $type['item_type_ids'] ?? [];
             $this->side_item_type_ids = $type['side_item_type_ids'] ?? [];
+            $this->output_item_type_ids = $type['output_item_type_ids'] ?? [];
         }
     }
 
@@ -54,6 +56,7 @@ class RecipeTypeCreate extends Component
             'name' => 'required|string|max:255',
             'item_type_ids' => 'required|array|min:1',
             'side_item_type_ids' => 'nullable|array',
+            'output_item_type_ids' => 'required|array|min:1',
         ];
     }
 
@@ -65,6 +68,7 @@ class RecipeTypeCreate extends Component
             'name' => $this->name,
             'item_type_ids' => array_map('intval', $this->item_type_ids),
             'side_item_type_ids' => array_map('intval', $this->side_item_type_ids ?? []),
+            'output_item_type_ids' => array_map('intval', $this->output_item_type_ids ?? []),
         ];
 
         if ($this->editing) {

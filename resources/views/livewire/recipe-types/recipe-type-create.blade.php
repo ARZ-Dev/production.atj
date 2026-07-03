@@ -78,6 +78,33 @@
                                 @enderror
                             </div>
 
+                            {{-- Output Item Type --}}
+                            <div class="col-md-6">
+                                <div wire:ignore>
+                                    <label for="output_item_type_ids" class="form-label">
+                                        Output Item Types <span class="text-danger">*</span>
+                                    </label>
+                                    <select id="output_item_type_ids" multiple
+                                            class="selectpicker w-100"
+                                            title="Select Output Item Types"
+                                            data-style="btn-default"
+                                            data-live-search="true"
+                                            data-icon-base="ti"
+                                            data-size="5"
+                                            data-tick-icon="ti-check text-white">
+                                        @foreach($itemTypes as $itemType)
+                                            <option value="{{ $itemType['id'] }}"
+                                                @selected(in_array($itemType['id'], (array) $output_item_type_ids))>
+                                                {{ $itemType['name'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                @error('output_item_type_ids')
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -98,6 +125,7 @@
         // Initial boot
         $('#item_type_ids').selectpicker();
         $('#side_item_type_ids').selectpicker();
+        $('#output_item_type_ids').selectpicker();
 
         // Sync selectpicker -> Livewire (the plugin mutates the hidden select
         // without firing the native event wire:model listens for)
@@ -106,6 +134,9 @@
         });
         $('#side_item_type_ids').on('changed.bs.select', function () {
             @this.set('side_item_type_ids', $(this).val());
+        });
+        $('#output_item_type_ids').on('changed.bs.select', function () {
+            @this.set('output_item_type_ids', $(this).val());
         });
 
         // Re-init any selectpicker added to the DOM via morph
