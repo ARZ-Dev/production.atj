@@ -100,23 +100,6 @@
                     </div>
 
                     <div class="col-6 col-md-3">
-                        <div class="ec-field-label">Recipe Type <span class="text-danger">*</span></div>
-                        <select class="form-select form-select-sm @error('events.'.$index.'.recipe_type_id') is-invalid @enderror"
-                            wire:model="events.{{ $index }}.recipe_type_id"
-                            wire:change="onRecipeTypeChanged({{ $index }}, $event.target.value)">
-                            <option value="">— Select —</option>
-                            @foreach($recipeTypesByRow[$index] ?? [] as $rt)
-                            <option value="{{ $rt['id'] }}" @selected((int)($event['recipe_type_id'] ?? 0) === $rt['id'])>
-                                {{ $rt['name'] }}
-                            </option>
-                            @endforeach
-                        </select>
-                        @error('events.' . $index . '.recipe_type_id')
-                            <div class="invalid-feedback d-block">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="col-6 col-md-3">
                         <div class="ec-field-label">Recipe <span class="text-danger">*</span></div>
                         <select class="form-select form-select-sm @error('events.'.$index.'.recipe_id') is-invalid @enderror"
                             wire:model="events.{{ $index }}.recipe_id"
@@ -145,18 +128,12 @@
                         @enderror
                     </div>
 
-                    <div class="col-6 col-md-3">
+                    <div class="col-12 col-md-6">
                         <div class="ec-field-label">Duration</div>
-                        <input type="text" class="form-control form-control-sm" disabled
-                            value="{{ $event['duration'] ? $event['duration'] . ' min' . ($event['placeable_type'] ? '' : ' (estimate)') : 'Set recipe, item & batch' }}">
-                    </div>
-                </div>
-                @else
-                <div class="row g-2 mb-2">
-                    <div class="col-6 col-md-3">
-                        <div class="ec-field-label">Duration</div>
-                        <input type="text" class="form-control form-control-sm" disabled
-                            value="{{ $event['duration'] ? $event['duration'] . ' min' : '—' }}">
+                        <div class="ec-duration-note">
+                            <i class="bi bi-info-circle"></i>
+                            Duration will be calculated when the event is placed on a production/preparation line.
+                        </div>
                     </div>
                 </div>
                 @endif

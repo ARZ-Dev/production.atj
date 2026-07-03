@@ -10,10 +10,30 @@
         <div>
             <div class="pv-title">Plan #{{ $plan->id }}</div>
             <div class="pv-chips">
+                @if($prevPlan)
+                <a href="{{ route('plans.view', $prevPlan->id) }}" class="btn btn-light btn-sm pb-day-nav"
+                    title="Previous day — {{ \Carbon\Carbon::parse($prevPlan->date)->format('d M Y') }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+                @else
+                <button type="button" class="btn btn-light btn-sm pb-day-nav" disabled title="No earlier plan for this factory">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                @endif
                 <span class="pv-chip">
                     <i class="bi bi-calendar3 text-primary chip-icon"></i>
                     {{ \Carbon\Carbon::parse($plan->date)->format('d F Y') }}
                 </span>
+                @if($nextPlan)
+                <a href="{{ route('plans.view', $nextPlan->id) }}" class="btn btn-light btn-sm pb-day-nav"
+                    title="Next day — {{ \Carbon\Carbon::parse($nextPlan->date)->format('d M Y') }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+                @else
+                <button type="button" class="btn btn-light btn-sm pb-day-nav" disabled title="No later plan for this factory">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+                @endif
                 @if($factoryName)
                 <span class="pv-chip green">
                     <i class="bi bi-building chip-icon"></i>
@@ -143,10 +163,22 @@
                 </div>
                 @if($selectedEvent)
                 <div class="modal-body">
+                    @if($selectedEvent['is_carry_over'])
+                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size:12px;">
+                        <i class="bi bi-arrow-return-right me-1"></i>
+                        Started on {{ $selectedEvent['plan_date'] }} and runs past midnight into this day.
+                        Open that day's plan to edit it.
+                    </div>
+                    @endif
                     <div class="row g-3">
                         <div class="col-6">
                             <div class="pvc-body-label">Time</div>
-                            <div>{{ $selectedEvent['from_time'] ?? '—' }}{{ $selectedEvent['to_time'] ? ' – '.$selectedEvent['to_time'] : '' }}</div>
+                            <div>
+                                {{ $selectedEvent['from_time'] ?? '—' }}{{ $selectedEvent['to_time'] ? ' – '.$selectedEvent['to_time'] : '' }}
+                                @if($selectedEvent['crosses_midnight'] && $selectedEvent['to_time'])
+                                <span class="text-muted" style="font-size:11px;">(next day)</span>
+                                @endif
+                            </div>
                         </div>
                         <div class="col-6">
                             <div class="pvc-body-label">Duration</div>
@@ -199,7 +231,7 @@
                 @endif
                 <div class="modal-footer">
                     @hasPermission('production.event-create')
-                    @if($selectedEvent)
+                    @if($selectedEvent && !$selectedEvent['is_carry_over'])
                     <button type="button" class="btn btn-danger me-auto"
                         wire:click="deleteEvent({{ $selectedEvent['id'] }})"
                         wire:confirm="Delete this event? This cannot be undone.">

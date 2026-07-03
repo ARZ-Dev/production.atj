@@ -6,7 +6,6 @@ use App\Models\Event;
 use App\Models\EventType;
 use App\Models\Plan;
 use App\Models\Recipe;
-use App\Models\RecipeType;
 use App\Services\ApiService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
@@ -25,7 +24,6 @@ class EventCreate extends Component
     // Per-row cascading option lists, keyed by row index.
     public array $itemTypesByRow = [];
     public array $itemsByRow = [];
-    public array $recipeTypesByRow = [];
     public array $recipesByRow = [];
 
     protected ApiService $api;
@@ -51,7 +49,7 @@ class EventCreate extends Component
     #[On('openForCreate')]
     public function openForCreate(): void
     {
-        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipeTypesByRow', 'recipesByRow');
+        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipesByRow');
         $this->editingEventId = null;
         $this->addEventRow();
         $this->resetValidation();
@@ -60,7 +58,7 @@ class EventCreate extends Component
     #[On('openForEdit')]
     public function openForEdit(int $eventId): void
     {
-        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipeTypesByRow', 'recipesByRow');
+        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipesByRow');
         $this->editingEventId = $eventId;
 
         $event = Event::where('plan_id', $this->planId)->find($eventId);
@@ -118,12 +116,11 @@ class EventCreate extends Component
         $this->itemTypesByRow[$index] = $this->api->get('/v1/item-types')['data'] ?? [];
 
         if ($event->item_type_id) {
-            $this->itemsByRow[$index]       = $this->fetchItemsForType((int) $event->item_type_id);
-            $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType((int) $event->item_type_id);
+            $this->itemsByRow[$index] = $this->fetchItemsForType((int) $event->item_type_id);
         }
 
-        if ($event->recipe_type_id && $event->item_id) {
-            $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->recipe_type_id, (int) $event->item_id);
+        if ($event->item_id) {
+            $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->item_id);
         }
     }
 
@@ -187,26 +184,9 @@ class EventCreate extends Component
         return $this->api->get('/v1/items', ['item_type' => $typeName, 'is_active' => true])['data'] ?? [];
     }
 
-    private function fetchRecipeTypesForItemType(int $itemTypeId): array
+    private function fetchRecipes(int $itemId): array
     {
-        // A recipe type is offered here if at least one of its recipes is
-        // expected to output ($recipe->item_type_id) the selected item type —
-        // not based on RecipeType::item_type_ids (that lists ingredient types).
-        $recipeTypeIds = Recipe::where('item_type_id', $itemTypeId)
-            ->whereNotNull('recipe_type_id')
-            ->distinct()
-            ->pluck('recipe_type_id');
-
-        return RecipeType::whereIn('id', $recipeTypeIds)
-            ->orderBy('name')
-            ->get()
-            ->toArray();
-    }
-
-    private function fetchRecipes(int $recipeTypeId, int $itemId): array
-    {
-        return Recipe::where('recipe_type_id', $recipeTypeId)
-            ->where('item_id', $itemId)
+        return Recipe::where('item_id', $itemId)
             ->where('status', true)
             ->orderBy('name')
             ->get()
@@ -229,7 +209,7 @@ class EventCreate extends Component
         $this->events[$index]['recipe_id']               = null;
         $this->events[$index]['batch_count']             = '';
 
-        unset($this->itemsByRow[$index], $this->recipeTypesByRow[$index], $this->recipesByRow[$index]);
+        unset($this->itemsByRow[$index], $this->recipesByRow[$index]);
 
         if ($hasRecipe) {
             $this->events[$index]['duration'] = null;
@@ -253,10 +233,9 @@ class EventCreate extends Component
         unset($this->recipesByRow[$index]);
 
         if ($itemTypeId) {
-            $this->itemsByRow[$index]       = $this->fetchItemsForType($itemTypeId);
-            $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType($itemTypeId);
+            $this->itemsByRow[$index] = $this->fetchItemsForType($itemTypeId);
         } else {
-            unset($this->itemsByRow[$index], $this->recipeTypesByRow[$index]);
+            unset($this->itemsByRow[$index]);
         }
     }
 
@@ -264,31 +243,12 @@ class EventCreate extends Component
     {
         $itemId = $itemId !== '' ? (int) $itemId : null;
 
-        $this->events[$index]['item_id']    = $itemId;
-        $this->events[$index]['recipe_id']  = null;
-
-        $recipeTypeId = $this->events[$index]['recipe_type_id'] ?? null;
-
-        if ($recipeTypeId && $itemId) {
-            $this->recipesByRow[$index] = $this->fetchRecipes((int) $recipeTypeId, $itemId);
-        } else {
-            unset($this->recipesByRow[$index]);
-        }
-
-        $this->recalculateDuration($index);
-    }
-
-    public function onRecipeTypeChanged(int $index, $recipeTypeId): void
-    {
-        $recipeTypeId = $recipeTypeId !== '' ? (int) $recipeTypeId : null;
-
-        $this->events[$index]['recipe_type_id'] = $recipeTypeId;
+        $this->events[$index]['item_id']        = $itemId;
+        $this->events[$index]['recipe_type_id'] = null;
         $this->events[$index]['recipe_id']      = null;
 
-        $itemId = $this->events[$index]['item_id'] ?? null;
-
-        if ($recipeTypeId && $itemId) {
-            $this->recipesByRow[$index] = $this->fetchRecipes($recipeTypeId, (int) $itemId);
+        if ($itemId) {
+            $this->recipesByRow[$index] = $this->fetchRecipes($itemId);
         } else {
             unset($this->recipesByRow[$index]);
         }
@@ -298,7 +258,14 @@ class EventCreate extends Component
 
     public function onRecipeChanged(int $index, $recipeId): void
     {
-        $this->events[$index]['recipe_id'] = $recipeId !== '' ? (int) $recipeId : null;
+        $recipeId = $recipeId !== '' ? (int) $recipeId : null;
+
+        $this->events[$index]['recipe_id'] = $recipeId;
+        // The dropdown is gone — the recipe type is carried along from the
+        // chosen recipe so it still gets stored and shown on the board.
+        $this->events[$index]['recipe_type_id'] = $recipeId
+            ? Recipe::find($recipeId)?->recipe_type_id
+            : null;
 
         $this->recalculateDuration($index);
     }
@@ -346,7 +313,7 @@ class EventCreate extends Component
             $requiredIfRecipe = $hasRecipe ? 'required' : 'nullable';
             $rules["events.{$index}.item_type_id"]   = "{$requiredIfRecipe}|integer";
             $rules["events.{$index}.item_id"]        = "{$requiredIfRecipe}|integer";
-            $rules["events.{$index}.recipe_type_id"] = "{$requiredIfRecipe}|integer|exists:recipe_types,id";
+            $rules["events.{$index}.recipe_type_id"] = 'nullable|integer|exists:recipe_types,id';
             $rules["events.{$index}.recipe_id"]      = "{$requiredIfRecipe}|integer|exists:recipes,id";
             $rules["events.{$index}.batch_count"]    = "{$requiredIfRecipe}|string|max:255";
         }
@@ -359,7 +326,6 @@ class EventCreate extends Component
         'events.*.event_type_id.exists'    => 'Selected event type is invalid.',
         'events.*.item_type_id.required'   => 'Item type is required.',
         'events.*.item_id.required'        => 'Item is required.',
-        'events.*.recipe_type_id.required' => 'Recipe type is required.',
         'events.*.recipe_id.required'      => 'Recipe is required.',
         'events.*.batch_count.required'    => 'Batch number is required.',
     ];
