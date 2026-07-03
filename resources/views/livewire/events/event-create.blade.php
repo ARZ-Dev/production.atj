@@ -130,8 +130,10 @@
 
                     <div class="col-12 col-md-6">
                         <div class="ec-field-label">Duration</div>
-                        <input type="text" class="form-control form-control-sm" disabled
-                            value="{{ $event['duration'] ? $event['duration'] . ' min' . ($event['placeable_type'] ? '' : ' (estimate)') : 'Set recipe, item & batch' }}">
+                        <div class="ec-duration-note">
+                            <i class="bi bi-info-circle"></i>
+                            Duration will be calculated when the event is placed on a production/preparation line.
+                        </div>
                     </div>
                 </div>
                 @else
@@ -150,12 +152,6 @@
                         @error('events.' . $index . '.item_type_id')
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
-                    </div>
-
-                    <div class="col-6 col-md-3">
-                        <div class="ec-field-label">Duration</div>
-                        <input type="text" class="form-control form-control-sm" disabled
-                            value="{{ $event['duration'] ? $event['duration'] . ' min' : '—' }}">
                     </div>
                 </div>
                 @endif
