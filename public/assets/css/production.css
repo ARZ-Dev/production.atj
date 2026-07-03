@@ -313,6 +313,18 @@
     font-weight: 700; opacity: .4; margin-bottom: 5px;
 }
 
+.ec-duration-value {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    background: rgba(129,140,248,.08); border: 1px solid rgba(129,140,248,.18);
+}
+.ec-duration-note {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 500;
+    background: rgba(56,189,248,.07); border: 1px dashed rgba(56,189,248,.35);
+    color: #38bdf8; line-height: 1.4;
+}
+
 .ec-add-card {
     width: 100%; padding: 12px; border-radius: 10px;
     border: 1.5px dashed rgba(130,130,180,.25); background: transparent;
@@ -434,3 +446,18 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
 .pbc-card-duration { font-size: 10px; font-weight: 600; opacity: .85; white-space: nowrap; }
+
+/* Cross-midnight events: the tail shown on the next day's board… */
+.pbc-card--carry {
+    border-left: 3px dashed rgba(255,255,255,.8);
+    border-top-left-radius: 0; border-bottom-left-radius: 0;
+    cursor: pointer; /* view-only — not draggable from this board */
+}
+/* …and the clipped head on the day it starts. */
+.pbc-card--continues {
+    border-right: 3px dashed rgba(255,255,255,.8);
+    border-top-right-radius: 0; border-bottom-right-radius: 0;
+}
+
+/* Plan board header: previous/next day navigation */
+.pb-day-nav { display: inline-flex; align-items: center; border-radius: 20px; }
