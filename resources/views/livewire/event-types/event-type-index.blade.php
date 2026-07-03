@@ -181,14 +181,20 @@
         const eventTypeModal = new bootstrap.Modal(document.getElementById('eventTypeModal'));
 
         $('#et_item_type_ids').selectpicker();
-        $('#et_item_type_ids').on('changed.bs.select', function () {
+
+        // Delegated on document so the sync survives any future rebind of
+        // the widget (e.g. if the options list stops being static).
+        $(document).on('changed.bs.select', '#et_item_type_ids', function () {
             @this.set('item_type_ids', $(this).val());
         });
 
+        // The option list is static (same item types for create & edit) —
+        // only the selected values differ, so just update the value; no
+        // need to destroy/reinit the widget (which would also strip any
+        // handler bound directly on it via the same `.bs.select` namespace).
         $wire.on('openModal', () => {
             eventTypeModal.show();
             setTimeout(() => {
-                $('#et_item_type_ids').selectpicker('destroy').selectpicker();
                 $('#et_item_type_ids').selectpicker('val', ($wire.get('item_type_ids') || []).map(String));
             }, 150);
         });
