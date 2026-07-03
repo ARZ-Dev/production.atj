@@ -10,16 +10,16 @@
         <div>
             <div class="pv-title">Plan #{{ $plan->id }}</div>
             <div class="pv-chips">
-                @if($prevPlan)
-                <a href="{{ route('plans.view', $prevPlan->id) }}" class="btn btn-light btn-sm pb-day-nav"
-                    title="Previous day — {{ \Carbon\Carbon::parse($prevPlan->date)->format('d M Y') }}">
-                    <i class="bi bi-chevron-left"></i>
-                </a>
-                @else
-                <button type="button" class="btn btn-light btn-sm pb-day-nav" disabled title="No earlier plan for this factory">
-                    <i class="bi bi-chevron-left"></i>
-                </button>
-                @endif
+                <div class="btn-group btn-group-sm me-1">
+                    <button type="button" class="btn btn-light" wire:click="goToPreviousDay"
+                        wire:loading.attr="disabled" wire:target="goToPreviousDay" title="Previous day">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button type="button" class="btn btn-light" wire:click="goToNextDay"
+                        wire:loading.attr="disabled" wire:target="goToNextDay" title="Next day">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
                 <span class="pv-chip">
                     <i class="bi bi-calendar3 text-primary chip-icon"></i>
                     {{ \Carbon\Carbon::parse($plan->date)->format('d F Y') }}

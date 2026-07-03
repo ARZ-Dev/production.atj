@@ -27,6 +27,7 @@
                                 <th>Name</th>
                                 <th>With Recipe</th>
                                 <th>Duration</th>
+                                <th>Item Types</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -46,6 +47,14 @@
                                     @endif
                                 </td>
                                 <td>{{ $eventType->has_recipe ? '—' : ($eventType->duration ? $eventType->duration . ' min' : '—') }}</td>
+                                <td>
+                                    @php
+                                        $etItemTypeNames = collect((array) $eventType->item_type_ids)
+                                            ->map(fn($id) => $itemTypesMap[$id] ?? "ID:$id")
+                                            ->implode(', ');
+                                    @endphp
+                                    {{ $etItemTypeNames ?: '—' }}
+                                </td>
                                 <td>
                                     @hasPermission('production.eventType-edit')
                                     <button type="button" wire:click="edit({{ $eventType->id }})"
@@ -131,11 +140,34 @@
                         @error('duration')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     @endif
+
+                    <div class="mb-3">
+                        <div wire:ignore>
+                            <label for="et_item_type_ids" class="form-label">Item Types</label>
+                            <select id="et_item_type_ids" multiple
+                                    class="selectpicker w-100"
+                                    title="Select Item Types"
+                                    data-style="btn-default"
+                                    data-live-search="true"
+                                    data-icon-base="ti"
+                                    data-size="5"
+                                    data-tick-icon="ti-check text-white">
+                                @foreach($itemTypes as $itemType)
+                                    <option value="{{ $itemType['id'] }}"
+                                        @selected(in_array($itemType['id'], (array) $item_type_ids))>
+                                        {{ $itemType['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-text">Restricts which item types can be selected for events of this type.</div>
+                        @error('item_type_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal"
                         wire:click="resetForm">Cancel</button>
-                    <button type="button" class="btn btn-primary" wire:click="submit" wire:loading.attr="disabled">
+                    <button type="button" id="et_submit_btn" class="btn btn-primary" wire:loading.attr="disabled" wire:target="submit">
                         <span wire:loading wire:target="submit" class="spinner-border spinner-border-sm me-1"></span>
                         {{ $editing ? 'Update' : 'Create' }}
                     </button>
@@ -148,8 +180,43 @@
     <script>
         const eventTypeModal = new bootstrap.Modal(document.getElementById('eventTypeModal'));
 
-        $wire.on('openModal', () => eventTypeModal.show());
+        $('#et_item_type_ids').selectpicker();
+
+        // Delegated on document: the widget is destroyed & rebuilt every
+        // time the modal opens (see below — needed because it's initialized
+        // while the modal is still display:none, which leaves bootstrap-select's
+        // menu malformed until it's rebuilt once visible). That destroy()
+        // call internally does `$element.off('.bs.select')`, which would
+        // silently strip a handler bound directly on the element with the
+        // same namespace (e.g. `.on('changed.bs.select', ...)`). Binding on
+        // `document` instead keeps the sync alive across every rebuild.
+        $(document).on('changed.bs.select', '#et_item_type_ids', function () {
+            @this.set('item_type_ids', $(this).val());
+        });
+
+        $wire.on('openModal', () => {
+            eventTypeModal.show();
+            setTimeout(() => {
+                $('#et_item_type_ids').selectpicker('destroy').selectpicker();
+                $('#et_item_type_ids').selectpicker('val', ($wire.get('item_type_ids') || []).map(String));
+            }, 150);
+        });
         $wire.on('closeModal', () => eventTypeModal.hide());
+
+        // Belt-and-suspenders: rather than trust every intermediate
+        // `changed.bs.select` event to have landed (and survived any widget
+        // rebuild) before this point, read the widget's current selection
+        // directly off the DOM at the moment Save is clicked and push it in
+        // right before submitting.
+        $(document).on('click', '#et_submit_btn', function () {
+            const selected = ($('#et_item_type_ids').val() || []).map(v => parseInt(v));
+            $wire.set('item_type_ids', selected, false);
+            $wire.call('submit');
+        });
+
+        Livewire.hook('morph.added', ({ el }) => {
+            $(el).find('.selectpicker').selectpicker();
+        });
     </script>
     @endscript
 

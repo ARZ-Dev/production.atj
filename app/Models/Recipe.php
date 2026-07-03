@@ -17,6 +17,11 @@ class Recipe extends Model
         return $this->hasMany(RecipeInput::class);
     }
 
+    public function sideProducts()
+    {
+        return $this->hasMany(RecipeSideProduct::class);
+    }
+
     public function recipeType()
     {
         return $this->belongsTo(RecipeType::class);

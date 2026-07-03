@@ -36,6 +36,11 @@ class PlanBoard extends Component
 
     public function mount($id): void
     {
+        $this->loadPlan($id);
+    }
+
+    protected function loadPlan(int $id): void
+    {
         $this->plan = Plan::findOrFail($id);
 
         $this->productionLines = ProductionLine::with('preparations.eventTypes', 'lines.eventTypes')
@@ -43,10 +48,44 @@ class PlanBoard extends Component
             ->orderBy('name')
             ->get();
 
+        $this->factoryName = null;
+
         if ($this->plan->factory_id) {
             $warehouses = $this->api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
             $this->factoryName = collect($warehouses)->firstWhere('id', $this->plan->factory_id)['name'] ?? null;
         }
+    }
+
+    // ─── Date navigation: jump to the sibling plan (same factory) for the
+    //     previous/next day, if one exists ─────────────────────────────────────
+    public function goToPreviousDay()
+    {
+        return $this->navigateToDate(-1);
+    }
+
+    public function goToNextDay()
+    {
+        return $this->navigateToDate(1);
+    }
+
+    protected function navigateToDate(int $dayOffset)
+    {
+        $targetDate = Carbon::parse($this->plan->date)->addDays($dayOffset);
+
+        $targetPlan = Plan::where('factory_id', $this->plan->factory_id)
+            ->whereDate('date', $targetDate->format('Y-m-d'))
+            ->first();
+
+        if (!$targetPlan) {
+            $this->dispatch('swal:error', [
+                'title' => 'No plan found',
+                'text'  => 'There is no plan for ' . $targetDate->format('d F Y') . ($this->factoryName ? " at {$this->factoryName}" : '') . '.',
+            ]);
+
+            return;
+        }
+
+        return redirect()->route('plans.view', $targetPlan->id);
     }
 
     protected function loadEvents(): void

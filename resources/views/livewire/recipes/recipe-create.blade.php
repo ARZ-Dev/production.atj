@@ -293,6 +293,119 @@
                 </div>
                 @endforeach
 
+                {{-- ── Dynamic Side Product Sections (one per side_item_type_id) ───── --}}
+                @foreach($sideSections as $sectionIndex => $section)
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ $section['title'] }} <span class="badge bg-light-info text-info ms-1">Side Product</span></h5>
+                        <button type="button" class="btn btn-success btn-sm"
+                            wire:click="addRowToSideSection({{ $sectionIndex }})">
+                            <i class="ti ti-plus me-1"></i> Add {{ $section['title'] }}
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        @if(count($section['rows']) > 0)
+                        <div class="row g-3">
+                            @foreach($section['rows'] as $rowIndex => $row)
+                            <div class="col-12" wire:key="side-section-{{ $sectionIndex }}-row-{{ $rowIndex }}">
+                                <div class="border rounded p-3">
+
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <label class="form-label mb-0 fw-semibold">#{{ $rowIndex + 1 }}</label>
+                                        @if(count($section['rows']) > 1)
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                            wire:click="removeRowFromSideSection({{ $sectionIndex }}, {{ $rowIndex }})">
+                                            <i class="ti ti-trash me-1"></i> Remove
+                                        </button>
+                                        @endif
+                                    </div>
+
+                                    <div class="row g-3 align-items-end">
+
+                                        {{-- Item --}}
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">
+                                                Item <span class="text-danger">*</span>
+                                            </label>
+                                            <div wire:ignore>
+                                                <select id="side_section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                                    class="selectpicker w-100 side-section-item-select" title="Select Item"
+                                                    data-style="btn-default" data-live-search="true" data-icon-base="ti"
+                                                    data-size="5" data-tick-icon="ti-check text-white"
+                                                    data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
+                                                    @foreach($sideSectionItems[$sectionIndex] ?? [] as $item)
+                                                    <option value="{{ $item['id'] }}"
+                                                        @selected($row['item_id']==$item['id'])>
+                                                        {{ $item['name'] }} ({{ $item['code'] ?? '' }})
+                                                    </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.item_id")
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+
+                                        {{-- Unit --}}
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label">
+                                                Unit <span class="text-danger">*</span>
+                                            </label>
+                                            <select id="side_section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                                class="selectpicker w-100" title="Select Unit" data-style="btn-default"
+                                                data-live-search="true" data-icon-base="ti" data-size="5"
+                                                data-tick-icon="ti-check text-white"
+                                                wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_unit_id"
+                                                data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
+                                                @foreach($section['rowUnits'][$rowIndex] ?? [] as $unit)
+                                                <option value="{{ $unit['id'] }}"
+                                                    @selected($row['item_unit_id']==$unit['id'])>
+                                                    {{ $unit['name'] }} ({{ $unit['symbol'] ?? '' }})
+                                                </option>
+                                                @endforeach
+                                            </select>
+                                            @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.item_unit_id")
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+
+                                        {{-- Quantity --}}
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label">
+                                                Quantity <span class="text-danger">*</span>
+                                            </label>
+                                            <input type="text"
+                                                wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.quantity"
+                                                id="side_section_qty_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                                class="form-control" placeholder="Enter quantity">
+                                            @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.quantity")
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+
+                                        {{-- Notes --}}
+                                        <div class="col-12 col-md-2">
+                                            <label class="form-label">Notes</label>
+                                            <input type="text"
+                                                wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.notes"
+                                                id="side_section_notes_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                                class="form-control" placeholder="Optional">
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                        @else
+                        <div class="text-center py-4">
+                            <p class="text-muted mb-0">No items added yet.</p>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @endforeach
+
                 {{-- Submit --}}
                 @if($recipe_type_id)
                 <div class="col-12 text-end mb-2">
@@ -314,7 +427,18 @@
 
         // ── New DOM nodes (new rows / cards added by Livewire) ───────────────
         Livewire.hook('morph.added', ({ el }) => {
-            $('.selectpicker').selectpicker();
+            $(el).find('[id^="section_item_"], [id^="section_unit_"], [id^="side_section_item_"], [id^="side_section_unit_"], #header_item, #header_unit, #output_item_type').selectpicker();
+        });
+
+        // ── After Livewire round-trip: re-init non-wire:ignore unit pickers ───
+        Livewire.hook('commit', ({ succeed }) => {
+            succeed(() => {
+                $nextTick(() => {
+                    $('[id^="section_unit_"], [id^="side_section_unit_"], #header_unit').each(function () {
+                        $(this).selectpicker('destroy').selectpicker();
+                    });
+                });
+            });
         });
 
         // ── After Livewire round-trip: re-init non-wire:ignore unit pickers ───
@@ -328,12 +452,14 @@
         //     });
         // });
 
-        // ── Recipe type changed: reset output item type picker ────────────────
-        // $wire.on('recipe-type-changed', () => {
-        //     $nextTick(() => {
-        //         $('#output_item_type').val('').selectpicker('refresh');
-        //     });
-        // });
+        // ── Recipe type changed: rebuild output item type picker options ──────
+        $wire.on('output-item-types-changed', ({ itemTypes }) => {
+            $nextTick(() => {
+                if (typeof setOptions === 'function') {
+                    setOptions($('#output_item_type'), itemTypes);
+                }
+            });
+        });
 
         // ── Output item type changed: update header item picker options ────────
         $wire.on('output-type-changed', ({ headerItems }) => {
@@ -396,6 +522,28 @@
             if (isNaN(sectionIndex) || isNaN(rowIndex)) return;
 
             $wire.call('onSectionItemChanged', sectionIndex, rowIndex, val ? parseInt(val) : null);
+        });
+
+        // ── After row removed from a side section: re-sync picker values ─────
+        $wire.on('side-section-rows-removed', ({ sectionIndex, rows }) => {
+            $nextTick(() => {
+                rows.forEach(function (itemId, i) {
+                    $(`#side_section_item_${sectionIndex}_${i}`)
+                        .val(itemId ? String(itemId) : '')
+                        .selectpicker('refresh');
+                });
+            });
+        });
+
+        // ── Side section item change: load units for that row ─────────────────
+        $(document).on('change', '.side-section-item-select', function () {
+            const sectionIndex = parseInt($(this).data('section'));
+            const rowIndex     = parseInt($(this).data('row'));
+            const val          = $(this).val();
+
+            if (isNaN(sectionIndex) || isNaN(rowIndex)) return;
+
+            $wire.call('onSideSectionItemChanged', sectionIndex, rowIndex, val ? parseInt(val) : null);
         });
     </script>
     @endscript

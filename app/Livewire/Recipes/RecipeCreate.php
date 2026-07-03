@@ -4,6 +4,7 @@ namespace App\Livewire\Recipes;
 
 use App\Models\Recipe;
 use App\Models\RecipeInput;
+use App\Models\RecipeSideProduct;
 use App\Models\RecipeType;
 use App\Services\ApiService;
 use DB;
@@ -49,6 +50,10 @@ class RecipeCreate extends Component
     // $sections lean — only stores user-editable row data)
     public array $sectionItems = [];
 
+    // ─── Dynamic side product sections (one per side_item_type_id from recipe type) ──
+    public array $sideSections     = [];
+    public array $sideSectionItems = [];
+
     // ─── API ──────────────────────────────────────────────────────────────────
     protected ApiService $api;
 
@@ -73,7 +78,7 @@ class RecipeCreate extends Component
     // ─── Load existing recipe for edit ───────────────────────────────────────
     protected function loadRecipe(int $id): void
     {
-        $recipe = Recipe::with('inputs')->findOrFail($id);
+        $recipe = Recipe::with(['inputs', 'sideProducts'])->findOrFail($id);
 
         $this->name              = $recipe->name;
         $this->recipe_type_id    = $recipe->recipe_type_id;
@@ -87,7 +92,7 @@ class RecipeCreate extends Component
         $this->notes             = $recipe->notes;
 
         if ($this->recipe_type_id) {
-            $this->buildSections($this->recipe_type_id, $recipe->inputs);
+            $this->buildSections($this->recipe_type_id, $recipe->inputs, $recipe->sideProducts);
             // $this->itemTypes is now populated
         }
 
@@ -108,20 +113,44 @@ class RecipeCreate extends Component
     }
 
     // ─── Build dynamic sections from recipe type's item_type_ids ─────────────
-    protected function buildSections(int $recipeTypeId, $existingInputs = null): void
+    protected function buildSections(int $recipeTypeId, $existingInputs = null, $existingSideProducts = null): void
     {
-        $recipeType  = RecipeType::find($recipeTypeId);
-        $itemTypeIds = $recipeType->item_type_ids ?? [];
+        $recipeType        = RecipeType::find($recipeTypeId);
+        $itemTypeIds       = $recipeType->item_type_ids ?? [];
+        $sideItemTypeIds   = $recipeType->side_item_type_ids ?? [];
+        $outputItemTypeIds = $recipeType->output_item_type_ids ?? [];
 
         $allItemTypes = $this->api->get('/v1/item-types')['data'] ?? [];
         $itemTypeMap  = collect($allItemTypes)->keyBy('id');
 
-        $this->itemTypes    = $allItemTypes;
-        $this->sections     = [];
-        $this->sectionItems = [];
+        $this->itemTypes = collect($allItemTypes)
+            ->filter(fn($type) => in_array($type['id'], $outputItemTypeIds))
+            ->values()
+            ->toArray();
 
-        $inputsByType = $existingInputs
-            ? collect($existingInputs)->groupBy('input_type')
+        [$this->sections, $this->sectionItems] = $this->buildSectionGroup(
+            $itemTypeIds,
+            $itemTypeMap,
+            $existingInputs,
+            'input_type'
+        );
+
+        [$this->sideSections, $this->sideSectionItems] = $this->buildSectionGroup(
+            $sideItemTypeIds,
+            $itemTypeMap,
+            $existingSideProducts,
+            'item_type_id'
+        );
+    }
+
+    // ─── Shared builder for both ingredient and side product sections ────────
+    protected function buildSectionGroup(array $itemTypeIds, $itemTypeMap, $existingRecords, string $groupField): array
+    {
+        $sections     = [];
+        $sectionItems = [];
+
+        $recordsByType = $existingRecords
+            ? collect($existingRecords)->groupBy($groupField)
             : collect();
 
         foreach ($itemTypeIds as $typeId) {
@@ -129,18 +158,18 @@ class RecipeCreate extends Component
             $title    = $typeInfo['name'] ?? "Item Type {$typeId}";
             $items    = $this->api->get('/v1/items', ['item_type' => $title, 'is_active' => true])['data'] ?? [];
 
-            $existingRows = $inputsByType->get($typeId, collect());
+            $existingRows = $recordsByType->get($typeId, collect());
             $rows         = [];
             $rowUnits     = [];
 
-            foreach ($existingRows as $input) {
-                $itemId     = is_object($input) ? $input->item_id : $input['item_id'];
+            foreach ($existingRows as $record) {
+                $itemId     = is_object($record) ? $record->item_id : $record['item_id'];
                 $rows[]     = [
-                    'id'           => is_object($input) ? $input->id : ($input['id'] ?? null),
+                    'id'           => is_object($record) ? $record->id : ($record['id'] ?? null),
                     'item_id'      => $itemId,
-                    'item_unit_id' => is_object($input) ? $input->item_unit_id : $input['item_unit_id'],
-                    'quantity'     => is_object($input) ? $input->quantity : $input['quantity'],
-                    'notes'        => is_object($input) ? $input->notes : ($input['notes'] ?? null),
+                    'item_unit_id' => is_object($record) ? $record->item_unit_id : $record['item_unit_id'],
+                    'quantity'     => is_object($record) ? $record->quantity : $record['quantity'],
+                    'notes'        => is_object($record) ? $record->notes : ($record['notes'] ?? null),
                 ];
                 $rowUnits[] = $itemId ? $this->fetchUnitsForItem((int) $itemId) : [];
             }
@@ -150,14 +179,16 @@ class RecipeCreate extends Component
                 $rowUnits[] = [];
             }
 
-            $this->sections[]     = [
+            $sections[]     = [
                 'item_type_id' => $typeId,
                 'title'        => $title,
                 'rows'         => $rows,
                 'rowUnits'     => $rowUnits,
             ];
-            $this->sectionItems[] = $items;
+            $sectionItems[] = $items;
         }
+
+        return [$sections, $sectionItems];
     }
 
     protected function fetchUnitsForItem(int $itemId): array
@@ -178,12 +209,16 @@ class RecipeCreate extends Component
         $this->headerUnits         = [];
         $this->sections            = [];
         $this->sectionItems        = [];
+        $this->sideSections        = [];
+        $this->sideSectionItems    = [];
 
         if ($value) {
             $this->buildSections($value);
 
             $this->dispatch('setSectionsItems', $this->sectionItems);
         }
+
+        $this->dispatch('output-item-types-changed', itemTypes: $this->itemTypes);
     }
 
     public function updatedOutputItemTypeId($value): void
@@ -264,6 +299,50 @@ class RecipeCreate extends Component
         }
     }
 
+    // ─── Row management (side product sections) ──────────────────────────────
+    public function addRowToSideSection(int $sectionIndex): void
+    {
+        $this->sideSections[$sectionIndex]['rows'][]     = ['id' => null, 'item_id' => null, 'item_unit_id' => null, 'quantity' => '', 'notes' => null];
+        $this->sideSections[$sectionIndex]['rowUnits'][] = [];
+    }
+
+    public function removeRowFromSideSection(int $sectionIndex, int $rowIndex): void
+    {
+        if (count($this->sideSections[$sectionIndex]['rows']) <= 1) {
+            $this->dispatch('swal:error', ['title' => 'Warning', 'text' => 'At least one item is required!']);
+            return;
+        }
+
+        unset(
+            $this->sideSections[$sectionIndex]['rows'][$rowIndex],
+            $this->sideSections[$sectionIndex]['rowUnits'][$rowIndex]
+        );
+
+        $this->sideSections[$sectionIndex]['rows']     = array_values($this->sideSections[$sectionIndex]['rows']);
+        $this->sideSections[$sectionIndex]['rowUnits'] = array_values($this->sideSections[$sectionIndex]['rowUnits']);
+
+        $this->dispatch('side-section-rows-removed',
+            sectionIndex: $sectionIndex,
+            rows: array_map(fn($r) => $r['item_id'], $this->sideSections[$sectionIndex]['rows'])
+        );
+    }
+
+    // ─── JS-callable: side section item changed → load units ─────────────────
+    public function onSideSectionItemChanged(int $sectionIndex, int $rowIndex, ?int $itemId): void
+    {
+        $this->sideSections[$sectionIndex]['rows'][$rowIndex]['item_id']      = $itemId;
+        $this->sideSections[$sectionIndex]['rows'][$rowIndex]['item_unit_id'] = null;
+
+        if ($itemId) {
+            $units = $this->fetchUnitsForItem($itemId);
+            $this->sideSections[$sectionIndex]['rowUnits'][$rowIndex] = $units;
+            $basic = collect($units)->firstWhere('basic', true);
+            $this->sideSections[$sectionIndex]['rows'][$rowIndex]['item_unit_id'] = $basic['id'] ?? ($units[0]['id'] ?? null);
+        } else {
+            $this->sideSections[$sectionIndex]['rowUnits'][$rowIndex] = [];
+        }
+    }
+
     // ─── Submit ───────────────────────────────────────────────────────────────
     public function submit(): void
     {
@@ -285,6 +364,13 @@ class RecipeCreate extends Component
             $rules["sections.{$sIdx}.rows.*.item_id"]      = 'required|integer';
             $rules["sections.{$sIdx}.rows.*.item_unit_id"] = 'required|integer';
             $rules["sections.{$sIdx}.rows.*.quantity"]     = 'required|numeric|min:0.0001';
+        }
+
+        foreach ($this->sideSections as $sIdx => $section) {
+            $rules["sideSections.{$sIdx}.rows"]                 = 'required|array|min:1';
+            $rules["sideSections.{$sIdx}.rows.*.item_id"]      = 'required|integer';
+            $rules["sideSections.{$sIdx}.rows.*.item_unit_id"] = 'required|integer';
+            $rules["sideSections.{$sIdx}.rows.*.quantity"]     = 'required|numeric|min:0.0001';
         }
 
         $this->validate($rules, [
@@ -350,6 +436,35 @@ class RecipeCreate extends Component
                 $recipe->inputs()->whereNotIn('id', $syncedIds)->delete();
             }
 
+            $syncedSideIds = [];
+
+            foreach ($this->sideSections as $sIdx => $section) {
+                foreach ($section['rows'] as $rIdx => $row) {
+                    $unit = collect($this->sideSections[$sIdx]['rowUnits'][$rIdx] ?? [])->firstWhere('id', (int) $row['item_unit_id']);
+                    abort_if(!$unit, 422, "Invalid unit for {$section['title']} row " . ($rIdx + 1));
+
+                    $data = [
+                        'item_type_id' => $section['item_type_id'],
+                        'item_id'      => (int) $row['item_id'],
+                        'item_unit_id' => (int) $row['item_unit_id'],
+                        'quantity'     => (float) $row['quantity'],
+                        'notes'        => $row['notes'] ?? null,
+                    ];
+
+                    if (!empty($row['id'])) {
+                        $sideProduct = RecipeSideProduct::findOrFail($row['id']);
+                        $sideProduct->update($data);
+                    } else {
+                        $sideProduct = $recipe->sideProducts()->create($data);
+                    }
+                    $syncedSideIds[] = $sideProduct->id;
+                }
+            }
+
+            if ($this->editing) {
+                $recipe->sideProducts()->whereNotIn('id', $syncedSideIds)->delete();
+            }
+
             DB::commit();
 
             redirect()->route('recipes')->with(
@@ -373,6 +488,8 @@ class RecipeCreate extends Component
             'headerUnits'         => $this->headerUnits,
             'sections'            => $this->sections,
             'sectionItems'        => $this->sectionItems,
+            'sideSections'        => $this->sideSections,
+            'sideSectionItems'    => $this->sideSectionItems,
         ]);
     }
 }

@@ -19,6 +19,8 @@
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Item Types</th>
+                                    <th>Side Product Item Types</th>
+                                    <th>Output Item Types</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -35,7 +37,23 @@
                                         @endphp
                                         {{ $names ?: '—' }}
                                     </td>
-                                  
+                                    <td>
+                                        @php
+                                            $sideNames = collect((array) $type->side_item_type_ids)
+                                                ->map(fn($id) => $itemTypesMap[$id] ?? "ID:$id")
+                                                ->implode(', ');
+                                        @endphp
+                                        {{ $sideNames ?: '—' }}
+                                    </td>
+                                    <td>
+                                        @php
+                                            $outputNames = collect((array) $type->output_item_type_ids)
+                                                ->map(fn($id) => $itemTypesMap[$id] ?? "ID:$id")
+                                                ->implode(', ');
+                                        @endphp
+                                        {{ $outputNames ?: '—' }}
+                                    </td>
+
                                     <td>
                                         @hasPermission('production.recipeType-view')
                                         <a href="{{ route('recipe-types.view', $type->id) }}"

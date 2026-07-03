@@ -3,6 +3,7 @@
 namespace App\Livewire\EventTypes;
 
 use App\Models\EventType;
+use App\Services\ApiService;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -15,10 +16,22 @@ class EventTypeIndex extends Component
     public bool $has_recipe = false;
     public $duration = null;
     public string $color = '#818cf8';
+    public $item_type_ids = [];
+    public $itemTypes = [];
+    public $itemTypesMap = [];
+
+    protected ApiService $api;
+
+    public function boot(ApiService $api): void
+    {
+        $this->api = $api;
+    }
 
     public function mount()
     {
         authorizeRequest('production.eventType-list');
+        $this->itemTypes = $this->api->get('/v1/item-types')['data'] ?? [];
+        $this->itemTypesMap = collect($this->itemTypes)->keyBy('id')->map(fn($t) => $t['name'])->toArray();
         $this->loadEventTypes();
     }
 
@@ -34,6 +47,7 @@ class EventTypeIndex extends Component
         $this->has_recipe = false;
         $this->duration = null;
         $this->color = '#818cf8';
+        $this->item_type_ids = [];
         $this->editing = false;
         $this->resetValidation();
     }
@@ -56,6 +70,7 @@ class EventTypeIndex extends Component
         $this->has_recipe = (bool) $eventType->has_recipe;
         $this->duration = $eventType->duration;
         $this->color = $eventType->color ?? '#818cf8';
+        $this->item_type_ids = $eventType->item_type_ids ?? [];
         $this->editing = true;
 
         $this->dispatch('openModal');
@@ -75,11 +90,14 @@ class EventTypeIndex extends Component
             'has_recipe' => 'boolean',
             'duration' => 'required_if:has_recipe,false|nullable|integer|min:1',
             'color' => 'required|string|max:7',
+            'item_type_ids' => 'nullable|array',
         ];
     }
 
     public function submit()
     {
+        \Log::info('EventTypeIndex::submit incoming', ['item_type_ids' => $this->item_type_ids, 'type' => gettype($this->item_type_ids)]);
+
         $this->validate();
 
         $data = [
@@ -87,14 +105,20 @@ class EventTypeIndex extends Component
             'has_recipe' => $this->has_recipe,
             'duration' => $this->has_recipe ? null : $this->duration,
             'color' => $this->color,
+            'item_type_ids' => array_map('intval', $this->item_type_ids ?? []),
         ];
+
+        \Log::info('EventTypeIndex::submit data payload', $data);
 
         if ($this->editing) {
             authorizeRequest('production.eventType-edit');
-            EventType::findOrFail($this->event_type_id)->update($data);
+            $et = EventType::findOrFail($this->event_type_id);
+            $et->update($data);
+            \Log::info('EventTypeIndex::submit after update', ['id' => $et->id, 'fresh_item_type_ids' => $et->fresh()->item_type_ids]);
         } else {
             authorizeRequest('production.eventType-create');
-            EventType::create($data);
+            $et = EventType::create($data);
+            \Log::info('EventTypeIndex::submit after create', ['id' => $et->id, 'fresh_item_type_ids' => $et->fresh()->item_type_ids]);
         }
 
         return redirect()->route('event-types')

@@ -72,14 +72,12 @@ class EventCreate extends Component
         $this->events[] = $this->buildRowFromEvent($event);
 
         $hasRecipe = (bool) ($event->eventType?->has_recipe);
-        if ($hasRecipe) {
-            $this->loadCascadeOptionsForRow(0, $event);
+        $this->loadCascadeOptionsForRow(0, $event);
 
-            // Not placed on a line yet — show a live estimate instead of
-            // the persisted (still-null) calculated_duration.
-            if (!$event->placeable_type) {
-                $this->recalculateDuration(0);
-            }
+        // Not placed on a line yet — show a live estimate instead of
+        // the persisted (still-null) calculated_duration.
+        if ($hasRecipe && !$event->placeable_type) {
+            $this->recalculateDuration(0);
         }
 
         $this->resetValidation();
@@ -113,7 +111,13 @@ class EventCreate extends Component
 
     private function loadCascadeOptionsForRow(int $index, Event $event): void
     {
-        $this->itemTypesByRow[$index] = $this->api->get('/v1/item-types')['data'] ?? [];
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
+
+        $this->itemTypesByRow[$index] = $this->allowedItemTypesFor($event->eventType);
+
+        if (!$hasRecipe) {
+            return;
+        }
 
         if ($event->item_type_id) {
             $this->itemsByRow[$index] = $this->fetchItemsForType((int) $event->item_type_id);
@@ -122,6 +126,24 @@ class EventCreate extends Component
         if ($event->item_id) {
             $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->item_id);
         }
+    }
+
+    // ─── Item types assigned to an event type, filtering the full external
+    //     item-types list; falls back to the unfiltered list if the event
+    //     type has none assigned (e.g. legacy event types). ─────────────────
+    private function allowedItemTypesFor(?EventType $eventType): array
+    {
+        $itemTypes  = $this->api->get('/v1/item-types')['data'] ?? [];
+        $allowedIds = $eventType?->item_type_ids ?? [];
+
+        if (empty($allowedIds)) {
+            return $itemTypes;
+        }
+
+        return collect($itemTypes)
+            ->filter(fn($type) => in_array($type['id'], $allowedIds))
+            ->values()
+            ->toArray();
     }
 
     public function addEventRow(): void
@@ -211,13 +233,9 @@ class EventCreate extends Component
 
         unset($this->itemsByRow[$index], $this->recipesByRow[$index]);
 
-        if ($hasRecipe) {
-            $this->events[$index]['duration'] = null;
-            $this->itemTypesByRow[$index]     = $this->api->get('/v1/item-types')['data'] ?? [];
-        } else {
-            $this->events[$index]['duration'] = $eventType?->duration;
-            unset($this->itemTypesByRow[$index]);
-        }
+        $this->itemTypesByRow[$index] = $this->allowedItemTypesFor($eventType);
+
+        $this->events[$index]['duration'] = $hasRecipe ? null : $eventType?->duration;
     }
 
     public function onItemTypeChanged(int $index, $itemTypeId): void
@@ -388,7 +406,7 @@ class EventCreate extends Component
                     'event_type_id'  => $event['event_type_id'],
                     'name'           => $typeNames[$event['event_type_id']] ?? '',
                     'description'    => $event['description'] ?: null,
-                    'item_type_id'   => $hasRecipe ? $event['item_type_id'] : null,
+                    'item_type_id'   => $event['item_type_id'] ?: null,
                     'item_id'        => $hasRecipe ? $event['item_id'] : null,
                     'recipe_type_id' => $hasRecipe ? $event['recipe_type_id'] : null,
                     'recipe_id'      => $hasRecipe ? $event['recipe_id'] : null,

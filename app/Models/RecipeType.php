@@ -14,6 +14,8 @@ class RecipeType extends Model
 
     protected $casts = [
         'item_type_ids' => 'array',
+        'side_item_type_ids' => 'array',
+        'output_item_type_ids' => 'array',
     ];
 
     public function recipes()
