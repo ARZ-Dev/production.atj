@@ -12,16 +12,26 @@ use App\Services\ApiService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PlanBoard extends Component
 {
+    public const EVENT_STATUS_LABELS = [
+        'in_progress' => 'In Progress',
+        'paused'      => 'Paused',
+        'terminated'  => 'Terminated',
+    ];
+
     public Plan $plan;
     public $productionLines = [];
     public $unplacedEvents = [];
     public ?string $factoryName = null;
     public ?array $selectedEvent = null;
+
+    #[Url(except: 'board')]
+    public string $view = 'board';
 
     protected Collection $allEvents;
 
@@ -37,6 +47,17 @@ class PlanBoard extends Component
     public function mount($id): void
     {
         $this->loadPlan($id);
+
+        if (!in_array($this->view, ['board', 'list'], true)) {
+            $this->view = 'board';
+        }
+    }
+
+    public function updatedView($value): void
+    {
+        if (!in_array($value, ['board', 'list'], true)) {
+            $this->view = 'board';
+        }
     }
 
     protected function loadPlan(int $id): void
@@ -85,12 +106,15 @@ class PlanBoard extends Component
             return;
         }
 
-        return redirect()->route('plans.view', $targetPlan->id);
+        return redirect()->route('plans.view', array_filter([
+            'id'   => $targetPlan->id,
+            'view' => $this->view !== 'board' ? $this->view : null,
+        ]));
     }
 
     protected function loadEvents(): void
     {
-        $events = Event::with('eventType')
+        $events = Event::with('eventType', 'recipe', 'productionLine', 'placeable')
             ->where('plan_id', $this->plan->id)
             ->orderBy('from_time')
             ->get();
@@ -124,7 +148,7 @@ class PlanBoard extends Component
             return collect();
         }
 
-        return Event::with('eventType')
+        return Event::with('eventType', 'recipe', 'productionLine', 'placeable')
             ->where('plan_id', $prevPlan->id)
             ->whereNotNull('placeable_id')
             ->whereNotNull('from_time')
@@ -141,6 +165,19 @@ class PlanBoard extends Component
         return $direction === 'prev'
             ? $query->whereDate('date', '<', $this->plan->date)->orderByDesc('date')->first()
             : $query->whereDate('date', '>', $this->plan->date)->orderBy('date')->first();
+    }
+
+    // ─── List view ────────────────────────────────────────────────────────────
+
+    /**
+     * Every event on this board (placed, unplaced and carry-over) in
+     * chronological order, for the list view.
+     */
+    public function listRows(): Collection
+    {
+        return $this->allEvents
+            ->sortBy(fn(Event $e) => [$e->is_carry_over ? 0 : 1, $this->eventFromHour($e)])
+            ->values();
     }
 
     // ─── Calendar layout ──────────────────────────────────────────────────────
@@ -321,6 +358,42 @@ class PlanBoard extends Component
         $event->save();
     }
 
+    // ─── Event lifecycle ──────────────────────────────────────────────────────
+
+    public function updateEventStatus(int $eventId, string $action): void
+    {
+        authorizeRequest('production.event-create');
+
+        $transitions = [
+            'start'     => ['from' => [null], 'to' => 'in_progress'],
+            'pause'     => ['from' => ['in_progress'], 'to' => 'paused'],
+            'resume'    => ['from' => ['paused'], 'to' => 'in_progress'],
+            'terminate' => ['from' => ['in_progress', 'paused'], 'to' => 'terminated'],
+        ];
+
+        if (!isset($transitions[$action])) {
+            return;
+        }
+
+        $event = Event::where('plan_id', $this->plan->id)->findOrFail($eventId);
+
+        $current = $event->status ?: null;
+
+        if (!in_array($current, $transitions[$action]['from'], true)) {
+            $label = $current ? (self::EVENT_STATUS_LABELS[$current] ?? $current) : 'Planned';
+
+            $this->dispatch('swal:error', [
+                'title' => 'Action not allowed',
+                'text'  => "You can't {$action} an event while it is \"{$label}\".",
+            ]);
+
+            return;
+        }
+
+        $event->status = $transitions[$action]['to'];
+        $event->save();
+    }
+
     public function showEventDetails(int $eventId): void
     {
         // Carry-over cards belong to the previous day's plan, so allow that
@@ -370,7 +443,9 @@ class PlanBoard extends Component
             'placeable_kind'       => $event->placeable_type === Preparation::class ? 'Preparation' : ($event->placeable_type === Line::class ? 'Line' : null),
             'placeable_name'       => $placeableName,
             'description'          => $event->description,
-            'status'               => $event->status,
+            'status'               => $event->status
+                ? (self::EVENT_STATUS_LABELS[$event->status] ?? ucfirst($event->status))
+                : 'Planned',
         ];
 
         $this->dispatch('openEventModal');
