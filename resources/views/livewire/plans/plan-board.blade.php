@@ -32,7 +32,19 @@
                 @endif
             </div>
         </div>
-        <div class="d-flex gap-2 flex-shrink-0">
+        <div class="d-flex gap-2 flex-shrink-0 align-items-start">
+            @if($plan->factory_id)
+            <div class="btn-group btn-group-sm" role="group" aria-label="Switch view">
+                <button type="button" class="btn {{ $view === 'board' ? 'btn-primary' : 'btn-light' }}"
+                    wire:click="$set('view', 'board')" title="Timeline board view">
+                    <i class="bi bi-kanban me-1"></i> Board
+                </button>
+                <button type="button" class="btn {{ $view === 'list' ? 'btn-primary' : 'btn-light' }}"
+                    wire:click="$set('view', 'list')" title="List view">
+                    <i class="bi bi-list-ul me-1"></i> List
+                </button>
+            </div>
+            @endif
             @hasPermission('production.event-create')
             <button type="button" id="addEventBtn" class="btn btn-primary btn-sm">
                 <i class="bi bi-plus-circle me-1"></i> Add Event
@@ -54,6 +66,10 @@
         <i class="bi bi-exclamation-triangle me-2"></i>
         This plan has no factory assigned. Edit the plan to assign a factory before placing events on a line.
     </div>
+    @elseif($view === 'list')
+
+    @include('livewire.plans.partials._event-list', ['rows' => $this->listRows()])
+
     @else
 
     <div class="pbc-wrap">
