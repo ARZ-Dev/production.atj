@@ -107,7 +107,8 @@ class PreparationIndex extends Component
             'department_id'         => $deptId,
         ])['data'] ?? [];
         return collect($all)
-            ->filter(fn($wh) => !empty($wh['type']['is_internal']))
+            ->filter(fn($wh) => !empty($wh['type']['is_internal'])
+                && (int) ($wh['department_id'] ?? $wh['department']['id'] ?? null) === $deptId)
             ->values()
             ->toArray();
     }
