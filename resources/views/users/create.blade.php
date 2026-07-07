@@ -103,37 +103,35 @@
                             @enderror
                         </div>
 
-                        {{-- Departments --}}
+                        {{-- Department --}}
                         <div class="col-md-6">
-                            <label for="department_ids" class="form-label">Departments</label>
-                            <select class="selectpicker w-100 @error('department_ids') is-invalid @enderror"
-                                    name="department_ids[]"
-                                    id="department_ids"
-                                    title="Select Departments"
+                            <label for="department_id" class="form-label">Department</label>
+                            <select class="selectpicker w-100 @error('department_id') is-invalid @enderror"
+                                    name="department_id"
+                                    id="department_id"
+                                    title="Select Department"
                                     data-style="btn-default"
                                     data-live-search="true"
                                     data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                    multiple>
+                                    data-size="5">
                                 @foreach($departments as $department)
                                     <option value="{{ $department['id'] }}"
-                                        @selected(in_array($department['id'], $user['department_ids'] ?? old('department_ids', [])))>
+                                        @selected(old('department_id', $user['department_id'] ?? null) == $department['id'])>
                                         {{ $department['name'] }}
                                     </option>
                                 @endforeach
                             </select>
-                            @error('department_ids')
+                            @error('department_id')
                             <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
 
                         {{-- Warehouses --}}
                         <div class="col-md-6">
-                            <label for="warehouse_ids" class="form-label">Warehouses</label>
-                            <select class="selectpicker w-100 @error('warehouse_ids') is-invalid @enderror"
-                                    name="warehouse_ids[]"
-                                    id="warehouse_ids"
+                            <label for="warehouses_ids" class="form-label">Warehouses</label>
+                            <select class="selectpicker w-100 @error('warehouses_ids') is-invalid @enderror"
+                                    name="warehouses_ids[]"
+                                    id="warehouses_ids"
                                     title="Select Warehouses"
                                     data-style="btn-default"
                                     data-live-search="true"
@@ -143,12 +141,12 @@
                                     multiple>
                                 @foreach($warehouses ?? [] as $warehouse)
                                     <option value="{{ $warehouse['id'] }}"
-                                        @selected(in_array($warehouse['id'], $user['warehouse_ids'] ?? old('warehouse_ids', [])))>
+                                        @selected(in_array($warehouse['id'], $user['warehouses_ids'] ?? old('warehouses_ids', [])))>
                                         {{ $warehouse['name'] }}
                                     </option>
                                 @endforeach
                             </select>
-                            @error('warehouse_ids')
+                            @error('warehouses_ids')
                             <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -220,6 +218,100 @@
                             @enderror
                         </div>
 
+                        {{-- Shift Manager --}}
+                        <div class="col-12">
+                            <hr>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       name="is_shift_manager"
+                                       id="is_shift_manager"
+                                       value="1"
+                                       @checked(old('is_shift_manager', $userInfo->is_shift_manager ?? false))>
+                                <label class="form-check-label" for="is_shift_manager">Is Shift Manager?</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12" id="shift_manager_fields" style="display: none;">
+                            <div class="row g-3">
+                                {{-- Shift --}}
+                                <div class="col-md-4">
+                                    <label for="shift_id" class="form-label">
+                                        Shift <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="selectpicker w-100 @error('shift_id') is-invalid @enderror"
+                                            name="shift_id"
+                                            id="shift_id"
+                                            title="Select Shift"
+                                            data-style="btn-default"
+                                            data-live-search="true"
+                                            data-icon-base="ti"
+                                            data-size="5">
+                                        @foreach($shifts as $shift)
+                                            <option value="{{ $shift->id }}"
+                                                @selected(old('shift_id', $userInfo->shift_id ?? null) == $shift->id)>
+                                                {{ $shift->name }} ({{ \Carbon\Carbon::parse($shift->from_time)->format('h:i A') }} - {{ \Carbon\Carbon::parse($shift->to_time)->format('h:i A') }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('shift_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                {{-- Preparations --}}
+                                <div class="col-md-4">
+                                    <label for="preparation_ids" class="form-label">Preparations</label>
+                                    <select class="selectpicker w-100 @error('preparation_ids') is-invalid @enderror"
+                                            name="preparation_ids[]"
+                                            id="preparation_ids"
+                                            title="Select Preparations"
+                                            data-style="btn-default"
+                                            data-live-search="true"
+                                            data-icon-base="ti"
+                                            data-size="5"
+                                            data-tick-icon="ti-check text-white"
+                                            multiple>
+                                        @foreach($preparations ?? [] as $preparation)
+                                            <option value="{{ $preparation->id }}"
+                                                @selected(in_array($preparation->id, old('preparation_ids', $userInfo?->preparations->pluck('id')->all() ?? [])))>
+                                                {{ $preparation->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('preparation_ids')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                {{-- Lines --}}
+                                <div class="col-md-4">
+                                    <label for="line_ids" class="form-label">Lines</label>
+                                    <select class="selectpicker w-100 @error('line_ids') is-invalid @enderror"
+                                            name="line_ids[]"
+                                            id="line_ids"
+                                            title="Select Lines"
+                                            data-style="btn-default"
+                                            data-live-search="true"
+                                            data-icon-base="ti"
+                                            data-size="5"
+                                            data-tick-icon="ti-check text-white"
+                                            multiple>
+                                        @foreach($lines ?? [] as $line)
+                                            <option value="{{ $line->id }}"
+                                                @selected(in_array($line->id, old('line_ids', $userInfo?->lines->pluck('id')->all() ?? [])))>
+                                                {{ $line->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('line_ids')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+
                         {{-- Divider --}}
                         <div class="col-12">
                             <hr>
@@ -278,7 +370,7 @@
     const deptUsersBaseUrl  = '{{ url('/admin/users/departments') }}';
 
     function loadWarehouses(departmentId, selectedIds) {
-        $('#warehouse_ids').html('');
+        $('#warehouses_ids').html('');
         $('#item_type_ids').html('');
 
         if (!departmentId) return;
@@ -286,9 +378,9 @@
         $.get(`${warehousesBaseUrl}/${departmentId}/warehouses`, function (data) {
             data.forEach(function (w) {
                 const sel = selectedIds && selectedIds.includes(w.id) ? 'selected' : '';
-                $('#warehouse_ids').append(`<option value="${w.id}" ${sel}>${w.name}</option>`);
+                $('#warehouses_ids').append(`<option value="${w.id}" ${sel}>${w.name}</option>`);
             });
-            $('#warehouse_ids').selectpicker('refresh');
+            $('#warehouses_ids').selectpicker();
             if (selectedIds && selectedIds.length) {
                 loadItemTypes(selectedIds, @json($user['item_type_ids'] ?? []));
             }
@@ -314,7 +406,7 @@
                     }
                 });
                 pending--;
-                if (pending === 0) $itemTypes.selectpicker('refresh');
+                if (pending === 0) $itemTypes.selectpicker();
             });
         });
     }
@@ -330,31 +422,80 @@
                 const sel  = selectedIds && selectedIds.includes(u.id) ? 'selected' : '';
                 $('#supervisor_ids').append(`<option value="${u.id}" ${sel}>${name}</option>`);
             });
-            $('#supervisor_ids').selectpicker('refresh');
+            $('#supervisor_ids').selectpicker();
         });
+    }
+
+    function loadPreparations(departmentId, selectedIds) {
+        $('#preparation_ids').html('');
+
+        if (!departmentId) return;
+
+        $.get(`${deptUsersBaseUrl}/${departmentId}/preparations`, function (data) {
+            data.forEach(function (p) {
+                const sel = selectedIds && selectedIds.includes(p.id) ? 'selected' : '';
+                $('#preparation_ids').append(`<option value="${p.id}" ${sel}>${p.name}</option>`);
+            });
+            $('#preparation_ids').selectpicker();
+        });
+    }
+
+    function loadLines(departmentId, selectedIds) {
+        $('#line_ids').html('');
+
+        if (!departmentId) return;
+
+        $.get(`${deptUsersBaseUrl}/${departmentId}/lines`, function (data) {
+            data.forEach(function (l) {
+                const sel = selectedIds && selectedIds.includes(l.id) ? 'selected' : '';
+                $('#line_ids').append(`<option value="${l.id}" ${sel}>${l.name}</option>`);
+            });
+            $('#line_ids').selectpicker();
+        });
+    }
+
+    function toggleShiftManagerFields() {
+        if ($('#is_shift_manager').is(':checked')) {
+            $('#shift_manager_fields').show();
+            $('#shift_manager_fields .selectpicker').selectpicker();
+        } else {
+            $('#shift_manager_fields').hide();
+        }
     }
 
     $(document).ready(function () {
 
-        $(document).on('changed.bs.select', '#department_ids', function () {
-            const deptIds   = $(this).val() ?? [];
-            const firstDept = deptIds[0] ?? null;
-            loadWarehouses(firstDept, []);
-            loadSupervisors(firstDept, []);
+        $(document).on('changed.bs.select', '#department_id', function () {
+            const deptId = $(this).val() || null;
+            loadWarehouses(deptId, []);
+            loadSupervisors(deptId, []);
+            loadPreparations(deptId, []);
+            loadLines(deptId, []);
         });
 
-        $(document).on('changed.bs.select', '#warehouse_ids', function () {
+        $(document).on('changed.bs.select', '#warehouses_ids', function () {
             loadItemTypes($(this).val() ?? [], []);
         });
+
+        $(document).on('change', '#is_shift_manager', toggleShiftManagerFields);
+        toggleShiftManagerFields();
 
         @if($editing && !empty($user['department_ids']))
         loadWarehouses(
             {{ $user['department_ids'][0] }},
-            @json($user['warehouse_ids'] ?? [])
+            @json($user['warehouses_ids'] ?? [])
         );
         loadSupervisors(
             {{ $user['department_ids'][0] }},
             @json($user['supervisor_ids'] ?? [])
+        );
+        loadPreparations(
+            {{ $user['department_ids'][0] }},
+            @json($userInfo?->preparations->pluck('id')->all() ?? [])
+        );
+        loadLines(
+            {{ $user['department_ids'][0] }},
+            @json($userInfo?->lines->pluck('id')->all() ?? [])
         );
         @endif
     });

@@ -56,6 +56,8 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::get('/users/departments/{id}/warehouses', [\App\Http\Controllers\UserController::class, 'getWarehouses'])->name('users.warehouses');
     Route::get('/users/warehouses/{id}/item-types', [\App\Http\Controllers\UserController::class, 'getItemTypes'])->name('users.item-types');
     Route::get('/users/departments/{id}/users', [\App\Http\Controllers\UserController::class, 'getDepartmentUsers'])->name('users.department-users');
+    Route::get('/users/departments/{id}/preparations', [\App\Http\Controllers\UserController::class, 'getPreparations'])->name('users.department-preparations');
+    Route::get('/users/departments/{id}/lines', [\App\Http\Controllers\UserController::class, 'getLines'])->name('users.department-lines');
 
 
     // |--------------------------------------------------------------------------
