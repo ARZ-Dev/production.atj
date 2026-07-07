@@ -380,7 +380,7 @@
                 const sel = selectedIds && selectedIds.includes(w.id) ? 'selected' : '';
                 $('#warehouses_ids').append(`<option value="${w.id}" ${sel}>${w.name}</option>`);
             });
-            $('#warehouses_ids').selectpicker();
+            $('#warehouses_ids').selectpicker('refresh');
             if (selectedIds && selectedIds.length) {
                 loadItemTypes(selectedIds, @json($user['item_type_ids'] ?? []));
             }
@@ -406,7 +406,7 @@
                     }
                 });
                 pending--;
-                if (pending === 0) $itemTypes.selectpicker();
+                if (pending === 0) $itemTypes.selectpicker('refresh');
             });
         });
     }
@@ -422,7 +422,7 @@
                 const sel  = selectedIds && selectedIds.includes(u.id) ? 'selected' : '';
                 $('#supervisor_ids').append(`<option value="${u.id}" ${sel}>${name}</option>`);
             });
-            $('#supervisor_ids').selectpicker();
+            $('#supervisor_ids').selectpicker('refresh');
         });
     }
 
@@ -436,7 +436,7 @@
                 const sel = selectedIds && selectedIds.includes(p.id) ? 'selected' : '';
                 $('#preparation_ids').append(`<option value="${p.id}" ${sel}>${p.name}</option>`);
             });
-            $('#preparation_ids').selectpicker();
+            $('#preparation_ids').selectpicker('refresh');
         });
     }
 
@@ -450,14 +450,14 @@
                 const sel = selectedIds && selectedIds.includes(l.id) ? 'selected' : '';
                 $('#line_ids').append(`<option value="${l.id}" ${sel}>${l.name}</option>`);
             });
-            $('#line_ids').selectpicker();
+            $('#line_ids').selectpicker('refresh');
         });
     }
 
     function toggleShiftManagerFields() {
         if ($('#is_shift_manager').is(':checked')) {
             $('#shift_manager_fields').show();
-            $('#shift_manager_fields .selectpicker').selectpicker();
+            $('#shift_manager_fields .selectpicker').selectpicker('refresh');
         } else {
             $('#shift_manager_fields').hide();
         }
@@ -465,7 +465,7 @@
 
     $(document).ready(function () {
 
-        $(document).on('changed.bs.select', '#department_id', function () {
+        $(document).on('change', '#department_id', function () {
             const deptId = $(this).val() || null;
             loadWarehouses(deptId, []);
             loadSupervisors(deptId, []);
