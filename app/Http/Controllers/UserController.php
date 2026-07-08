@@ -145,7 +145,7 @@ class UserController extends Controller
         $data['warehouses']  = [];
         $data['warehouses_ids']  = $data['user']['warehouses_ids'] ?? [];
         $data['itemTypes']   = [];
-        $data['supervisors'] = [];
+        $data['supervisors_ids'] = $data['user']['supervisors_ids'] ?? [];
         $data['preparations'] = [];
         $data['lines']        = [];
         $departmentId = $data['user']['department_id'] ?? null;

@@ -370,17 +370,21 @@
     const deptUsersBaseUrl  = '{{ url('/admin/users/departments') }}';
 
     function loadWarehouses(departmentId, selectedIds) {
-        $('#warehouses_ids').html('');
-        $('#item_type_ids').html('');
-
-        if (!departmentId) return;
+        if (!departmentId) {
+            $('#warehouses_ids').empty().selectpicker('refresh');
+            $('#item_type_ids').empty().selectpicker('refresh');
+            return;
+        }
 
         $.get(`${warehousesBaseUrl}/${departmentId}/warehouses`, function (data) {
-            data.forEach(function (w) {
+            const options = data.map(function (w) {
                 const sel = selectedIds && selectedIds.includes(w.id) ? 'selected' : '';
-                $('#warehouses_ids').append(`<option value="${w.id}" ${sel}>${w.name}</option>`);
-            });
-            $('#warehouses_ids').selectpicker('refresh');
+                return `<option value="${w.id}" ${sel}>${w.name}</option>`;
+            }).join('');
+
+            $('#warehouses_ids').empty().append(options).selectpicker('destroy')
+                .selectpicker();
+
             if (selectedIds && selectedIds.length) {
                 loadItemTypes(selectedIds, @json($user['item_type_ids'] ?? []));
             }
@@ -389,12 +393,13 @@
 
     function loadItemTypes(warehouseIds, selectedIds) {
         const $itemTypes = $('#item_type_ids');
-        $itemTypes.html('');
+        $itemTypes.empty().selectpicker('refresh');
 
         if (!warehouseIds || !warehouseIds.length) return;
 
         const seen = {};
         let pending = warehouseIds.length;
+        let options = '';
 
         warehouseIds.forEach(function (wId) {
             $.get(`${itemTypesBaseUrl}/${wId}/item-types`, function (data) {
@@ -402,62 +407,70 @@
                     if (!seen[t.id]) {
                         seen[t.id] = true;
                         const sel = selectedIds && selectedIds.includes(t.id) ? 'selected' : '';
-                        $itemTypes.append(`<option value="${t.id}" ${sel}>${t.name}</option>`);
+                        options += `<option value="${t.id}" ${sel}>${t.name}</option>`;
                     }
                 });
                 pending--;
-                if (pending === 0) $itemTypes.selectpicker('refresh');
+                if (pending === 0) {
+                    $itemTypes.empty().append(options).selectpicker('destroy').selectpicker();
+                }
             });
         });
     }
 
     function loadSupervisors(departmentId, selectedIds) {
-        $('#supervisor_ids').html('');
-
-        if (!departmentId) return;
+        if (!departmentId) {
+            $('#supervisor_ids').empty().selectpicker('refresh');
+            return;
+        }
 
         $.get(`${deptUsersBaseUrl}/${departmentId}/users`, function (data) {
-            data.forEach(function (u) {
+            const options = data.map(function (u) {
                 const name = u.name ?? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
                 const sel  = selectedIds && selectedIds.includes(u.id) ? 'selected' : '';
-                $('#supervisor_ids').append(`<option value="${u.id}" ${sel}>${name}</option>`);
-            });
-            $('#supervisor_ids').selectpicker('refresh');
+                return `<option value="${u.id}" ${sel}>${name}</option>`;
+            }).join('');
+
+            $('#supervisor_ids').empty().append(options).selectpicker('destroy').selectpicker();
         });
     }
 
     function loadPreparations(departmentId, selectedIds) {
-        $('#preparation_ids').html('');
-
-        if (!departmentId) return;
+        if (!departmentId) {
+            $('#preparation_ids').empty().selectpicker('refresh');
+            return;
+        }
 
         $.get(`${deptUsersBaseUrl}/${departmentId}/preparations`, function (data) {
-            data.forEach(function (p) {
+            const options = data.map(function (p) {
                 const sel = selectedIds && selectedIds.includes(p.id) ? 'selected' : '';
-                $('#preparation_ids').append(`<option value="${p.id}" ${sel}>${p.name}</option>`);
-            });
-            $('#preparation_ids').selectpicker('refresh');
+                return `<option value="${p.id}" ${sel}>${p.name}</option>`;
+            }).join('');
+
+            $('#preparation_ids').empty().append(options).selectpicker('destroy').selectpicker();
         });
     }
 
     function loadLines(departmentId, selectedIds) {
-        $('#line_ids').html('');
-
-        if (!departmentId) return;
+        if (!departmentId) {
+            $('#line_ids').empty().selectpicker('refresh');
+            return;
+        }
 
         $.get(`${deptUsersBaseUrl}/${departmentId}/lines`, function (data) {
-            data.forEach(function (l) {
+            const options = data.map(function (l) {
                 const sel = selectedIds && selectedIds.includes(l.id) ? 'selected' : '';
-                $('#line_ids').append(`<option value="${l.id}" ${sel}>${l.name}</option>`);
-            });
-            $('#line_ids').selectpicker('refresh');
+                return `<option value="${l.id}" ${sel}>${l.name}</option>`;
+            }).join('');
+
+            $('#line_ids').empty().append(options).selectpicker('destroy').selectpicker();
         });
     }
 
     function toggleShiftManagerFields() {
         if ($('#is_shift_manager').is(':checked')) {
             $('#shift_manager_fields').show();
-            $('#shift_manager_fields .selectpicker').selectpicker('refresh');
+            //$('#shift_manager_fields .selectpicker').selectpicker('refresh');
         } else {
             $('#shift_manager_fields').hide();
         }
