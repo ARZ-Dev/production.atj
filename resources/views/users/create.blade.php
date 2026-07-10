@@ -493,24 +493,6 @@
         $(document).on('change', '#is_shift_manager', toggleShiftManagerFields);
         toggleShiftManagerFields();
 
-        @if($editing && !empty($user['department_ids']))
-        loadWarehouses(
-            {{ $user['department_ids'][0] }},
-            @json($user['warehouses_ids'] ?? [])
-        );
-        loadSupervisors(
-            {{ $user['department_ids'][0] }},
-            @json($user['supervisor_ids'] ?? [])
-        );
-        loadPreparations(
-            {{ $user['department_ids'][0] }},
-            @json($userInfo?->preparations->pluck('id')->all() ?? [])
-        );
-        loadLines(
-            {{ $user['department_ids'][0] }},
-            @json($userInfo?->lines->pluck('id')->all() ?? [])
-        );
-        @endif
     });
 </script>
 @endpush
