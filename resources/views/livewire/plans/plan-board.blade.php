@@ -313,10 +313,10 @@
             return isFinite(v) && v > 0 ? v : 46;
         };
 
-        const showRejectedToast = (message) => {
+        const showToast = (message, variant = 'danger', delay = 4000) => {
             const host = document.getElementById('pbToastHost');
             const toastEl = document.createElement('div');
-            toastEl.className = 'toast align-items-center text-bg-danger border-0';
+            toastEl.className = `toast align-items-center text-bg-${variant} border-0`;
             toastEl.setAttribute('role', 'alert');
             toastEl.innerHTML = `
                 <div class="d-flex">
@@ -324,12 +324,13 @@
                     <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
                 </div>`;
             host.appendChild(toastEl);
-            const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+            const toast = new bootstrap.Toast(toastEl, { delay });
             toast.show();
             toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
         };
 
-        $wire.on('dropRejected', ({ message }) => showRejectedToast(message));
+        $wire.on('dropRejected', ({ message }) => showToast(message));
+        $wire.on('carryOverPlanCreated', ({ message }) => showToast(message, 'success', 6000));
 
         const initCalendarDrag = () => {
             document.querySelectorAll('.pbc-card[draggable="true"]').forEach(card => {

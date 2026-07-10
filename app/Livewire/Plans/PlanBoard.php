@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Preparation;
 use App\Models\ProductionLine;
 use App\Services\ApiService;
+use App\Services\PlanCarryOverService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -37,11 +38,13 @@ class PlanBoard extends Component
 
     protected ApiService $api;
     protected RecipeDurationService $durationService;
+    protected PlanCarryOverService $carryOverService;
 
-    public function boot(ApiService $api, RecipeDurationService $durationService): void
+    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService): void
     {
-        $this->api             = $api;
-        $this->durationService = $durationService;
+        $this->api              = $api;
+        $this->durationService  = $durationService;
+        $this->carryOverService = $carryOverService;
     }
 
     public function mount($id): void
@@ -345,6 +348,36 @@ class PlanBoard extends Component
             : null;
 
         $event->save();
+
+        $this->ensureCarryOverPlan($event);
+    }
+
+    /**
+     * When a placed event runs past midnight, its tail renders on the next
+     * day's board — so that plan (and, on a month boundary, its month plan)
+     * is created automatically for the same factory if it doesn't exist yet.
+     */
+    protected function ensureCarryOverPlan(Event $event): void
+    {
+        if (!$this->carryOverService->crossesMidnight($event->from_time, $event->to_time)) {
+            return;
+        }
+
+        $nextPlan = $this->carryOverService->ensureNextDayPlan($this->plan);
+
+        if (!$nextPlan?->wasRecentlyCreated) {
+            return;
+        }
+
+        $date    = Carbon::parse($nextPlan->date)->format('d F Y');
+        $message = "This event runs past midnight — a plan for {$date} was created automatically.";
+
+        if ($nextPlan->monthPlan?->wasRecentlyCreated) {
+            $message = "This event runs past midnight — the monthly plan for " . $nextPlan->monthPlan->period_label
+                . " and a plan for {$date} were created automatically.";
+        }
+
+        $this->dispatch('carryOverPlanCreated', message: $message);
     }
 
     public function unplaceEvent(int $eventId): void

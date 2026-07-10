@@ -7,6 +7,7 @@ use App\Models\EventType;
 use App\Models\Plan;
 use App\Models\Recipe;
 use App\Services\ApiService;
+use App\Services\PlanCarryOverService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
@@ -28,11 +29,13 @@ class EventCreate extends Component
 
     protected ApiService $api;
     protected RecipeDurationService $durationService;
+    protected PlanCarryOverService $carryOverService;
 
-    public function boot(ApiService $api, RecipeDurationService $durationService): void
+    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService): void
     {
-        $this->api             = $api;
-        $this->durationService = $durationService;
+        $this->api              = $api;
+        $this->durationService  = $durationService;
+        $this->carryOverService = $carryOverService;
     }
 
     public function mount($planId): void
@@ -136,9 +139,9 @@ class EventCreate extends Component
         $itemTypes  = $this->api->get('/v1/item-types')['data'] ?? [];
         $allowedIds = $eventType?->item_type_ids ?? [];
 
-        if (empty($allowedIds)) {
-            return $itemTypes;
-        }
+//        if (empty($allowedIds)) {
+//            return $itemTypes;
+//        }
 
         return collect($itemTypes)
             ->filter(fn($type) => in_array($type['id'], $allowedIds))
@@ -389,14 +392,16 @@ class EventCreate extends Component
             array_filter(array_column($this->events, 'event_type_id'))
         )->pluck('name', 'id');
 
+        \DB::beginTransaction();
         try {
-            \DB::beginTransaction();
 
             if (!empty($this->removedEventIds)) {
                 Event::whereIn('id', $this->removedEventIds)
                     ->where('plan_id', $this->planId)
                     ->delete();
             }
+
+            $carryOverPlan = null;
 
             foreach ($this->events as $event) {
                 $hasRecipe = !empty($event['event_type_has_recipe']);
@@ -422,10 +427,29 @@ class EventCreate extends Component
                     // dragging them onto the plan board calendar.
                     Event::create($data);
                 }
+
+                // A duration change can push a placed event past midnight —
+                // the spill-over then needs the next day's plan (and, on a
+                // month boundary, its month plan) to exist.
+                if ($this->carryOverService->crossesMidnight($event['from_time_raw'] ?? null, $data['to_time'])) {
+                    $carryOverPlan ??= $this->carryOverService->ensureNextDayPlan($this->plan);
+                }
             }
 
             \DB::commit();
             $this->removedEventIds = [];
+
+            if ($carryOverPlan?->wasRecentlyCreated) {
+                session()->flash(
+                    'success',
+                    'An event runs past midnight — a plan for '
+                    . Carbon::parse($carryOverPlan->date)->format('d F Y')
+                    . ($carryOverPlan->monthPlan?->wasRecentlyCreated
+                        ? ' (and the monthly plan for ' . $carryOverPlan->monthPlan->period_label . ')'
+                        : '')
+                    . ' was created automatically.'
+                );
+            }
 
             // Full page reload so the plan board re-renders with the saved event(s).
             $this->redirect(route('plans.view', $this->planId));

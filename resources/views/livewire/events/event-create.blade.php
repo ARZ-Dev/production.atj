@@ -153,6 +153,12 @@
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
+
+                    <div class="col-6 col-md-3">
+                        <div class="ec-field-label">Duration</div>
+                        <input type="text" class="form-control form-control-sm" disabled
+                               value="{{ $event['duration'] ? $event['duration'] . ' min' : '—' }}">
+                    </div>
                 </div>
                 @endif
 
