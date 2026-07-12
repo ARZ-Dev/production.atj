@@ -47,7 +47,7 @@
 
                         $isCarryOver = (bool) ($event->is_carry_over ?? false);
                         $continuesNextDay = !$isCarryOver && $event->placeable_id && $event->from_time && $event->to_time
-                            && \Carbon\Carbon::parse($event->to_time)->lte(\Carbon\Carbon::parse($event->from_time));
+                            && \Carbon\Carbon::parse($event->to_time)->gt(\Carbon\Carbon::parse($event->from_time)->startOfDay()->addDay());
 
                         $statusKey = $event->status ?: '';
                         $status    = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'badge' => 'bg-secondary'];
@@ -58,9 +58,9 @@
                         <td style="white-space: nowrap;">
                             <span class="fw-semibold">{{ $event->from_time ? \Carbon\Carbon::parse($event->from_time)->format('H:i') : '—' }}</span>{{ $event->to_time ? ' – ' . \Carbon\Carbon::parse($event->to_time)->format('H:i') : '' }}
                             @if($isCarryOver)
-                            <div class="text-muted" style="font-size: 11px;"><i class="bi bi-arrow-bar-right"></i> started previous day</div>
+                            <div class="text-muted" style="font-size: 11px;"><i class="bi bi-arrow-bar-right"></i> started {{ \Carbon\Carbon::parse($event->from_time)->format('d M') }}</div>
                             @elseif($continuesNextDay)
-                            <div class="text-muted" style="font-size: 11px;">ends next day <i class="bi bi-arrow-bar-right"></i></div>
+                            <div class="text-muted" style="font-size: 11px;">ends {{ \Carbon\Carbon::parse($event->to_time)->format('d M') }} <i class="bi bi-arrow-bar-right"></i></div>
                             @endif
                         </td>
                         <td>

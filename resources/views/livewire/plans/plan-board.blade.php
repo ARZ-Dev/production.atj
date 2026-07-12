@@ -182,7 +182,7 @@
                             <div>
                                 {{ $selectedEvent['from_time'] ?? '—' }}{{ $selectedEvent['to_time'] ? ' – '.$selectedEvent['to_time'] : '' }}
                                 @if($selectedEvent['crosses_midnight'] && $selectedEvent['to_time'])
-                                <span class="text-muted" style="font-size:11px;">(next day)</span>
+                                <span class="text-muted" style="font-size:11px;">(+{{ $selectedEvent['to_day_offset'] }} day{{ $selectedEvent['to_day_offset'] > 1 ? 's' : '' }})</span>
                                 @endif
                             </div>
                         </div>

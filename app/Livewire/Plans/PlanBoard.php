@@ -128,35 +128,26 @@ class PlanBoard extends Component
     }
 
     /**
-     * The same factory's plan for the calendar day right before this one,
-     * if it exists.
-     */
-    protected function prevDayPlan(): ?Plan
-    {
-        return Plan::where('factory_id', $this->plan->factory_id)
-            ->whereDate('date', Carbon::parse($this->plan->date)->subDay())
-            ->first();
-    }
-
-    /**
-     * Placed events from the previous day's plan that cross midnight
-     * (to_time wrapped past 24:00, so it reads earlier than from_time) —
-     * they spill into this board and are shown from 00:00 up to their end.
+     * Placed events from earlier days (same factory) still running when
+     * this board's day starts — they spill into this board from 00:00 up
+     * to their end (or the whole day, for events spanning several days).
      */
     protected function carryOverEvents(): Collection
     {
-        $prevPlan = $this->prevDayPlan();
-
-        if (!$prevPlan) {
+        if (!$this->plan->factory_id) {
             return collect();
         }
 
+        $dayStart = Carbon::parse($this->plan->date)->startOfDay();
+
         return Event::with('eventType', 'recipe', 'productionLine', 'placeable')
-            ->where('plan_id', $prevPlan->id)
+            ->where('plan_id', '!=', $this->plan->id)
             ->whereNotNull('placeable_id')
             ->whereNotNull('from_time')
             ->whereNotNull('to_time')
-            ->whereColumn('to_time', '<=', 'from_time')
+            ->where('from_time', '<', $dayStart)
+            ->where('to_time', '>', $dayStart)
+            ->whereHas('plan', fn($q) => $q->where('factory_id', $this->plan->factory_id))
             ->get()
             ->each(fn(Event $e) => $e->setAttribute('is_carry_over', true));
     }
@@ -256,46 +247,35 @@ class PlanBoard extends Component
 
     protected function eventFromHour(Event $event): float
     {
-        // Started on the previous day — on this board it runs from midnight.
-        if ($event->is_carry_over) {
-            return 0.0;
-        }
-
         if (!$event->from_time) {
             return 0.0;
         }
 
-        return $this->timeToMinutes($event->from_time) / 60;
+        $dayStart = Carbon::parse($this->plan->date)->startOfDay()->getTimestamp();
+        $from     = Carbon::parse($event->from_time)->getTimestamp();
+
+        // Clamp into this board's 24h window — carry-overs start before it
+        // and render from midnight.
+        return max(0, min(($from - $dayStart) / 60, 24 * 60)) / 60;
     }
 
     protected function eventSpanHours(Event $event): float
     {
         if ($event->from_time && $event->to_time) {
-            $from = $this->timeToMinutes($event->from_time);
-            $to   = $this->timeToMinutes($event->to_time);
+            $dayStart = Carbon::parse($this->plan->date)->startOfDay()->getTimestamp();
+            $dayEnd   = $dayStart + 24 * 60 * 60;
 
-            // Carry-over from yesterday: only the 00:00 → to_time part is here.
-            if ($event->is_carry_over) {
-                return max($to, 15) / 60;
-            }
+            // Only the part inside this board's day is drawn; the rest
+            // renders on the neighbouring days' boards.
+            $from = max(Carbon::parse($event->from_time)->getTimestamp(), $dayStart);
+            $to   = min(Carbon::parse($event->to_time)->getTimestamp(), $dayEnd);
 
-            // Crosses midnight: clip at the end of the board; the remainder
-            // renders on the next day's plan as a carry-over.
-            $minutes = $to > $from ? $to - $from : 24 * 60 - $from;
-
-            return max($minutes, 15) / 60;
+            return max(($to - $from) / 60, 15) / 60;
         }
 
         $minutes = $event->calculated_duration ?: $event->planned_duration;
 
         return $minutes ? max((float) $minutes, 15) / 60 : 1.0;
-    }
-
-    protected function timeToMinutes(string $time): int
-    {
-        $t = Carbon::parse($time);
-
-        return $t->hour * 60 + $t->minute;
     }
 
     public function dropEvent(int $eventId, int $productionLineId, string $placeableAlias, int $placeableId, int $slot): void
@@ -321,8 +301,9 @@ class PlanBoard extends Component
         // The board is divided into 15-minute slots (96 per day); the drop
         // reports which slot the card landed on.
         $slot    = max(0, min(95, $slot));
-        $minutes = $slot * 15;
-        $newFrom = sprintf('%02d:%02d:00', intdiv($minutes, 60), $minutes % 60);
+        $newFrom = Carbon::parse($this->plan->date)->startOfDay()
+            ->addMinutes($slot * 15)
+            ->format('Y-m-d H:i:s');
 
         $laneChanged = (int) $event->production_line_id !== $productionLineId
             || $event->placeable_type !== $placeableClass
@@ -344,40 +325,21 @@ class PlanBoard extends Component
 
         $durationMinutes = $hasRecipe ? $event->calculated_duration : $event->planned_duration;
         $event->to_time   = $durationMinutes
-            ? Carbon::parse($newFrom)->addMinutes((int) $durationMinutes)->format('H:i:s')
+            ? Carbon::parse($newFrom)->addMinutes((int) $durationMinutes)->format('Y-m-d H:i:s')
             : null;
 
+        // Runs past midnight → link the event to the plan of the day it
+        // ends on, creating that plan (and month plan) when missing.
+        // Moved back before midnight → the link is cleared.
+        ['to_plan_id' => $toPlanId, 'created' => $createdPlans] =
+            $this->carryOverService->carryOverLink($this->plan, $event->from_time, $event->to_time);
+
+        $event->to_plan_id = $toPlanId;
         $event->save();
 
-        $this->ensureCarryOverPlan($event);
-    }
-
-    /**
-     * When a placed event runs past midnight, its tail renders on the next
-     * day's board — so that plan (and, on a month boundary, its month plan)
-     * is created automatically for the same factory if it doesn't exist yet.
-     */
-    protected function ensureCarryOverPlan(Event $event): void
-    {
-        if (!$this->carryOverService->crossesMidnight($event->from_time, $event->to_time)) {
-            return;
+        if ($message = $this->carryOverService->describeCreatedPlans($createdPlans)) {
+            $this->dispatch('carryOverPlanCreated', message: "This event runs past midnight — {$message}");
         }
-
-        $nextPlan = $this->carryOverService->ensureNextDayPlan($this->plan);
-
-        if (!$nextPlan?->wasRecentlyCreated) {
-            return;
-        }
-
-        $date    = Carbon::parse($nextPlan->date)->format('d F Y');
-        $message = "This event runs past midnight — a plan for {$date} was created automatically.";
-
-        if ($nextPlan->monthPlan?->wasRecentlyCreated) {
-            $message = "This event runs past midnight — the monthly plan for " . $nextPlan->monthPlan->period_label
-                . " and a plan for {$date} were created automatically.";
-        }
-
-        $this->dispatch('carryOverPlanCreated', message: $message);
     }
 
     public function unplaceEvent(int $eventId): void
@@ -388,6 +350,9 @@ class PlanBoard extends Component
         $event->placeable_type      = null;
         $event->placeable_id        = null;
         $event->calculated_duration = null;
+        $event->from_time           = null;
+        $event->to_time             = null;
+        $event->to_plan_id          = null;
         $event->save();
     }
 
@@ -429,12 +394,14 @@ class PlanBoard extends Component
 
     public function showEventDetails(int $eventId): void
     {
-        // Carry-over cards belong to the previous day's plan, so allow that
-        // plan's events here too (view only — see is_carry_over below).
-        $planIds = array_filter([$this->plan->id, $this->prevDayPlan()?->id]);
-
+        // Carry-over cards belong to earlier days' plans of the same
+        // factory, so allow those events here too (view only — see
+        // is_carry_over below).
         $event = Event::with(['eventType', 'recipe', 'recipeType', 'plan'])
-            ->whereIn('plan_id', $planIds)
+            ->where(function ($query) {
+                $query->where('plan_id', $this->plan->id)
+                    ->orWhereHas('plan', fn($q) => $q->where('factory_id', $this->plan->factory_id));
+            })
             ->findOrFail($eventId);
 
         $hasRecipe = (bool) ($event->eventType?->has_recipe);
@@ -454,8 +421,14 @@ class PlanBoard extends Component
         }
 
         $isCarryOver     = (int) $event->plan_id !== (int) $this->plan->id;
-        $crossesMidnight = $event->from_time && $event->to_time
-            && $this->timeToMinutes($event->to_time) <= $this->timeToMinutes($event->from_time);
+        $crossesMidnight = $this->carryOverService->crossesMidnight($event->from_time, $event->to_time);
+
+        // How many days after its start day the event ends (0 = same day),
+        // for the "+N day(s)" hint next to the end time.
+        $toDayOffset = $crossesMidnight
+            ? (int) Carbon::parse($event->from_time)->startOfDay()
+                ->diffInDays(Carbon::parse($event->to_time)->subSecond()->startOfDay())
+            : 0;
 
         $this->selectedEvent = [
             'id'                   => $event->id,
@@ -464,6 +437,7 @@ class PlanBoard extends Component
             'has_recipe'           => $hasRecipe,
             'is_carry_over'        => $isCarryOver,
             'crosses_midnight'     => $crossesMidnight,
+            'to_day_offset'        => $toDayOffset,
             'plan_date'            => Carbon::parse($event->plan->date)->format('d M Y'),
             'from_time'            => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : null,
             'to_time'              => $event->to_time ? Carbon::parse($event->to_time)->format('H:i') : null,
