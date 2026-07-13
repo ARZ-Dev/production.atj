@@ -22,6 +22,14 @@ class Event extends Model
         return $this->belongsTo(Plan::class);
     }
 
+    /**
+     * The plan of the day this event ends on, when it crosses midnight.
+     */
+    public function toPlan()
+    {
+        return $this->belongsTo(Plan::class, 'to_plan_id');
+    }
+
     public function recipe()
     {
         return $this->belongsTo(Recipe::class);

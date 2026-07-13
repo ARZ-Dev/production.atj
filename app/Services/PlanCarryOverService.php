@@ -5,13 +5,14 @@ namespace App\Services;
 use App\Models\MonthPlan;
 use App\Models\Plan;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 class PlanCarryOverService
 {
     /**
-     * An event whose to_time wrapped past 24:00 reads earlier than (or equal
-     * to) its from_time — the same convention the plan board uses to detect
-     * carry-over events.
+     * Whether the event runs strictly past the midnight of the day it
+     * starts on. An event ending exactly at 00:00 finishes with its day
+     * and doesn't spill over.
      */
     public function crossesMidnight(?string $fromTime, ?string $toTime): bool
     {
@@ -19,27 +20,65 @@ class PlanCarryOverService
             return false;
         }
 
-        return Carbon::parse($toTime)->format('H:i:s') <= Carbon::parse($fromTime)->format('H:i:s');
+        return Carbon::parse($toTime)->gt(Carbon::parse($fromTime)->startOfDay()->addDay());
     }
 
     /**
-     * An event crossing midnight spills onto the next calendar day, so that
-     * day needs a plan for the same factory for the carry-over to land on.
-     * When the next day starts a new month (or year), the month plan is
-     * created as well. Returns the next-day plan, or null when the source
-     * plan has no factory; check wasRecentlyCreated on the result (and its
-     * monthPlan relation) to know what was actually created.
+     * Resolve events.to_plan_id for the given times: the plan of the day
+     * the event ends on, creating plans — and month plans — for every
+     * extra day the event touches along the way.
+     *
+     * Returns ['to_plan_id' => ?int, 'created' => Collection<Plan>] where
+     * created holds only newly created plans, each with its monthPlan
+     * relation set so monthPlan->wasRecentlyCreated is inspectable.
      */
-    public function ensureNextDayPlan(Plan $plan): ?Plan
+    public function carryOverLink(Plan $plan, ?string $fromTime, ?string $toTime): array
     {
-        if (!$plan->factory_id) {
-            return null;
+        if (!$this->crossesMidnight($fromTime, $toTime)) {
+            return ['to_plan_id' => null, 'created' => collect()];
         }
 
-        $nextDate = Carbon::parse($plan->date)->addDay();
+        $dayPlans = $this->ensurePlansThrough($plan, $toTime);
 
-        $existing = Plan::where('factory_id', $plan->factory_id)
-            ->whereDate('date', $nextDate->format('Y-m-d'))
+        return [
+            'to_plan_id' => $dayPlans->last()?->id,
+            'created'    => $dayPlans->filter(fn (Plan $p) => $p->wasRecentlyCreated)->values(),
+        ];
+    }
+
+    /**
+     * Ensure a plan exists (same factory) for every calendar day after the
+     * event's own plan day, up to and including the day the event ends on.
+     * Usually that's just the next day; an event longer than 24h yields one
+     * plan per day it touches.
+     */
+    public function ensurePlansThrough(Plan $plan, string $toTime): Collection
+    {
+        if (!$plan->factory_id) {
+            return collect();
+        }
+
+        $end = Carbon::parse($toTime);
+
+        // Ending exactly at midnight occupies nothing on that calendar day.
+        if ($end->format('H:i:s') === '00:00:00') {
+            $end = $end->subDay();
+        }
+
+        $end   = $end->startOfDay();
+        $plans = collect();
+
+        for ($day = Carbon::parse($plan->date)->startOfDay()->addDay(); $day->lte($end); $day = $day->copy()->addDay()) {
+            $plans->push($this->ensurePlanFor($plan, $day));
+        }
+
+        return $plans;
+    }
+
+    protected function ensurePlanFor(Plan $source, Carbon $date): Plan
+    {
+        $existing = Plan::where('factory_id', $source->factory_id)
+            ->whereDate('date', $date->format('Y-m-d'))
             ->first();
 
         if ($existing) {
@@ -48,19 +87,50 @@ class PlanCarryOverService
 
         $monthPlan = MonthPlan::firstOrCreate(
             [
-                'factory_id' => $plan->factory_id,
-                'year'       => $nextDate->year,
-                'month'      => $nextDate->month,
+                'factory_id' => $source->factory_id,
+                'year'       => $date->year,
+                'month'      => $date->month,
             ],
-            ['factory_name' => $plan->monthPlan?->factory_name]
+            ['factory_name' => $source->monthPlan?->factory_name]
         );
 
-        $nextPlan = Plan::create([
-            'date'          => $nextDate->format('Y-m-d'),
-            'factory_id'    => $plan->factory_id,
+        $plan = Plan::create([
+            'date'          => $date->format('Y-m-d'),
+            'factory_id'    => $source->factory_id,
             'month_plan_id' => $monthPlan->id,
         ]);
 
-        return $nextPlan->setRelation('monthPlan', $monthPlan);
+        return $plan->setRelation('monthPlan', $monthPlan);
+    }
+
+    /**
+     * Human sentence for what was auto-created, e.g. "the monthly plan for
+     * August 2026 and a plan for 01 August 2026 were created automatically."
+     * Null when nothing was created.
+     */
+    public function describeCreatedPlans(Collection $createdPlans): ?string
+    {
+        $createdPlans = $createdPlans->unique('id')->values();
+
+        if ($createdPlans->isEmpty()) {
+            return null;
+        }
+
+        $dates    = $createdPlans->map(fn (Plan $p) => Carbon::parse($p->date)->format('d F Y'));
+        $planPart = ($dates->count() === 1 ? 'a plan for ' : 'plans for ') . $dates->join(', ', ' and ');
+
+        $months = $createdPlans
+            ->map(fn (Plan $p) => $p->monthPlan)
+            ->filter(fn (?MonthPlan $mp) => $mp && $mp->wasRecentlyCreated)
+            ->unique('id')
+            ->map(fn (MonthPlan $mp) => $mp->period_label);
+
+        if ($months->isEmpty()) {
+            return $planPart . ($dates->count() === 1 ? ' was' : ' were') . ' created automatically.';
+        }
+
+        return ($months->count() === 1 ? 'the monthly plan for ' : 'monthly plans for ')
+            . $months->join(', ', ' and ')
+            . " and {$planPart} were created automatically.";
     }
 }

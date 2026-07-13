@@ -26,4 +26,12 @@ class Plan extends Model
     {
         return $this->hasMany(Event::class);
     }
+
+    /**
+     * Events from earlier days that end on this plan's day.
+     */
+    public function carryOverEvents()
+    {
+        return $this->hasMany(Event::class, 'to_plan_id');
+    }
 }

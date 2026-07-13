@@ -105,11 +105,33 @@ class EventCreate extends Component
             'placeable_id'          => $event->placeable_id,
             'production_line_id'    => $event->production_line_id,
             'from_time_raw'         => $event->from_time,
-            'scheduled_label'       => $event->from_time
-                ? Carbon::parse($event->from_time)->format('H:i') . ($event->to_time ? ' – ' . Carbon::parse($event->to_time)->format('H:i') : '')
-                : null,
+            'scheduled_label'       => $this->scheduledLabel($event),
             'description'           => $event->description ?? '',
         ];
+    }
+
+    private function scheduledLabel(Event $event): ?string
+    {
+        if (!$event->from_time) {
+            return null;
+        }
+
+        $label = Carbon::parse($event->from_time)->format('H:i');
+
+        if ($event->to_time) {
+            $label .= ' – ' . Carbon::parse($event->to_time)->format('H:i');
+
+            // Ends on a later calendar day (an end at exactly 00:00 still
+            // belongs to the start day).
+            $plusDays = (int) Carbon::parse($event->from_time)->startOfDay()
+                ->diffInDays(Carbon::parse($event->to_time)->subSecond()->startOfDay());
+
+            if ($plusDays >= 1) {
+                $label .= " (+{$plusDays}d)";
+            }
+        }
+
+        return $label;
     }
 
     private function loadCascadeOptionsForRow(int $index, Event $event): void
@@ -371,7 +393,7 @@ class EventCreate extends Component
             }
 
             $toTime = ($event['from_time_raw'] && $duration)
-                ? Carbon::parse($event['from_time_raw'])->addMinutes((int) $duration)->format('H:i:s')
+                ? Carbon::parse($event['from_time_raw'])->addMinutes((int) $duration)->format('Y-m-d H:i:s')
                 : null;
         } else {
             $toTime = null;
@@ -401,7 +423,7 @@ class EventCreate extends Component
                     ->delete();
             }
 
-            $carryOverPlan = null;
+            $createdPlans = collect();
 
             foreach ($this->events as $event) {
                 $hasRecipe = !empty($event['event_type_has_recipe']);
@@ -418,6 +440,19 @@ class EventCreate extends Component
                     'batch_count'    => $hasRecipe ? $event['batch_count'] : null,
                 ] + $this->recomputePlacedDuration($event, $hasRecipe);
 
+                // A duration change can push a placed event past midnight
+                // (or pull it back): to_plan_id links it to the plan of the
+                // day it now ends on, creating that plan — and, on a month
+                // boundary, its month plan — when missing.
+                ['to_plan_id' => $toPlanId, 'created' => $created] = $this->carryOverService->carryOverLink(
+                    $this->plan,
+                    $event['from_time_raw'] ?? null,
+                    $data['to_time']
+                );
+
+                $data['to_plan_id'] = $toPlanId;
+                $createdPlans       = $createdPlans->merge($created);
+
                 if (!empty($event['id'])) {
                     Event::where('id', $event['id'])
                         ->where('plan_id', $this->planId)
@@ -427,28 +462,13 @@ class EventCreate extends Component
                     // dragging them onto the plan board calendar.
                     Event::create($data);
                 }
-
-                // A duration change can push a placed event past midnight —
-                // the spill-over then needs the next day's plan (and, on a
-                // month boundary, its month plan) to exist.
-                if ($this->carryOverService->crossesMidnight($event['from_time_raw'] ?? null, $data['to_time'])) {
-                    $carryOverPlan ??= $this->carryOverService->ensureNextDayPlan($this->plan);
-                }
             }
 
             \DB::commit();
             $this->removedEventIds = [];
 
-            if ($carryOverPlan?->wasRecentlyCreated) {
-                session()->flash(
-                    'success',
-                    'An event runs past midnight — a plan for '
-                    . Carbon::parse($carryOverPlan->date)->format('d F Y')
-                    . ($carryOverPlan->monthPlan?->wasRecentlyCreated
-                        ? ' (and the monthly plan for ' . $carryOverPlan->monthPlan->period_label . ')'
-                        : '')
-                    . ' was created automatically.'
-                );
+            if ($message = $this->carryOverService->describeCreatedPlans($createdPlans)) {
+                session()->flash('success', "An event runs past midnight — {$message}");
             }
 
             // Full page reload so the plan board re-renders with the saved event(s).

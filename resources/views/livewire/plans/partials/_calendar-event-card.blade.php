@@ -11,17 +11,17 @@
     }
 
     $isCarryOver = (bool) ($event->is_carry_over ?? false);
-    // Placed event whose to_time wrapped past midnight — it continues on the
-    // next day's board (carry-over cards are the tail end, not a continuation).
+    // Placed event running past midnight — it continues on a later day's
+    // board (carry-over cards are the tail end, not a continuation).
     $continuesNextDay = !$isCarryOver && $event->placeable_id && $event->from_time && $event->to_time
-        && \Carbon\Carbon::parse($event->to_time)->lte(\Carbon\Carbon::parse($event->from_time));
+        && \Carbon\Carbon::parse($event->to_time)->gt(\Carbon\Carbon::parse($event->from_time)->startOfDay()->addDay());
 
     $timeLabel = $event->from_time ? ' — ' . \Carbon\Carbon::parse($event->from_time)->format('H:i') : '';
     $timeLabel .= $event->to_time ? ' – ' . \Carbon\Carbon::parse($event->to_time)->format('H:i') : '';
     if ($isCarryOver) {
-        $timeLabel .= ' (started previous day)';
+        $timeLabel .= ' (started ' . \Carbon\Carbon::parse($event->from_time)->format('d M') . ')';
     } elseif ($continuesNextDay) {
-        $timeLabel .= ' (ends next day)';
+        $timeLabel .= ' (ends ' . \Carbon\Carbon::parse($event->to_time)->format('d M') . ')';
     }
 @endphp
 <div class="pbc-card {{ $isCarryOver ? 'pbc-card--carry' : '' }} {{ $continuesNextDay ? 'pbc-card--continues' : '' }}"
