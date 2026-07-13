@@ -151,55 +151,55 @@
                             @enderror
                         </div>
 
-                        {{-- Item Types --}}
-                        <div class="col-md-6">
-                            <label for="item_type_ids" class="form-label">Item Types</label>
-                            <select class="selectpicker w-100 @error('item_type_ids') is-invalid @enderror"
-                                    name="item_type_ids[]"
-                                    id="item_type_ids"
-                                    title="Select Item Types"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                    multiple>
-                                @foreach($itemTypes ?? [] as $itemType)
-                                    <option value="{{ $itemType['id'] }}"
-                                        @selected(in_array($itemType['id'], $user['item_type_ids'] ?? old('item_type_ids', [])))>
-                                        {{ $itemType['name'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('item_type_ids')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+{{--                        --}}{{-- Item Types --}}
+{{--                        <div class="col-md-6">--}}
+{{--                            <label for="item_type_ids" class="form-label">Item Types</label>--}}
+{{--                            <select class="selectpicker w-100 @error('item_type_ids') is-invalid @enderror"--}}
+{{--                                    name="item_type_ids[]"--}}
+{{--                                    id="item_type_ids"--}}
+{{--                                    title="Select Item Types"--}}
+{{--                                    data-style="btn-default"--}}
+{{--                                    data-live-search="true"--}}
+{{--                                    data-icon-base="ti"--}}
+{{--                                    data-size="5"--}}
+{{--                                    data-tick-icon="ti-check text-white"--}}
+{{--                                    multiple>--}}
+{{--                                @foreach($itemTypes ?? [] as $itemType)--}}
+{{--                                    <option value="{{ $itemType['id'] }}"--}}
+{{--                                        @selected(in_array($itemType['id'], $user['item_type_ids'] ?? old('item_type_ids', [])))>--}}
+{{--                                        {{ $itemType['name'] }}--}}
+{{--                                    </option>--}}
+{{--                                @endforeach--}}
+{{--                            </select>--}}
+{{--                            @error('item_type_ids')--}}
+{{--                            <div class="invalid-feedback">{{ $message }}</div>--}}
+{{--                            @enderror--}}
+{{--                        </div>--}}
 
-                        {{-- Supervisors --}}
-                        <div class="col-md-6">
-                            <label for="supervisor_ids" class="form-label">Supervisors</label>
-                            <select class="selectpicker w-100 @error('supervisor_ids') is-invalid @enderror"
-                                    name="supervisor_ids[]"
-                                    id="supervisor_ids"
-                                    title="Select Supervisors"
-                                    data-style="btn-default"
-                                    data-live-search="true"
-                                    data-icon-base="ti"
-                                    data-size="5"
-                                    data-tick-icon="ti-check text-white"
-                                    multiple>
-                                @foreach($supervisors ?? [] as $supervisor)
-                                    <option value="{{ $supervisor['id'] }}"
-                                        @selected(in_array($supervisor['id'], $user['supervisor_ids'] ?? old('supervisor_ids', [])))>
-                                        {{ $supervisor['name'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('supervisor_ids')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+{{--                        --}}{{-- Supervisors --}}
+{{--                        <div class="col-md-6">--}}
+{{--                            <label for="supervisor_ids" class="form-label">Supervisors</label>--}}
+{{--                            <select class="selectpicker w-100 @error('supervisor_ids') is-invalid @enderror"--}}
+{{--                                    name="supervisor_ids[]"--}}
+{{--                                    id="supervisor_ids"--}}
+{{--                                    title="Select Supervisors"--}}
+{{--                                    data-style="btn-default"--}}
+{{--                                    data-live-search="true"--}}
+{{--                                    data-icon-base="ti"--}}
+{{--                                    data-size="5"--}}
+{{--                                    data-tick-icon="ti-check text-white"--}}
+{{--                                    multiple>--}}
+{{--                                @foreach($supervisors ?? [] as $supervisor)--}}
+{{--                                    <option value="{{ $supervisor['id'] }}"--}}
+{{--                                        @selected(in_array($supervisor['id'], $user['supervisor_ids'] ?? old('supervisor_ids', [])))>--}}
+{{--                                        {{ $supervisor['name'] }}--}}
+{{--                                    </option>--}}
+{{--                                @endforeach--}}
+{{--                            </select>--}}
+{{--                            @error('supervisor_ids')--}}
+{{--                            <div class="invalid-feedback">{{ $message }}</div>--}}
+{{--                            @enderror--}}
+{{--                        </div>--}}
 
                         {{-- Phone --}}
                         <div class="col-md-6">

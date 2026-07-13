@@ -221,7 +221,8 @@ class RecipeCreate extends Component
         $this->dispatch('output-item-types-changed', itemTypes: $this->itemTypes);
     }
 
-    public function updatedOutputItemTypeId($value): void
+    #[On('getHeaderItems')]
+    public function getHeaderItems($value): void
     {
         $value = $value ? (int) $value : null;
         $this->output_item_type_id = $value;
