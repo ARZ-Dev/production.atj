@@ -236,7 +236,7 @@
                         <div class="col-12" id="shift_manager_fields" style="display: none;">
                             <div class="row g-3">
                                 {{-- Shift --}}
-                                <div class="col-md-4">
+                                <div class="col-lg-6 col-sm-12">
                                     <label for="shift_id" class="form-label">
                                         Shift <span class="text-danger">*</span>
                                     </label>
@@ -260,8 +260,33 @@
                                     @enderror
                                 </div>
 
+                                {{-- Production Lines --}}
+                                <div class="col-lg-6 col-sm-12">
+                                    <label for="production_line_ids" class="form-label">Production Lines</label>
+                                    <select class="selectpicker w-100 @error('production_line_ids') is-invalid @enderror"
+                                            name="production_line_ids[]"
+                                            id="production_line_ids"
+                                            title="Select Production Lines"
+                                            data-style="btn-default"
+                                            data-live-search="true"
+                                            data-icon-base="ti"
+                                            data-size="5"
+                                            data-tick-icon="ti-check text-white"
+                                            multiple>
+                                        @foreach($productionLines ?? [] as $productionLine)
+                                            <option value="{{ $productionLine->id }}"
+                                                @selected(in_array($productionLine->id, old('production_line_ids', $userInfo?->productionLines->pluck('id')->all() ?? [])))>
+                                                {{ $productionLine->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('production_line_ids')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
                                 {{-- Preparations --}}
-                                <div class="col-md-4">
+                                <div class="col-lg-6 col-sm-12">
                                     <label for="preparation_ids" class="form-label">Preparations</label>
                                     <select class="selectpicker w-100 @error('preparation_ids') is-invalid @enderror"
                                             name="preparation_ids[]"
@@ -286,7 +311,7 @@
                                 </div>
 
                                 {{-- Lines --}}
-                                <div class="col-md-4">
+                                <div class="col-lg-6 col-sm-12">
                                     <label for="line_ids" class="form-label">Lines</label>
                                     <select class="selectpicker w-100 @error('line_ids') is-invalid @enderror"
                                             name="line_ids[]"
@@ -365,9 +390,12 @@
 
 @push('scripts')
 <script>
-    const warehousesBaseUrl = '{{ url('/admin/users/departments') }}';
-    const itemTypesBaseUrl  = '{{ url('/admin/users/warehouses') }}';
-    const deptUsersBaseUrl  = '{{ url('/admin/users/departments') }}';
+    const warehousesBaseUrl  = '{{ url('/admin/users/departments') }}';
+    const itemTypesBaseUrl   = '{{ url('/admin/users/warehouses') }}';
+    const deptUsersBaseUrl   = '{{ url('/admin/users/departments') }}';
+    const productionLinesUrl = '{{ route('users.production-lines') }}';
+    const plPreparationsUrl  = '{{ route('users.production-line-preparations') }}';
+    const plLinesUrl         = '{{ route('users.production-line-lines') }}';
 
     function loadWarehouses(departmentId, selectedIds) {
         if (!departmentId) {
@@ -435,35 +463,67 @@
         });
     }
 
-    function loadPreparations(departmentId, selectedIds) {
-        if (!departmentId) {
-            $('#preparation_ids').empty().selectpicker('refresh');
+    function loadProductionLines(warehouseIds, selectedIds) {
+        const $productionLines = $('#production_line_ids');
+        const sel = (selectedIds ?? []).map(Number);
+
+        if (!warehouseIds || !warehouseIds.length) {
+            $productionLines.empty().selectpicker('refresh');
+            loadPreparations([], []);
+            loadLines([], []);
             return;
         }
 
-        $.get(`${deptUsersBaseUrl}/${departmentId}/preparations`, function (data) {
-            const options = data.map(function (p) {
-                const sel = selectedIds && selectedIds.includes(p.id) ? 'selected' : '';
-                return `<option value="${p.id}" ${sel}>${p.name}</option>`;
+        $.get(productionLinesUrl, { warehouse_ids: warehouseIds }, function (data) {
+            const options = data.map(function (pl) {
+                const s = sel.includes(pl.id) ? 'selected' : '';
+                return `<option value="${pl.id}" ${s}>${pl.name}</option>`;
             }).join('');
 
-            $('#preparation_ids').empty().append(options).selectpicker('destroy').selectpicker();
+            $productionLines.empty().append(options).selectpicker('destroy').selectpicker();
+
+            // Refresh dependents with the production lines that survived the reload
+            const remaining = $productionLines.val() ?? [];
+            loadPreparations(remaining, $('#preparation_ids').val() ?? []);
+            loadLines(remaining, $('#line_ids').val() ?? []);
         });
     }
 
-    function loadLines(departmentId, selectedIds) {
-        if (!departmentId) {
-            $('#line_ids').empty().selectpicker('refresh');
+    function loadPreparations(productionLineIds, selectedIds) {
+        const $preparations = $('#preparation_ids');
+        const sel = (selectedIds ?? []).map(Number);
+
+        if (!productionLineIds || !productionLineIds.length) {
+            $preparations.empty().selectpicker('refresh');
             return;
         }
 
-        $.get(`${deptUsersBaseUrl}/${departmentId}/lines`, function (data) {
-            const options = data.map(function (l) {
-                const sel = selectedIds && selectedIds.includes(l.id) ? 'selected' : '';
-                return `<option value="${l.id}" ${sel}>${l.name}</option>`;
+        $.get(plPreparationsUrl, { production_line_ids: productionLineIds }, function (data) {
+            const options = data.map(function (p) {
+                const s = sel.includes(p.id) ? 'selected' : '';
+                return `<option value="${p.id}" ${s}>${p.name}</option>`;
             }).join('');
 
-            $('#line_ids').empty().append(options).selectpicker('destroy').selectpicker();
+            $preparations.empty().append(options).selectpicker('destroy').selectpicker();
+        });
+    }
+
+    function loadLines(productionLineIds, selectedIds) {
+        const $lines = $('#line_ids');
+        const sel = (selectedIds ?? []).map(Number);
+
+        if (!productionLineIds || !productionLineIds.length) {
+            $lines.empty().selectpicker('refresh');
+            return;
+        }
+
+        $.get(plLinesUrl, { production_line_ids: productionLineIds }, function (data) {
+            const options = data.map(function (l) {
+                const s = sel.includes(l.id) ? 'selected' : '';
+                return `<option value="${l.id}" ${s}>${l.name}</option>`;
+            }).join('');
+
+            $lines.empty().append(options).selectpicker('destroy').selectpicker();
         });
     }
 
@@ -482,12 +542,19 @@
             const deptId = $(this).val() || null;
             loadWarehouses(deptId, []);
             loadSupervisors(deptId, []);
-            loadPreparations(deptId, []);
-            loadLines(deptId, []);
+            loadProductionLines([], []);
         });
 
         $(document).on('changed.bs.select', '#warehouses_ids', function () {
-            loadItemTypes($(this).val() ?? [], []);
+            const warehouseIds = $(this).val() ?? [];
+            loadItemTypes(warehouseIds, []);
+            loadProductionLines(warehouseIds, $('#production_line_ids').val() ?? []);
+        });
+
+        $(document).on('changed.bs.select', '#production_line_ids', function () {
+            const productionLineIds = $(this).val() ?? [];
+            loadPreparations(productionLineIds, $('#preparation_ids').val() ?? []);
+            loadLines(productionLineIds, $('#line_ids').val() ?? []);
         });
 
         $(document).on('change', '#is_shift_manager', toggleShiftManagerFields);
