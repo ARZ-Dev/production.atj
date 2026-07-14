@@ -489,6 +489,13 @@
             }
         });
 
+        $(document).on('change', '#output_item_type', function () {
+            let value = $(this).val();
+            if (value) {
+                $wire.dispatch('getHeaderItems', { value: parseInt(value)});
+            }
+        });
+
         // ── Header item change: fetch units from server ───────────────────────
         $(document).on('change', '#header_item', function () {
             $wire.dispatch('getHeaderUnits', { itemId: $(this).val() });

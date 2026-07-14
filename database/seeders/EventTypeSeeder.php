@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\EventType;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -12,15 +13,24 @@ class EventTypeSeeder extends Seeder
      */
     public function run(): void
     {
-        $eventTypes = [
-            ['name' => 'Preparation'],
-            ['name' => 'Production'],
-            ['name' => 'Maintenance'],
-            ['name' => 'Cleaning'],
-        ];
+        EventType::create([
+            'id' => 1,
+            'recipe_id' => null,
+            'name' => 'Cleaning',
+            'color' => '#818cf8',
+            'has_recipe' => 0,
+            'duration' => 40,
+            'item_type_ids' => [15],
+        ]);
 
-        foreach ($eventTypes as $eventType) {
-            \App\Models\EventType::create($eventType);
-        }
+        EventType::create([
+            'id' => 2,
+            'recipe_id' => null,
+            'name' => 'Preparation MT',
+            'color' => '#818cf8',
+            'has_recipe' => 1,
+            'duration' => null,
+            'item_type_ids' => [7],
+        ]);
     }
 }

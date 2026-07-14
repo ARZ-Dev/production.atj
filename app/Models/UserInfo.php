@@ -20,6 +20,11 @@ class UserInfo extends Model
         return $this->belongsTo(Shift::class);
     }
 
+    public function productionLines()
+    {
+        return $this->belongsToMany(ProductionLine::class);
+    }
+
     public function preparations()
     {
         return $this->belongsToMany(Preparation::class);

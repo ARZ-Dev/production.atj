@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Line;
 use App\Models\Preparation;
+use App\Models\ProductionLine;
 use App\Models\Shift;
 use App\Models\UserInfo;
 use App\Services\ApiService;
@@ -46,6 +47,7 @@ class UserController extends Controller
         // Shift manager assignments (local production DB)
         $data['shifts'] = Shift::orderBy('from_time')->get();
         $data['userInfo'] = null;
+        $data['productionLines'] = [];
         $data['preparations'] = [];
         $data['lines'] = [];
 
@@ -73,6 +75,8 @@ class UserController extends Controller
             'supervisor_ids.*'      => 'integer',
             'is_shift_manager'      => 'nullable|boolean',
             'shift_id'              => 'required_if:is_shift_manager,1|nullable|integer|exists:shifts,id',
+            'production_line_ids'   => 'nullable|array',
+            'production_line_ids.*' => 'integer|exists:production_lines,id',
             'preparation_ids'       => 'nullable|array',
             'preparation_ids.*'     => 'integer|exists:preparations,id',
             'line_ids'              => 'nullable|array',
@@ -139,13 +143,14 @@ class UserController extends Controller
 
         // Shift manager assignments (local production DB)
         $data['shifts'] = Shift::orderBy('from_time')->get();
-        $data['userInfo'] = UserInfo::with(['preparations', 'lines'])->where('user_id', $id)->first();
+        $data['userInfo'] = UserInfo::with(['productionLines', 'preparations', 'lines'])->where('user_id', $id)->first();
 
         // Pre-load warehouses and supervisors for existing department selection
         $data['warehouses']  = [];
         $data['warehouses_ids']  = $data['user']['warehouses_ids'] ?? [];
         $data['itemTypes']   = [];
         $data['supervisors_ids'] = $data['user']['supervisors_ids'] ?? [];
+        $data['productionLines'] = [];
         $data['preparations'] = [];
         $data['lines']        = [];
         $departmentId = $data['user']['department_id'] ?? null;
@@ -155,12 +160,24 @@ class UserController extends Controller
 
             $supervisorsResult  = $this->api->get("/v1/departments/{$departmentId}/users");
             $data['supervisors'] = $supervisorsResult['data'] ?? [];
-
-            $data['preparations'] = Preparation::where('department_id', $departmentId)->get();
-            $data['lines']        = Line::where('department_id', $departmentId)->get();
         }
+
+        // Pre-load production lines for the selected warehouses (factories)
+        $warehouseIds = array_map('intval', $data['user']['warehouses_ids'] ?? []);
+        if ($warehouseIds) {
+            $data['productionLines'] = ProductionLine::whereIn('factory_id', $warehouseIds)->get();
+        }
+
+        // Pre-load preparations and lines for the saved production lines
+        $productionLineIds = $data['userInfo']?->productionLines->pluck('id')->all() ?? [];
+        if ($productionLineIds) {
+            $data['preparations'] = Preparation::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get();
+            $data['lines'] = Line::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get();
+        }
+
         // Pre-load item types for all selected warehouses
-        $warehouseIds = $data['user']['warehouses_ids'] ?? [];
         $itemTypes = [];
         $seen = [];
         foreach ($warehouseIds as $wId) {
@@ -196,12 +213,14 @@ class UserController extends Controller
             'item_type_ids.*'   => 'integer',
             'supervisor_ids'    => 'nullable|array',
             'supervisor_ids.*'  => 'integer',
-            'is_shift_manager'  => 'nullable|boolean',
-            'shift_id'          => 'required_if:is_shift_manager,1|nullable|integer|exists:shifts,id',
-            'preparation_ids'   => 'nullable|array',
-            'preparation_ids.*' => 'integer|exists:preparations,id',
-            'line_ids'          => 'nullable|array',
-            'line_ids.*'        => 'integer|exists:lines,id',
+            'is_shift_manager'      => 'nullable|boolean',
+            'shift_id'              => 'required_if:is_shift_manager,1|nullable|integer|exists:shifts,id',
+            'production_line_ids'   => 'nullable|array',
+            'production_line_ids.*' => 'integer|exists:production_lines,id',
+            'preparation_ids'       => 'nullable|array',
+            'preparation_ids.*'     => 'integer|exists:preparations,id',
+            'line_ids'              => 'nullable|array',
+            'line_ids.*'            => 'integer|exists:lines,id',
         ];
 
         // Password optional on update
@@ -257,6 +276,7 @@ class UserController extends Controller
                 ]
             );
 
+            $userInfo->productionLines()->sync($request->input('production_line_ids', []));
             $userInfo->preparations()->sync($request->input('preparation_ids', []));
             $userInfo->lines()->sync($request->input('line_ids', []));
         } else {
@@ -292,22 +312,52 @@ class UserController extends Controller
     }
 
     /**
-     * Return preparations for a given department (AJAX, local DB).
+     * Return production lines for the given warehouses (AJAX, local DB).
      */
-    public function getPreparations(int $id): JsonResponse
+    public function getProductionLines(Request $request): JsonResponse
     {
+        $warehouseIds = array_filter((array) $request->input('warehouse_ids', []));
+
+        if (empty($warehouseIds)) {
+            return response()->json([]);
+        }
+
         return response()->json(
-            Preparation::where('department_id', $id)->get(['id', 'name'])
+            ProductionLine::whereIn('factory_id', $warehouseIds)->get(['id', 'name'])
         );
     }
 
     /**
-     * Return lines for a given department (AJAX, local DB).
+     * Return preparations for the given production lines (AJAX, local DB).
      */
-    public function getLines(int $id): JsonResponse
+    public function getPreparations(Request $request): JsonResponse
     {
+        $productionLineIds = array_filter((array) $request->input('production_line_ids', []));
+
+        if (empty($productionLineIds)) {
+            return response()->json([]);
+        }
+
         return response()->json(
-            Line::where('department_id', $id)->get(['id', 'name'])
+            Preparation::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get(['id', 'name'])
+        );
+    }
+
+    /**
+     * Return lines for the given production lines (AJAX, local DB).
+     */
+    public function getLines(Request $request): JsonResponse
+    {
+        $productionLineIds = array_filter((array) $request->input('production_line_ids', []));
+
+        if (empty($productionLineIds)) {
+            return response()->json([]);
+        }
+
+        return response()->json(
+            Line::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get(['id', 'name'])
         );
     }
 
