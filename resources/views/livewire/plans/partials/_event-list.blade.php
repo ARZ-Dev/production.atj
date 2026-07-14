@@ -116,6 +116,12 @@
                                 <i class="bi bi-stop-fill"></i> Terminate
                             </button>
                             @elseif($statusKey === 'paused')
+                            <button type="button" class="btn btn-light-primary btn-sm"
+                                wire:click.stop="openPauseActivities({{ $event->id }})"
+                                wire:loading.attr="disabled" wire:target="openPauseActivities"
+                                title="Record activities done during this pause (cleaning, maintenance, …)">
+                                <i class="bi bi-tools"></i> Activities
+                            </button>
                             <button type="button" class="btn btn-light-success btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'resume')"
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">

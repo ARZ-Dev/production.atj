@@ -16,10 +16,7 @@ return new class extends Migration {
             $table->string('action');                  // start | pause | resume | terminate
             $table->string('from_status')->nullable(); // null = planned
             $table->string('to_status');
-            // Pause/resume: what kind of stop it was (Cleaning, Maintenance, …)
-            $table->foreignId('pause_event_type_id')->nullable()->constrained('event_types')->nullOnDelete();
-            $table->integer('expected_duration')->nullable(); // minutes, from the pause event type
-            $table->integer('actual_duration')->nullable();   // minutes actually paused (set on resume)
+            $table->integer('actual_duration')->nullable(); // minutes actually paused (set on resume)
             $table->text('reason')->nullable();               // pause/resume reason
             $table->text('notes')->nullable();                // start/terminate notes
             // Snapshot of the acting user (users live in the external auth service)
