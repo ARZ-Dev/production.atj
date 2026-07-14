@@ -132,7 +132,7 @@ class RecipeCreate extends Component
             $itemTypeIds,
             $itemTypeMap,
             $existingInputs,
-            'input_type'
+            'item_type_id'
         );
 
         [$this->sideSections, $this->sideSectionItems] = $this->buildSectionGroup(
@@ -416,7 +416,7 @@ class RecipeCreate extends Component
                     abort_if(!$unit, 422, "Invalid unit for {$section['title']} row " . ($rIdx + 1));
 
                     $data = [
-                        'input_type'   => $section['item_type_id'],
+                        'item_type_id' => $section['item_type_id'],
                         'item_id'      => (int) $row['item_id'],
                         'item_unit_id' => (int) $row['item_unit_id'],
                         'quantity'     => (float) $row['quantity'],

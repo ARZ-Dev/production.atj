@@ -49,6 +49,10 @@
                         $continuesNextDay = !$isCarryOver && $event->placeable_id && $event->from_time && $event->to_time
                             && \Carbon\Carbon::parse($event->to_time)->gt(\Carbon\Carbon::parse($event->from_time)->startOfDay()->addDay());
 
+                        // Recipe events confirm terminate through the quantities
+                        // modal instead of a plain confirm dialog.
+                        $needsQtyModal = $hasRecipe && $event->recipe_id;
+
                         $statusKey = $event->status ?: '';
                         $status    = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'badge' => 'bg-secondary'];
                     @endphp
@@ -83,6 +87,12 @@
                         </td>
                         <td><span class="badge {{ $status['badge'] }}">{{ $status['label'] }}</span></td>
                         <td class="text-end" style="white-space: nowrap;">
+                            <button type="button" class="btn btn-light-secondary btn-sm"
+                                wire:click.stop="showEventHistory({{ $event->id }})"
+                                wire:loading.attr="disabled" wire:target="showEventHistory"
+                                title="Status history">
+                                <i class="bi bi-clock-history"></i>
+                            </button>
                             @if($isCarryOver)
                             <span class="text-muted" style="font-size: 11px;" title="Manage this event from the previous day's plan">—</span>
                             @else
@@ -101,7 +111,7 @@
                             </button>
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
-                                wire:confirm="Terminate this event? It cannot be resumed afterwards."
+                                @unless($needsQtyModal) wire:confirm="Terminate this event? It cannot be resumed afterwards." @endunless
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-stop-fill"></i> Terminate
                             </button>
@@ -113,7 +123,7 @@
                             </button>
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
-                                wire:confirm="Terminate this event? It cannot be resumed afterwards."
+                                @unless($needsQtyModal) wire:confirm="Terminate this event? It cannot be resumed afterwards." @endunless
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-stop-fill"></i> Terminate
                             </button>
