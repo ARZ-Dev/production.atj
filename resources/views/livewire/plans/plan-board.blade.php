@@ -274,6 +274,275 @@
     </div>
     @endhasPermission
 
+    @hasPermission('production.event-create')
+    <!-- Event Status Action Modal (start / pause / resume / terminate) -->
+    <div class="modal fade" id="eventActionModal" tabindex="-1" aria-labelledby="eventActionModalLabel" aria-hidden="true"
+        data-bs-backdrop="static" wire:ignore.self>
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                @if($eventAction)
+                @php
+                    $actionMeta = [
+                        'start'     => ['title' => 'Start Event',     'icon' => 'play-fill',  'btn' => 'btn-success'],
+                        'pause'     => ['title' => 'Pause Event',     'icon' => 'pause-fill', 'btn' => 'btn-warning'],
+                        'resume'    => ['title' => 'Resume Event',    'icon' => 'play-fill',  'btn' => 'btn-success'],
+                        'terminate' => ['title' => 'Terminate Event', 'icon' => 'stop-fill',  'btn' => 'btn-danger'],
+                    ][$eventAction['action']];
+                @endphp
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventActionModalLabel">
+                        <i class="bi bi-{{ $actionMeta['icon'] }} me-1"></i>
+                        {{ $actionMeta['title'] }} —
+                        <span class="d-inline-block rounded-circle mx-1" style="width:12px;height:12px;background-color: {{ $eventAction['color'] }}"></span>
+                        {{ $eventAction['type_name'] }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if($eventAction['action'] === 'start')
+
+                    <p class="text-muted mb-2" style="font-size: 12px;">
+                        Record the actual quantity used for each recipe item, then start the event.
+                    </p>
+                    @if(count($actionInputs))
+                    @include('livewire.plans.partials._action-quantity-table', [
+                        'rows'         => $actionInputs,
+                        'model'        => 'actionInputs',
+                        'actualLabel'  => 'Used Qty',
+                        'percentLabel' => '% Used',
+                    ])
+                    @else
+                    <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
+                        This recipe has no input items defined.
+                    </div>
+                    @endif
+                    <div class="mt-2">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" rows="3" wire:model="actionNotes"
+                            placeholder="Optional notes about the quantities used…"></textarea>
+                    </div>
+
+                    @elseif($eventAction['action'] === 'terminate')
+
+                    <div class="fw-bold mb-1" style="font-size: 13px;">
+                        <i class="bi bi-box-seam me-1 text-primary"></i> Produced Item
+                    </div>
+                    @include('livewire.plans.partials._action-quantity-table', [
+                        'rows'         => $actionOutputs,
+                        'model'        => 'actionOutputs',
+                        'actualLabel'  => 'Produced Qty',
+                        'percentLabel' => '% Produced',
+                    ])
+
+                    @if(count($actionSideProducts))
+                    <div class="fw-bold mb-1 mt-3" style="font-size: 13px;">
+                        <i class="bi bi-boxes me-1 text-primary"></i> Side Products
+                    </div>
+                    @include('livewire.plans.partials._action-quantity-table', [
+                        'rows'         => $actionSideProducts,
+                        'model'        => 'actionSideProducts',
+                        'actualLabel'  => 'Produced Qty',
+                        'percentLabel' => '% Produced',
+                    ])
+                    @endif
+
+                    <div class="mt-2">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" rows="3" wire:model="actionNotes"
+                            placeholder="Optional notes about the produced quantities…"></textarea>
+                    </div>
+
+                    @elseif($eventAction['action'] === 'pause')
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Pause Type <span class="text-danger">*</span></label>
+                            <select class="form-select @error('pauseEventTypeId') is-invalid @enderror"
+                                wire:model.live="pauseEventTypeId">
+                                <option value="">Select type…</option>
+                                @foreach($pauseEventTypes as $type)
+                                <option value="{{ $type['id'] }}">{{ $type['name'] }}</option>
+                                @endforeach
+                            </select>
+                            @error('pauseEventTypeId')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Expected Duration</label>
+                            @php $selectedPauseType = collect($pauseEventTypes)->firstWhere('id', (int) $pauseEventTypeId); @endphp
+                            <input type="text" class="form-control" disabled
+                                value="{{ $selectedPauseType && $selectedPauseType['duration'] ? $selectedPauseType['duration'] . ' min' : '—' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Reason</label>
+                            <textarea class="form-control" rows="3" wire:model="actionReason"
+                                placeholder="Why is this event being paused?"></textarea>
+                        </div>
+                    </div>
+
+                    @elseif($eventAction['action'] === 'resume')
+
+                    <div class="row g-3">
+                        @if($eventAction['paused_at'])
+                        <div class="col-md-6">
+                            <div class="pvc-body-label">Paused At</div>
+                            <div>{{ $eventAction['paused_at'] }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="pvc-body-label">Pause Type</div>
+                            <div>{{ $eventAction['pause_type_name'] ?? '—' }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="pvc-body-label">Expected Duration</div>
+                            <div>{{ $eventAction['expected_duration'] ? $eventAction['expected_duration'] . ' min' : '—' }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="pvc-body-label">Actual Duration (so far)</div>
+                            <div>
+                                {{ $eventAction['actual_duration'] !== null ? $eventAction['actual_duration'] . ' min' : '—' }}
+                                @if($eventAction['expected_duration'] && $eventAction['actual_duration'] > $eventAction['expected_duration'])
+                                <span class="badge bg-danger ms-1">over expected</span>
+                                @endif
+                            </div>
+                        </div>
+                        @if($eventAction['pause_reason'])
+                        <div class="col-12">
+                            <div class="pvc-body-label">Pause Reason</div>
+                            <div>{{ $eventAction['pause_reason'] }}</div>
+                        </div>
+                        @endif
+                        @else
+                        <div class="col-12">
+                            <div class="alert alert-info py-2 px-3 mb-0" style="font-size: 12px;">
+                                No pause record was found for this event.
+                            </div>
+                        </div>
+                        @endif
+                        <div class="col-12">
+                            <label class="form-label">Reason</label>
+                            <textarea class="form-control" rows="3" wire:model="actionReason"
+                                placeholder="Optional resume notes…"></textarea>
+                        </div>
+                    </div>
+
+                    @endif
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn {{ $actionMeta['btn'] }}" wire:click="submitEventAction"
+                        wire:loading.attr="disabled" wire:target="submitEventAction">
+                        <span wire:loading wire:target="submitEventAction" class="spinner-border spinner-border-sm me-1"></span>
+                        {{ $actionMeta['title'] }}
+                    </button>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endhasPermission
+
+    <!-- Event Status History Modal -->
+    <div class="modal fade" id="eventHistoryModal" tabindex="-1" aria-labelledby="eventHistoryModalLabel" aria-hidden="true" wire:ignore.self>
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventHistoryModalLabel">
+                        <i class="bi bi-clock-history text-primary me-2"></i>
+                        @if($eventHistory)
+                        Status History —
+                        <span class="d-inline-block rounded-circle mx-1" style="width:12px;height:12px;background-color: {{ $eventHistory['color'] }}"></span>
+                        {{ $eventHistory['type_name'] }}
+                        @else
+                        Status History
+                        @endif
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if($eventHistory)
+                    @if(empty($eventHistory['logs']))
+                    <div class="pb-empty-hint">No status changes have been recorded for this event yet.</div>
+                    @else
+                    @php
+                        $actionBadges = [
+                            'start'     => 'bg-success',
+                            'pause'     => 'bg-warning text-dark',
+                            'resume'    => 'bg-info text-dark',
+                            'terminate' => 'bg-danger',
+                        ];
+                        $sourceLabels = ['input' => 'Used', 'output' => 'Produced', 'side_product' => 'Side Product'];
+                    @endphp
+                    <div class="d-flex flex-column gap-3">
+                        @foreach($eventHistory['logs'] as $log)
+                        <div class="border rounded p-3">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge {{ $actionBadges[$log['action']] ?? 'bg-secondary' }}">{{ ucfirst($log['action']) }}</span>
+                                <span style="font-size: 12px;">{{ $log['from'] }} <i class="bi bi-arrow-right"></i> {{ $log['to'] }}</span>
+                                <span class="text-muted ms-auto" style="font-size: 12px;">
+                                    {{ $log['at'] }}{{ $log['by'] ? ' · ' . $log['by'] : '' }}
+                                </span>
+                            </div>
+                            @if($log['pause_type'] || $log['expected_duration'] || $log['actual_duration'] !== null)
+                            <div class="mt-2" style="font-size: 12px;">
+                                @if($log['pause_type'])
+                                <span class="me-3"><span class="text-muted">Type:</span> {{ $log['pause_type'] }}</span>
+                                @endif
+                                @if($log['expected_duration'])
+                                <span class="me-3"><span class="text-muted">Expected:</span> {{ $log['expected_duration'] }} min</span>
+                                @endif
+                                @if($log['actual_duration'] !== null)
+                                <span><span class="text-muted">Actual:</span> {{ $log['actual_duration'] }} min</span>
+                                @endif
+                            </div>
+                            @endif
+                            @if($log['reason'])
+                            <div class="mt-1" style="font-size: 12px;"><span class="text-muted">Reason:</span> {{ $log['reason'] }}</div>
+                            @endif
+                            @if($log['notes'])
+                            <div class="mt-1" style="font-size: 12px;"><span class="text-muted">Notes:</span> {{ $log['notes'] }}</div>
+                            @endif
+                            @if(count($log['quantities']))
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm mb-0" style="font-size: 12px;">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>Item</th>
+                                            <th>Unit</th>
+                                            <th class="text-end">Original</th>
+                                            <th class="text-end">Actual</th>
+                                            <th class="text-end">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($log['quantities'] as $qty)
+                                        <tr>
+                                            <td><span class="badge bg-light-primary">{{ $sourceLabels[$qty['source']] ?? $qty['source'] }}</span></td>
+                                            <td>{{ $qty['item_name'] }}</td>
+                                            <td>{{ $qty['unit_name'] ?? '—' }}</td>
+                                            <td class="text-end">{{ $qty['planned'] + 0 }}</td>
+                                            <td class="text-end">{{ $qty['actual'] + 0 }}</td>
+                                            <td class="text-end">{{ $qty['percentage'] !== null ? ($qty['percentage'] + 0) . '%' : '—' }}</td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @endif
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
+                    @endif
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="pbToastHost" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
 
     @script
@@ -282,6 +551,18 @@
         const eventDetailsModal = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
         $wire.on('openEventModal', () => eventDetailsModal.show());
         $wire.on('closeEventDetailsModal', () => eventDetailsModal.hide());
+
+        // Status action modal (start / pause / resume / terminate) — only in
+        // the DOM for users with the event-create permission.
+        const eventActionModalEl = document.getElementById('eventActionModal');
+        const eventActionModal = eventActionModalEl
+            ? bootstrap.Modal.getOrCreateInstance(eventActionModalEl)
+            : null;
+        $wire.on('openEventActionModal', () => eventActionModal?.show());
+        $wire.on('closeEventActionModal', () => eventActionModal?.hide());
+
+        const eventHistoryModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('eventHistoryModal'));
+        $wire.on('openEventHistoryModal', () => eventHistoryModal.show());
 
         const eventCreateModalEl = document.getElementById('eventCreateModal');
         const eventCreateModalTitleText = document.getElementById('eventCreateModalTitleText');

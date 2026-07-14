@@ -49,4 +49,14 @@ class Event extends Model
     {
         return $this->morphTo();
     }
+
+    public function statusLogs()
+    {
+        return $this->hasMany(EventStatusLog::class);
+    }
+
+    public function quantities()
+    {
+        return $this->hasMany(EventQuantity::class);
+    }
 }
