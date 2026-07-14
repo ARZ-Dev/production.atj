@@ -4,6 +4,7 @@ namespace App\Livewire\Plans;
 
 use App\Exports\PlanEventsExport;
 use App\Models\Event;
+use App\Models\EventPauseActivity;
 use App\Models\EventQuantity;
 use App\Models\EventStatusLog;
 use App\Models\EventType;
@@ -51,8 +52,8 @@ class PlanBoard extends Component
     public array $actionSideProducts = [];    // terminate: side product rows
     public ?string $actionNotes = null;       // start/terminate global notes
     public ?string $actionReason = null;      // pause/resume reason
-    public $pauseEventTypeId = null;          // pause: selected event type
-    public array $pauseEventTypes = [];       // pause: dropdown options
+    public array $pauseEventTypes = [];       // activities: dropdown options
+    public array $pauseActivityRows = [];     // activities: rows being added
 
     // ─── History modal state ──────────────────────────────────────────────────
     public ?array $eventHistory = null;
@@ -452,8 +453,8 @@ class PlanBoard extends Component
         $this->actionSideProducts = [];
         $this->actionNotes        = null;
         $this->actionReason       = null;
-        $this->pauseEventTypeId   = null;
         $this->pauseEventTypes    = [];
+        $this->pauseActivityRows  = [];
 
         $this->resetValidation();
     }
@@ -512,16 +513,6 @@ class PlanBoard extends Component
 
     protected function preparePauseModal(Event $event): void
     {
-        $this->pauseEventTypes = EventType::where('has_recipe', false)
-            ->orderBy('name')
-            ->get(['id', 'name', 'duration'])
-            ->map(fn(EventType $type) => [
-                'id'       => $type->id,
-                'name'     => $type->name,
-                'duration' => $type->duration,
-            ])
-            ->all();
-
         $this->eventAction = $this->baseActionPayload($event, 'pause');
     }
 
@@ -529,10 +520,18 @@ class PlanBoard extends Component
     {
         $pauseLog = $this->latestPauseLog($event->id);
 
+        // Activities of this pause; for pauses recorded before status logging
+        // existed (no pause log), fall back to all of the event's activities.
+        $activities = $pauseLog
+            ? $this->activitiesFor($pauseLog)
+            : $this->eventActivities($event->id);
+
+        $expectedTotal = collect($activities)->sum(fn($a) => (int) ($a['expected_duration'] ?? 0)) ?: null;
+
         $this->eventAction = array_merge($this->baseActionPayload($event, 'resume'), [
-            'pause_type_name'   => $pauseLog?->pauseEventType?->name,
+            'activities'        => $activities,
             'pause_reason'      => $pauseLog?->reason,
-            'expected_duration' => $pauseLog?->expected_duration,
+            'expected_duration' => $expectedTotal,
             'paused_at'         => $pauseLog ? $pauseLog->created_at->format('d M Y H:i') : null,
             'actual_duration'   => $pauseLog ? $this->minutesSince($pauseLog->created_at) : null,
         ]);
@@ -540,11 +539,50 @@ class PlanBoard extends Component
 
     protected function latestPauseLog(int $eventId): ?EventStatusLog
     {
-        return EventStatusLog::with('pauseEventType')
-            ->where('event_id', $eventId)
+        return EventStatusLog::where('event_id', $eventId)
             ->where('action', 'pause')
             ->latest('id')
             ->first();
+    }
+
+    /**
+     * Activities (Cleaning, Maintenance, …) recorded under a pause log.
+     */
+    protected function activitiesFor(?EventStatusLog $pauseLog): array
+    {
+        if (!$pauseLog) {
+            return [];
+        }
+
+        return $pauseLog->pauseActivities()
+            ->with('eventType')
+            ->orderBy('id')
+            ->get()
+            ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+            ->all();
+    }
+
+    /**
+     * Every activity ever recorded for an event, across all its pauses.
+     */
+    protected function eventActivities(int $eventId): array
+    {
+        return EventPauseActivity::with('eventType')
+            ->where('event_id', $eventId)
+            ->orderBy('id')
+            ->get()
+            ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+            ->all();
+    }
+
+    protected function activityRow(EventPauseActivity $activity): array
+    {
+        return [
+            'type_name'         => $activity->event_type_name ?: ($activity->eventType?->name ?? '—'),
+            'expected_duration' => $activity->expected_duration,
+            'at'                => $activity->created_at->format('d M Y H:i'),
+            'by'                => $activity->created_by_name,
+        ];
     }
 
     protected function minutesSince($datetime): int
@@ -619,6 +657,113 @@ class PlanBoard extends Component
         return round((float) $actual / (float) $planned * 100, 2);
     }
 
+    // ─── Pause activities (Cleaning, Maintenance, … while paused) ─────────────
+
+    public function openPauseActivities(int $eventId): void
+    {
+        authorizeRequest('production.event-create');
+
+        $event = Event::with('eventType')
+            ->where('plan_id', $this->plan->id)
+            ->findOrFail($eventId);
+
+        if ($event->status !== 'paused') {
+            $this->dispatch('swal:error', [
+                'title' => 'Action not allowed',
+                'text'  => 'Activities can only be added while the event is paused.',
+            ]);
+
+            return;
+        }
+
+        $this->resetActionForm();
+
+        $this->pauseEventTypes = EventType::where('has_recipe', false)
+            ->orderBy('name')
+            ->get(['id', 'name', 'duration'])
+            ->map(fn(EventType $type) => [
+                'id'       => $type->id,
+                'name'     => $type->name,
+                'duration' => $type->duration,
+            ])
+            ->all();
+
+        $this->pauseActivityRows = [['event_type_id' => null]];
+
+        $pauseLog = $this->latestPauseLog($event->id);
+
+        $this->eventAction = array_merge($this->baseActionPayload($event, 'activities'), [
+            'pause_log_id'        => $pauseLog?->id,
+            'paused_at'           => $pauseLog ? $pauseLog->created_at->format('d M Y H:i') : null,
+            // All activities ever recorded for the event, so earlier pauses
+            // (and legacy pauses without a log) stay visible.
+            'existing_activities' => $this->eventActivities($event->id),
+        ]);
+
+        $this->dispatch('openEventActionModal');
+    }
+
+    public function addPauseActivityRow(): void
+    {
+        $this->pauseActivityRows[] = ['event_type_id' => null];
+    }
+
+    public function removePauseActivityRow(int $index): void
+    {
+        if (count($this->pauseActivityRows) <= 1) {
+            return;
+        }
+
+        unset($this->pauseActivityRows[$index]);
+        $this->pauseActivityRows = array_values($this->pauseActivityRows);
+    }
+
+    protected function submitPauseActivities(Event $event): void
+    {
+        if ($event->status !== 'paused') {
+            $this->dispatch('swal:error', [
+                'title' => 'Action not allowed',
+                'text'  => 'Activities can only be added while the event is paused.',
+            ]);
+            $this->closeActionModal();
+
+            return;
+        }
+
+        $allowedIds = collect($this->pauseEventTypes)->pluck('id')->implode(',');
+
+        $this->validate(
+            [
+                'pauseActivityRows'                 => 'required|array|min:1',
+                'pauseActivityRows.*.event_type_id' => "required|in:{$allowedIds}",
+            ],
+            [
+                'pauseActivityRows.*.event_type_id.required' => 'Please select an event type.',
+                'pauseActivityRows.*.event_type_id.in'       => 'Please select a valid event type.',
+            ]
+        );
+
+        $pauseLog = $this->latestPauseLog($event->id);
+
+        DB::transaction(function () use ($event, $pauseLog) {
+            foreach ($this->pauseActivityRows as $row) {
+                $type = collect($this->pauseEventTypes)->firstWhere('id', (int) $row['event_type_id']);
+
+                EventPauseActivity::create([
+                    'event_id'            => $event->id,
+                    'event_status_log_id' => $pauseLog?->id,
+                    'event_type_id'       => (int) $row['event_type_id'],
+                    'event_type_name'     => $type['name'] ?? null,
+                    'expected_duration'   => $type['duration'] ?? null,
+                    'created_by'          => authUser()?->id,
+                    'created_by_name'     => authUser()?->name,
+                ]);
+            }
+        });
+
+        $this->closeActionModal();
+    }
+
     public function submitEventAction(): void
     {
         authorizeRequest('production.event-create');
@@ -632,6 +777,13 @@ class PlanBoard extends Component
         $event = Event::with('eventType')
             ->where('plan_id', $this->plan->id)
             ->findOrFail($this->eventAction['event_id']);
+
+        // Recording activities is not a status transition.
+        if ($action === 'activities') {
+            $this->submitPauseActivities($event);
+
+            return;
+        }
 
         // The board may have changed since the modal opened.
         if (!$this->assertTransitionAllowed($event, $action)) {
@@ -698,19 +850,8 @@ class PlanBoard extends Component
 
     protected function submitPause(Event $event): void
     {
-        $allowedIds = collect($this->pauseEventTypes)->pluck('id')->implode(',');
-
-        $this->validate(
-            ['pauseEventTypeId' => "required|in:{$allowedIds}"],
-            ['pauseEventTypeId.required' => 'Please select a pause type.', 'pauseEventTypeId.in' => 'Please select a valid pause type.']
-        );
-
-        $type = collect($this->pauseEventTypes)->firstWhere('id', (int) $this->pauseEventTypeId);
-
         DB::transaction(fn() => $this->applyStatusChange($event, 'pause', [
-            'pause_event_type_id' => (int) $this->pauseEventTypeId,
-            'expected_duration'   => $type['duration'] ?? null,
-            'reason'              => $this->actionReason,
+            'reason' => $this->actionReason,
         ]));
 
         $this->closeActionModal();
@@ -723,10 +864,8 @@ class PlanBoard extends Component
 
         DB::transaction(function () use ($event, $pauseLog, $actualDuration) {
             $this->applyStatusChange($event, 'resume', [
-                'pause_event_type_id' => $pauseLog?->pause_event_type_id,
-                'expected_duration'   => $pauseLog?->expected_duration,
-                'actual_duration'     => $actualDuration,
-                'reason'              => $this->actionReason,
+                'actual_duration' => $actualDuration,
+                'reason'          => $this->actionReason,
             ]);
 
             // Close the pause entry with how long it actually lasted.
@@ -784,7 +923,13 @@ class PlanBoard extends Component
     {
         // Same visibility rule as showEventDetails: this plan's events plus
         // carry-overs from the same factory (read only).
-        $event = Event::with(['eventType', 'statusLogs' => fn($q) => $q->with('pauseEventType', 'quantities')->orderByDesc('id')])
+        $event = Event::with([
+                'eventType',
+                'statusLogs' => fn($q) => $q->with('quantities', 'pauseActivities.eventType')->orderByDesc('id'),
+                // Activities recorded without a pause log (pauses that predate
+                // status logging) — shown in their own block.
+                'pauseActivities' => fn($q) => $q->whereNull('event_status_log_id')->with('eventType')->orderBy('id'),
+            ])
             ->where(function ($query) {
                 $query->where('plan_id', $this->plan->id)
                     ->orWhereHas('plan', fn($q) => $q->where('factory_id', $this->plan->factory_id));
@@ -796,17 +941,24 @@ class PlanBoard extends Component
             'event_name' => $event->name,
             'type_name'  => $event->eventType?->name ?? 'No type',
             'color'      => $event->eventType?->color ?? '#818cf8',
+            'other_activities' => $event->pauseActivities
+                ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+                ->all(),
             'logs'       => $event->statusLogs->map(fn(EventStatusLog $log) => [
-                'action'            => $log->action,
-                'from'              => $log->from_status ? (self::EVENT_STATUS_LABELS[$log->from_status] ?? $log->from_status) : 'Planned',
-                'to'                => self::EVENT_STATUS_LABELS[$log->to_status] ?? $log->to_status,
-                'at'                => $log->created_at->format('d M Y H:i'),
-                'by'                => $log->changed_by_name,
-                'pause_type'        => $log->pauseEventType?->name,
-                'expected_duration' => $log->expected_duration,
-                'actual_duration'   => $log->actual_duration,
-                'reason'            => $log->reason,
-                'notes'             => $log->notes,
+                'action'          => $log->action,
+                'from'            => $log->from_status ? (self::EVENT_STATUS_LABELS[$log->from_status] ?? $log->from_status) : 'Planned',
+                'to'              => self::EVENT_STATUS_LABELS[$log->to_status] ?? $log->to_status,
+                'at'              => $log->created_at->format('d M Y H:i'),
+                'by'              => $log->changed_by_name,
+                'actual_duration' => $log->actual_duration,
+                'reason'          => $log->reason,
+                'notes'           => $log->notes,
+                'activities'      => $log->pauseActivities->map(fn(EventPauseActivity $activity) => [
+                    'type_name'         => $activity->event_type_name ?: ($activity->eventType?->name ?? '—'),
+                    'expected_duration' => $activity->expected_duration,
+                    'at'                => $activity->created_at->format('d M Y H:i'),
+                    'by'                => $activity->created_by_name,
+                ])->all(),
                 'quantities'        => $log->quantities->map(fn(EventQuantity $qty) => [
                     'source'     => $qty->source,
                     'item_name'  => $qty->item_name ?: ($qty->item_id ? "Item #{$qty->item_id}" : '—'),

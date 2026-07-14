@@ -283,10 +283,11 @@
                 @if($eventAction)
                 @php
                     $actionMeta = [
-                        'start'     => ['title' => 'Start Event',     'icon' => 'play-fill',  'btn' => 'btn-success'],
-                        'pause'     => ['title' => 'Pause Event',     'icon' => 'pause-fill', 'btn' => 'btn-warning'],
-                        'resume'    => ['title' => 'Resume Event',    'icon' => 'play-fill',  'btn' => 'btn-success'],
-                        'terminate' => ['title' => 'Terminate Event', 'icon' => 'stop-fill',  'btn' => 'btn-danger'],
+                        'start'      => ['title' => 'Start Event',      'icon' => 'play-fill',  'btn' => 'btn-success', 'submit' => 'Start Event'],
+                        'pause'      => ['title' => 'Pause Event',      'icon' => 'pause-fill', 'btn' => 'btn-warning', 'submit' => 'Pause Event'],
+                        'resume'     => ['title' => 'Resume Event',     'icon' => 'play-fill',  'btn' => 'btn-success', 'submit' => 'Resume Event'],
+                        'terminate'  => ['title' => 'Terminate Event',  'icon' => 'stop-fill',  'btn' => 'btn-danger',  'submit' => 'Terminate Event'],
+                        'activities' => ['title' => 'Pause Activities', 'icon' => 'tools',      'btn' => 'btn-primary', 'submit' => 'Save Activities'],
                     ][$eventAction['action']];
                 @endphp
                 <div class="modal-header">
@@ -355,29 +356,17 @@
                     @elseif($eventAction['action'] === 'pause')
 
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Pause Type <span class="text-danger">*</span></label>
-                            <select class="form-select @error('pauseEventTypeId') is-invalid @enderror"
-                                wire:model.live="pauseEventTypeId">
-                                <option value="">Select type…</option>
-                                @foreach($pauseEventTypes as $type)
-                                <option value="{{ $type['id'] }}">{{ $type['name'] }}</option>
-                                @endforeach
-                            </select>
-                            @error('pauseEventTypeId')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Expected Duration</label>
-                            @php $selectedPauseType = collect($pauseEventTypes)->firstWhere('id', (int) $pauseEventTypeId); @endphp
-                            <input type="text" class="form-control" disabled
-                                value="{{ $selectedPauseType && $selectedPauseType['duration'] ? $selectedPauseType['duration'] . ' min' : '—' }}">
-                        </div>
                         <div class="col-12">
                             <label class="form-label">Reason</label>
                             <textarea class="form-control" rows="3" wire:model="actionReason"
                                 placeholder="Why is this event being paused?"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="alert alert-info py-2 px-3 mb-0" style="font-size: 12px;">
+                                <i class="bi bi-tools me-1"></i>
+                                Once paused, use the "Activities" button on the event to record what
+                                is being done (Cleaning, Maintenance, …).
+                            </div>
                         </div>
                     </div>
 
@@ -385,19 +374,15 @@
 
                     <div class="row g-3">
                         @if($eventAction['paused_at'])
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="pvc-body-label">Paused At</div>
                             <div>{{ $eventAction['paused_at'] }}</div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="pvc-body-label">Pause Type</div>
-                            <div>{{ $eventAction['pause_type_name'] ?? '—' }}</div>
-                        </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="pvc-body-label">Expected Duration</div>
                             <div>{{ $eventAction['expected_duration'] ? $eventAction['expected_duration'] . ' min' : '—' }}</div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="pvc-body-label">Actual Duration (so far)</div>
                             <div>
                                 {{ $eventAction['actual_duration'] !== null ? $eventAction['actual_duration'] . ' min' : '—' }}
@@ -405,6 +390,20 @@
                                 <span class="badge bg-danger ms-1">over expected</span>
                                 @endif
                             </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="pvc-body-label">Activities During Pause</div>
+                            @if(count($eventAction['activities']))
+                            <div class="mt-1">
+                                @foreach($eventAction['activities'] as $activity)
+                                <span class="badge bg-light-primary me-1 mb-1">
+                                    {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min' : '' }}
+                                </span>
+                                @endforeach
+                            </div>
+                            @else
+                            <div class="text-muted" style="font-size: 12px;">No activities were recorded during this pause.</div>
+                            @endif
                         </div>
                         @if($eventAction['pause_reason'])
                         <div class="col-12">
@@ -426,6 +425,73 @@
                         </div>
                     </div>
 
+                    @elseif($eventAction['action'] === 'activities')
+
+                    <div class="d-flex align-items-center gap-2 mb-3" style="font-size: 12px;">
+                        <span class="badge bg-warning text-dark">Paused</span>
+                        <span class="text-muted">since {{ $eventAction['paused_at'] ?? '—' }}</span>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="fw-bold mb-1" style="font-size: 13px;">Recorded Activities</div>
+                        @if(count($eventAction['existing_activities']))
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0" style="font-size: 12px;">
+                                <thead>
+                                    <tr>
+                                        <th>Event Type</th>
+                                        <th>Expected Duration</th>
+                                        <th>Added</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($eventAction['existing_activities'] as $activity)
+                                    <tr>
+                                        <td>{{ $activity['type_name'] }}</td>
+                                        <td>{{ $activity['expected_duration'] ? $activity['expected_duration'] . ' min' : '—' }}</td>
+                                        <td>{{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @else
+                        <div class="text-muted" style="font-size: 12px;">No activities have been recorded for this event yet.</div>
+                        @endif
+                    </div>
+
+                    <div class="fw-bold mb-1" style="font-size: 13px;">Add Activities</div>
+                    @foreach($pauseActivityRows as $i => $row)
+                    <div class="d-flex gap-2 align-items-start mb-2" wire:key="pause-activity-row-{{ $i }}">
+                        <div class="flex-grow-1">
+                            <select class="form-select form-select-sm @error("pauseActivityRows.{$i}.event_type_id") is-invalid @enderror"
+                                wire:model.live="pauseActivityRows.{{ $i }}.event_type_id">
+                                <option value="">Select event type…</option>
+                                @foreach($pauseEventTypes as $type)
+                                <option value="{{ $type['id'] }}">{{ $type['name'] }}</option>
+                                @endforeach
+                            </select>
+                            @error("pauseActivityRows.{$i}.event_type_id")
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div style="width: 140px;">
+                            @php $rowType = collect($pauseEventTypes)->firstWhere('id', (int) ($row['event_type_id'] ?? 0)); @endphp
+                            <input type="text" class="form-control form-control-sm" disabled
+                                title="Expected duration"
+                                value="{{ $rowType && $rowType['duration'] ? $rowType['duration'] . ' min' : '—' }}">
+                        </div>
+                        <button type="button" class="btn btn-light-danger btn-sm"
+                            wire:click="removePauseActivityRow({{ $i }})"
+                            @if(count($pauseActivityRows) <= 1) disabled @endif>
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    @endforeach
+                    <button type="button" class="btn btn-light-primary btn-sm" wire:click="addPauseActivityRow">
+                        <i class="bi bi-plus-circle me-1"></i> Add another
+                    </button>
+
                     @endif
                 </div>
                 <div class="modal-footer">
@@ -433,7 +499,7 @@
                     <button type="button" class="btn {{ $actionMeta['btn'] }}" wire:click="submitEventAction"
                         wire:loading.attr="disabled" wire:target="submitEventAction">
                         <span wire:loading wire:target="submitEventAction" class="spinner-border spinner-border-sm me-1"></span>
-                        {{ $actionMeta['title'] }}
+                        {{ $actionMeta['submit'] }}
                     </button>
                 </div>
                 @endif
@@ -461,7 +527,7 @@
                 </div>
                 <div class="modal-body">
                     @if($eventHistory)
-                    @if(empty($eventHistory['logs']))
+                    @if(empty($eventHistory['logs']) && empty($eventHistory['other_activities']))
                     <div class="pb-empty-hint">No status changes have been recorded for this event yet.</div>
                     @else
                     @php
@@ -483,17 +549,20 @@
                                     {{ $log['at'] }}{{ $log['by'] ? ' · ' . $log['by'] : '' }}
                                 </span>
                             </div>
-                            @if($log['pause_type'] || $log['expected_duration'] || $log['actual_duration'] !== null)
+                            @if($log['actual_duration'] !== null)
                             <div class="mt-2" style="font-size: 12px;">
-                                @if($log['pause_type'])
-                                <span class="me-3"><span class="text-muted">Type:</span> {{ $log['pause_type'] }}</span>
-                                @endif
-                                @if($log['expected_duration'])
-                                <span class="me-3"><span class="text-muted">Expected:</span> {{ $log['expected_duration'] }} min</span>
-                                @endif
-                                @if($log['actual_duration'] !== null)
-                                <span><span class="text-muted">Actual:</span> {{ $log['actual_duration'] }} min</span>
-                                @endif
+                                <span class="text-muted">Pause duration:</span> {{ $log['actual_duration'] }} min
+                            </div>
+                            @endif
+                            @if(!empty($log['activities']))
+                            <div class="mt-1" style="font-size: 12px;">
+                                <span class="text-muted">Activities:</span>
+                                @foreach($log['activities'] as $activity)
+                                <span class="badge bg-light-primary me-1"
+                                    title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}">
+                                    {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min' : '' }}
+                                </span>
+                                @endforeach
                             </div>
                             @endif
                             @if($log['reason'])
@@ -532,6 +601,23 @@
                             @endif
                         </div>
                         @endforeach
+
+                        @if(!empty($eventHistory['other_activities']))
+                        <div class="border rounded p-3">
+                            <div class="fw-bold mb-1" style="font-size: 13px;">
+                                <i class="bi bi-tools me-1 text-primary"></i> Pause Activities
+                            </div>
+                            <div class="text-muted mb-2" style="font-size: 11px;">
+                                Recorded while paused, before pause logging was available.
+                            </div>
+                            @foreach($eventHistory['other_activities'] as $activity)
+                            <span class="badge bg-primary me-1 mb-1"
+                                title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}">
+                                {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min' : '' }}
+                            </span>
+                            @endforeach
+                        </div>
+                        @endif
                     </div>
                     @endif
                     @endif

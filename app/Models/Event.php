@@ -59,4 +59,9 @@ class Event extends Model
     {
         return $this->hasMany(EventQuantity::class);
     }
+
+    public function pauseActivities()
+    {
+        return $this->hasMany(EventPauseActivity::class);
+    }
 }
