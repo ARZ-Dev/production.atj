@@ -128,11 +128,11 @@
 
                         {{-- Warehouses --}}
                         <div class="col-md-6">
-                            <label for="warehouses_ids" class="form-label">Warehouses</label>
+                            <label for="warehouses_ids" class="form-label">Factories</label>
                             <select class="selectpicker w-100 @error('warehouses_ids') is-invalid @enderror"
                                     name="warehouses_ids[]"
                                     id="warehouses_ids"
-                                    title="Select Warehouses"
+                                    title="Select Factories"
                                     data-style="btn-default"
                                     data-live-search="true"
                                     data-icon-base="ti"
