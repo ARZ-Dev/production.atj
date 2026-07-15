@@ -3,7 +3,7 @@
         ''            => ['label' => 'Planned',     'badge' => 'bg-secondary'],
         'in_progress' => ['label' => 'In Progress', 'badge' => 'bg-success'],
         'paused'      => ['label' => 'Paused',      'badge' => 'bg-warning text-dark'],
-        'terminated'  => ['label' => 'Terminated',  'badge' => 'bg-danger'],
+        'terminated'  => ['label' => 'Ended',       'badge' => 'bg-danger'],
     ];
 @endphp
 <div class="card mb-0">
@@ -11,7 +11,7 @@
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             <i class="bi bi-list-ul text-primary"></i>
             <span class="fw-bold" style="font-size: 13px;">Day Events</span>
-            <span class="badge bg-light-primary rounded-pill">{{ count($rows) }}</span>
+            <span class="badge bg-primary rounded-pill">{{ count($rows) }}</span>
             <span class="text-muted ms-auto" style="font-size: 11px;">Click a row for details</span>
         </div>
 
@@ -82,7 +82,7 @@
                             @if($event->placeable_id)
                             <i class="bi bi-{{ $event->placeable_type === \App\Models\Preparation::class ? 'egg-fried' : 'diagram-3' }} me-1"></i>{{ $event->placeable?->name ?? '—' }}
                             @else
-                            <span class="badge bg-light-primary">Unplaced</span>
+                            <span class="badge bg-primary">Unplaced</span>
                             @endif
                         </td>
                         <td><span class="badge {{ $status['badge'] }}">{{ $status['label'] }}</span></td>
@@ -111,16 +111,16 @@
                             </button>
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
-                                @unless($needsQtyModal) wire:confirm="Terminate this event? It cannot be resumed afterwards." @endunless
+                                @unless($needsQtyModal) wire:confirm="End this event? It cannot be resumed afterwards." @endunless
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
-                                <i class="bi bi-stop-fill"></i> Terminate
+                                <i class="bi bi-stop-fill"></i> End
                             </button>
                             @elseif($statusKey === 'paused')
                             <button type="button" class="btn btn-light-primary btn-sm"
                                 wire:click.stop="openPauseActivities({{ $event->id }})"
                                 wire:loading.attr="disabled" wire:target="openPauseActivities"
-                                title="Record activities done during this pause (cleaning, maintenance, …)">
-                                <i class="bi bi-tools"></i> Activities
+                                title="Record emergency events during this pause (cleaning, maintenance, …)">
+                                <i class="bi bi-exclamation-triangle"></i> Emergency
                             </button>
                             <button type="button" class="btn btn-light-success btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'resume')"
@@ -129,9 +129,9 @@
                             </button>
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
-                                @unless($needsQtyModal) wire:confirm="Terminate this event? It cannot be resumed afterwards." @endunless
+                                @unless($needsQtyModal) wire:confirm="End this event? It cannot be resumed afterwards." @endunless
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
-                                <i class="bi bi-stop-fill"></i> Terminate
+                                <i class="bi bi-stop-fill"></i> End
                             </button>
                             @else
                             <span class="text-muted" style="font-size: 11px;">—</span>

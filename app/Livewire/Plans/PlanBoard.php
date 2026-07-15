@@ -29,7 +29,7 @@ class PlanBoard extends Component
     public const EVENT_STATUS_LABELS = [
         'in_progress' => 'In Progress',
         'paused'      => 'Paused',
-        'terminated'  => 'Terminated',
+        'terminated'  => 'Ended',
     ];
 
     public const EVENT_TRANSITIONS = [
@@ -50,10 +50,12 @@ class PlanBoard extends Component
     public array $actionInputs = [];          // start: recipe input rows
     public array $actionOutputs = [];         // terminate: produced item rows
     public array $actionSideProducts = [];    // terminate: side product rows
-    public ?string $actionNotes = null;       // start/terminate global notes
+    public ?string $actionNotes = null;       // start/end global notes
     public ?string $actionReason = null;      // pause/resume reason
-    public array $pauseEventTypes = [];       // activities: dropdown options
-    public array $pauseActivityRows = [];     // activities: rows being added
+    public ?string $actionTime = null;        // when the action happened (defaults to now)
+    public array $pauseEventTypes = [];       // emergency events: dropdown options
+    public array $pauseActivityRows = [];     // emergency events: rows being added
+    public ?array $endingActivity = null;     // emergency event being ended: ['id', 'time', 'note']
 
     // ─── History modal state ──────────────────────────────────────────────────
     public ?array $eventHistory = null;
@@ -436,10 +438,11 @@ class PlanBoard extends Component
         }
 
         $label = $current ? (self::EVENT_STATUS_LABELS[$current] ?? $current) : 'Planned';
+        $verb  = $action === 'terminate' ? 'end' : $action;
 
         $this->dispatch('swal:error', [
             'title' => 'Action not allowed',
-            'text'  => "You can't {$action} an event while it is \"{$label}\".",
+            'text'  => "You can't {$verb} an event while it is \"{$label}\".",
         ]);
 
         return false;
@@ -453,8 +456,10 @@ class PlanBoard extends Component
         $this->actionSideProducts = [];
         $this->actionNotes        = null;
         $this->actionReason       = null;
+        $this->actionTime         = now()->format('Y-m-d\TH:i');
         $this->pauseEventTypes    = [];
         $this->pauseActivityRows  = [];
+        $this->endingActivity     = null;
 
         $this->resetValidation();
     }
@@ -519,9 +524,10 @@ class PlanBoard extends Component
     protected function prepareResumeModal(Event $event): void
     {
         $pauseLog = $this->latestPauseLog($event->id);
+        $pausedAt = $pauseLog ? $this->logHappenedAt($pauseLog) : null;
 
-        // Activities of this pause; for pauses recorded before status logging
-        // existed (no pause log), fall back to all of the event's activities.
+        // Emergency events of this pause; for pauses recorded before status
+        // logging existed (no pause log), fall back to all of the event's.
         $activities = $pauseLog
             ? $this->activitiesFor($pauseLog)
             : $this->eventActivities($event->id);
@@ -532,9 +538,19 @@ class PlanBoard extends Component
             'activities'        => $activities,
             'pause_reason'      => $pauseLog?->reason,
             'expected_duration' => $expectedTotal,
-            'paused_at'         => $pauseLog ? $pauseLog->created_at->format('d M Y H:i') : null,
-            'actual_duration'   => $pauseLog ? $this->minutesSince($pauseLog->created_at) : null,
+            'paused_at'         => $pausedAt?->format('d M Y H:i'),
+            'paused_at_raw'     => $pausedAt?->format('Y-m-d H:i:s'),
+            'actual_duration'   => $pausedAt ? $this->minutesBetween($pausedAt, now()) : null,
         ]);
+    }
+
+    /**
+     * When a status change happened: the user-entered time, falling back to
+     * the row's insert time for logs recorded before the time field existed.
+     */
+    protected function logHappenedAt(EventStatusLog $log): Carbon
+    {
+        return $log->happened_at ? Carbon::parse($log->happened_at) : $log->created_at;
     }
 
     protected function latestPauseLog(int $eventId): ?EventStatusLog
@@ -577,17 +593,31 @@ class PlanBoard extends Component
 
     protected function activityRow(EventPauseActivity $activity): array
     {
+        $startedAt = $activity->happened_at ? Carbon::parse($activity->happened_at) : $activity->created_at;
+
         return [
+            'id'                => $activity->id,
             'type_name'         => $activity->event_type_name ?: ($activity->eventType?->name ?? '—'),
             'expected_duration' => $activity->expected_duration,
-            'at'                => $activity->created_at->format('d M Y H:i'),
+            'at'                => $startedAt->format('d M Y H:i'),
             'by'                => $activity->created_by_name,
+            'ended_at'          => $activity->ended_at ? Carbon::parse($activity->ended_at)->format('d M Y H:i') : null,
+            'end_note'          => $activity->end_note,
+            'actual_duration'   => $activity->ended_at ? $this->minutesBetween($startedAt, $activity->ended_at) : null,
         ];
     }
 
-    protected function minutesSince($datetime): int
+    protected function minutesBetween($from, $to): int
     {
-        return (int) round(Carbon::parse($datetime)->diffInMinutes(now()));
+        return max(0, (int) round(Carbon::parse($from)->diffInMinutes(Carbon::parse($to))));
+    }
+
+    /**
+     * The user-entered action time, falling back to now.
+     */
+    protected function parsedActionTime(): Carbon
+    {
+        return $this->actionTime ? Carbon::parse($this->actionTime) : now();
     }
 
     /**
@@ -633,7 +663,7 @@ class PlanBoard extends Component
     }
 
     /**
-     * Live "% used" recalculation while typing in the action modals.
+     * Live recalculations while typing in the action modals.
      */
     public function updated($property, $value): void
     {
@@ -646,15 +676,28 @@ class PlanBoard extends Component
                 $value
             );
         }
+
+        // Changing the resume time re-computes the pause's actual duration.
+        if ($property === 'actionTime'
+            && ($this->eventAction['action'] ?? null) === 'resume'
+            && !empty($this->eventAction['paused_at_raw'])
+            && strtotime((string) $value) !== false
+        ) {
+            $this->eventAction['actual_duration'] = $this->minutesBetween($this->eventAction['paused_at_raw'], $value);
+        }
     }
 
+    /**
+     * Variance between actual and planned: (actual − planned) / planned × 100.
+     * Negative = under the original quantity, positive = over.
+     */
     protected function percentageOf($planned, $actual): ?float
     {
         if ($actual === null || $actual === '' || !is_numeric($actual) || (float) $planned <= 0) {
             return null;
         }
 
-        return round((float) $actual / (float) $planned * 100, 2);
+        return round(((float) $actual - (float) $planned) / (float) $planned * 100, 2);
     }
 
     // ─── Pause activities (Cleaning, Maintenance, … while paused) ─────────────
@@ -718,6 +761,58 @@ class PlanBoard extends Component
         $this->pauseActivityRows = array_values($this->pauseActivityRows);
     }
 
+    // ─── Ending an emergency event (time + note) ──────────────────────────────
+
+    public function beginEndActivity(int $activityId): void
+    {
+        $this->endingActivity = [
+            'id'   => $activityId,
+            'time' => now()->format('Y-m-d\TH:i'),
+            'note' => null,
+        ];
+
+        $this->resetValidation();
+    }
+
+    public function cancelEndActivity(): void
+    {
+        $this->endingActivity = null;
+        $this->resetValidation();
+    }
+
+    public function submitEndActivity(): void
+    {
+        authorizeRequest('production.event-create');
+
+        if (!$this->endingActivity) {
+            return;
+        }
+
+        $this->validate(
+            [
+                'endingActivity.time' => 'required|date',
+                'endingActivity.note' => 'nullable|string',
+            ],
+            ['endingActivity.time.required' => 'Please enter the end time.', 'endingActivity.time.date' => 'Please enter a valid end time.']
+        );
+
+        $activity = EventPauseActivity::whereHas('event', fn($q) => $q->where('plan_id', $this->plan->id))
+            ->whereNull('ended_at')
+            ->findOrFail($this->endingActivity['id']);
+
+        $activity->update([
+            'ended_at' => Carbon::parse($this->endingActivity['time'])->format('Y-m-d H:i:s'),
+            'end_note' => $this->endingActivity['note'] ?: null,
+        ]);
+
+        $this->endingActivity = null;
+
+        // Refresh the list shown in the open modal.
+        if (($this->eventAction['action'] ?? null) === 'activities') {
+            $this->eventAction['existing_activities'] = $this->eventActivities($this->eventAction['event_id']);
+        }
+    }
+
     protected function submitPauseActivities(Event $event): void
     {
         if ($event->status !== 'paused') {
@@ -755,6 +850,7 @@ class PlanBoard extends Component
                     'event_type_id'       => (int) $row['event_type_id'],
                     'event_type_name'     => $type['name'] ?? null,
                     'expected_duration'   => $type['duration'] ?? null,
+                    'happened_at'         => $this->parsedActionTime(),
                     'created_by'          => authUser()?->id,
                     'created_by_name'     => authUser()?->name,
                 ]);
@@ -778,7 +874,12 @@ class PlanBoard extends Component
             ->where('plan_id', $this->plan->id)
             ->findOrFail($this->eventAction['event_id']);
 
-        // Recording activities is not a status transition.
+        $this->validate(
+            ['actionTime' => 'required|date'],
+            ['actionTime.required' => 'Please enter the time.', 'actionTime.date' => 'Please enter a valid time.']
+        );
+
+        // Recording emergency events is not a status transition.
         if ($action === 'activities') {
             $this->submitPauseActivities($event);
 
@@ -809,7 +910,10 @@ class PlanBoard extends Component
         );
 
         DB::transaction(function () use ($event) {
-            $log = $this->applyStatusChange($event, 'start', ['notes' => $this->actionNotes]);
+            $log = $this->applyStatusChange($event, 'start', [
+                'notes'       => $this->actionNotes,
+                'happened_at' => $this->parsedActionTime(),
+            ]);
 
             foreach ($this->actionInputs as $row) {
                 $this->storeQuantity($event, $log, 'input', $row);
@@ -834,7 +938,10 @@ class PlanBoard extends Component
         );
 
         DB::transaction(function () use ($event) {
-            $log = $this->applyStatusChange($event, 'terminate', ['notes' => $this->actionNotes]);
+            $log = $this->applyStatusChange($event, 'terminate', [
+                'notes'       => $this->actionNotes,
+                'happened_at' => $this->parsedActionTime(),
+            ]);
 
             foreach ($this->actionOutputs as $row) {
                 $this->storeQuantity($event, $log, 'output', $row);
@@ -851,7 +958,8 @@ class PlanBoard extends Component
     protected function submitPause(Event $event): void
     {
         DB::transaction(fn() => $this->applyStatusChange($event, 'pause', [
-            'reason' => $this->actionReason,
+            'reason'      => $this->actionReason,
+            'happened_at' => $this->parsedActionTime(),
         ]));
 
         $this->closeActionModal();
@@ -859,13 +967,18 @@ class PlanBoard extends Component
 
     protected function submitResume(Event $event): void
     {
-        $pauseLog       = $this->latestPauseLog($event->id);
-        $actualDuration = $pauseLog ? $this->minutesSince($pauseLog->created_at) : null;
+        $pauseLog = $this->latestPauseLog($event->id);
+        $resumeAt = $this->parsedActionTime();
 
-        DB::transaction(function () use ($event, $pauseLog, $actualDuration) {
+        $actualDuration = $pauseLog
+            ? $this->minutesBetween($this->logHappenedAt($pauseLog), $resumeAt)
+            : null;
+
+        DB::transaction(function () use ($event, $pauseLog, $resumeAt, $actualDuration) {
             $this->applyStatusChange($event, 'resume', [
                 'actual_duration' => $actualDuration,
                 'reason'          => $this->actionReason,
+                'happened_at'     => $resumeAt,
             ]);
 
             // Close the pause entry with how long it actually lasted.
@@ -887,6 +1000,7 @@ class PlanBoard extends Component
             'action'          => $action,
             'from_status'     => $from,
             'to_status'       => $event->status,
+            'happened_at'     => now(),
             'changed_by'      => authUser()?->id,
             'changed_by_name' => authUser()?->name,
         ], $logData));
@@ -948,17 +1062,14 @@ class PlanBoard extends Component
                 'action'          => $log->action,
                 'from'            => $log->from_status ? (self::EVENT_STATUS_LABELS[$log->from_status] ?? $log->from_status) : 'Planned',
                 'to'              => self::EVENT_STATUS_LABELS[$log->to_status] ?? $log->to_status,
-                'at'              => $log->created_at->format('d M Y H:i'),
+                'at'              => $this->logHappenedAt($log)->format('d M Y H:i'),
                 'by'              => $log->changed_by_name,
                 'actual_duration' => $log->actual_duration,
                 'reason'          => $log->reason,
                 'notes'           => $log->notes,
-                'activities'      => $log->pauseActivities->map(fn(EventPauseActivity $activity) => [
-                    'type_name'         => $activity->event_type_name ?: ($activity->eventType?->name ?? '—'),
-                    'expected_duration' => $activity->expected_duration,
-                    'at'                => $activity->created_at->format('d M Y H:i'),
-                    'by'                => $activity->created_by_name,
-                ])->all(),
+                'activities'      => $log->pauseActivities
+                    ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+                    ->all(),
                 'quantities'        => $log->quantities->map(fn(EventQuantity $qty) => [
                     'source'     => $qty->source,
                     'item_name'  => $qty->item_name ?: ($qty->item_id ? "Item #{$qty->item_id}" : '—'),

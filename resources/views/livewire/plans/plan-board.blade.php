@@ -77,7 +77,7 @@
             <div class="pbc-tray-head">
                 <i class="bi bi-inbox text-primary"></i>
                 <span class="pb-tray-title">Unplaced Events</span>
-                <span class="badge bg-light-primary rounded-pill">{{ count($unplacedEvents) }}</span>
+                <span class="badge bg-primary rounded-pill">{{ count($unplacedEvents) }}</span>
             </div>
             <div class="pbc-tray-body pbc-drop" data-tray>
                 @forelse($unplacedEvents as $event)
@@ -283,11 +283,11 @@
                 @if($eventAction)
                 @php
                     $actionMeta = [
-                        'start'      => ['title' => 'Start Event',      'icon' => 'play-fill',  'btn' => 'btn-success', 'submit' => 'Start Event'],
-                        'pause'      => ['title' => 'Pause Event',      'icon' => 'pause-fill', 'btn' => 'btn-warning', 'submit' => 'Pause Event'],
-                        'resume'     => ['title' => 'Resume Event',     'icon' => 'play-fill',  'btn' => 'btn-success', 'submit' => 'Resume Event'],
-                        'terminate'  => ['title' => 'Terminate Event',  'icon' => 'stop-fill',  'btn' => 'btn-danger',  'submit' => 'Terminate Event'],
-                        'activities' => ['title' => 'Pause Activities', 'icon' => 'tools',      'btn' => 'btn-primary', 'submit' => 'Save Activities'],
+                        'start'      => ['title' => 'Start Event',      'icon' => 'play-fill',             'btn' => 'btn-success', 'submit' => 'Start Event'],
+                        'pause'      => ['title' => 'Pause Event',      'icon' => 'pause-fill',            'btn' => 'btn-warning', 'submit' => 'Pause Event'],
+                        'resume'     => ['title' => 'Resume Event',     'icon' => 'play-fill',             'btn' => 'btn-success', 'submit' => 'Resume Event'],
+                        'terminate'  => ['title' => 'End Event',        'icon' => 'stop-fill',             'btn' => 'btn-danger',  'submit' => 'End Event'],
+                        'activities' => ['title' => 'Emergency Events', 'icon' => 'exclamation-triangle',  'btn' => 'btn-primary', 'submit' => 'Save Emergency Events'],
                     ][$eventAction['action']];
                 @endphp
                 <div class="modal-header">
@@ -317,10 +317,20 @@
                         This recipe has no input items defined.
                     </div>
                     @endif
-                    <div class="mt-2">
-                        <label class="form-label">Notes</label>
-                        <textarea class="form-control" rows="3" wire:model="actionNotes"
-                            placeholder="Optional notes about the quantities used…"></textarea>
+                    <div class="row g-3 mt-0">
+                        <div class="col-md-6">
+                            <label class="form-label">Start Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control @error('actionTime') is-invalid @enderror"
+                                wire:model="actionTime">
+                            @error('actionTime')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" rows="3" wire:model="actionNotes"
+                                placeholder="Optional notes about the quantities used…"></textarea>
+                        </div>
                     </div>
 
                     @elseif($eventAction['action'] === 'terminate')
@@ -347,15 +357,33 @@
                     ])
                     @endif
 
-                    <div class="mt-2">
-                        <label class="form-label">Notes</label>
-                        <textarea class="form-control" rows="3" wire:model="actionNotes"
-                            placeholder="Optional notes about the produced quantities…"></textarea>
+                    <div class="row g-3 mt-0">
+                        <div class="col-md-6">
+                            <label class="form-label">End Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control @error('actionTime') is-invalid @enderror"
+                                wire:model="actionTime">
+                            @error('actionTime')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" rows="3" wire:model="actionNotes"
+                                placeholder="Optional notes about the produced quantities…"></textarea>
+                        </div>
                     </div>
 
                     @elseif($eventAction['action'] === 'pause')
 
                     <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Pause Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control @error('actionTime') is-invalid @enderror"
+                                wire:model="actionTime">
+                            @error('actionTime')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Reason</label>
                             <textarea class="form-control" rows="3" wire:model="actionReason"
@@ -363,9 +391,9 @@
                         </div>
                         <div class="col-12">
                             <div class="alert alert-info py-2 px-3 mb-0" style="font-size: 12px;">
-                                <i class="bi bi-tools me-1"></i>
-                                Once paused, use the "Activities" button on the event to record what
-                                is being done (Cleaning, Maintenance, …).
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                Once paused, use the "Emergency" button on the event to record
+                                emergency events (Cleaning, Maintenance, …).
                             </div>
                         </div>
                     </div>
@@ -392,17 +420,17 @@
                             </div>
                         </div>
                         <div class="col-12">
-                            <div class="pvc-body-label">Activities During Pause</div>
+                            <div class="pvc-body-label">Emergency Events During Pause</div>
                             @if(count($eventAction['activities']))
                             <div class="mt-1">
                                 @foreach($eventAction['activities'] as $activity)
-                                <span class="badge bg-light-primary me-1 mb-1">
+                                <span class="badge bg-primary me-1 mb-1">
                                     {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min' : '' }}
                                 </span>
                                 @endforeach
                             </div>
                             @else
-                            <div class="text-muted" style="font-size: 12px;">No activities were recorded during this pause.</div>
+                            <div class="text-muted" style="font-size: 12px;">No emergency events were recorded during this pause.</div>
                             @endif
                         </div>
                         @if($eventAction['pause_reason'])
@@ -418,6 +446,14 @@
                             </div>
                         </div>
                         @endif
+                        <div class="col-md-6">
+                            <label class="form-label">Resume Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control @error('actionTime') is-invalid @enderror"
+                                wire:model.live="actionTime">
+                            @error('actionTime')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Reason</label>
                             <textarea class="form-control" rows="3" wire:model="actionReason"
@@ -433,7 +469,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <div class="fw-bold mb-1" style="font-size: 13px;">Recorded Activities</div>
+                        <div class="fw-bold mb-1" style="font-size: 13px;">Recorded Emergency Events</div>
                         @if(count($eventAction['existing_activities']))
                         <div class="table-responsive">
                             <table class="table table-sm mb-0" style="font-size: 12px;">
@@ -442,25 +478,85 @@
                                         <th>Event Type</th>
                                         <th>Expected Duration</th>
                                         <th>Added</th>
+                                        <th>Ended</th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach($eventAction['existing_activities'] as $activity)
-                                    <tr>
+                                    <tr wire:key="existing-activity-{{ $activity['id'] }}">
                                         <td>{{ $activity['type_name'] }}</td>
                                         <td>{{ $activity['expected_duration'] ? $activity['expected_duration'] . ' min' : '—' }}</td>
                                         <td>{{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}</td>
+                                        <td>
+                                            @if($activity['ended_at'])
+                                            {{ $activity['ended_at'] }}{{ $activity['actual_duration'] !== null ? ' · ' . $activity['actual_duration'] . ' min' : '' }}
+                                            @if($activity['end_note'])
+                                            <i class="bi bi-chat-left-text ms-1" title="{{ $activity['end_note'] }}"></i>
+                                            @endif
+                                            @else
+                                            <span class="text-muted">Ongoing</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end">
+                                            @if(!$activity['ended_at'])
+                                            <button type="button" class="btn btn-light-danger btn-sm py-0"
+                                                wire:click="beginEndActivity({{ $activity['id'] }})">
+                                                <i class="bi bi-stop-fill"></i> End
+                                            </button>
+                                            @endif
+                                        </td>
                                     </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
                         @else
-                        <div class="text-muted" style="font-size: 12px;">No activities have been recorded for this event yet.</div>
+                        <div class="text-muted" style="font-size: 12px;">No emergency events have been recorded for this event yet.</div>
+                        @endif
+
+                        @if($endingActivity)
+                        @php $endingRow = collect($eventAction['existing_activities'])->firstWhere('id', $endingActivity['id']); @endphp
+                        <div class="border rounded p-3 mt-2 bg-light">
+                            <div class="fw-bold mb-2" style="font-size: 13px;">
+                                <i class="bi bi-stop-fill text-danger me-1"></i>
+                                End Emergency Event{{ $endingRow ? ' — ' . $endingRow['type_name'] : '' }}
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-5">
+                                    <label class="form-label mb-1" style="font-size: 12px;">End Time <span class="text-danger">*</span></label>
+                                    <input type="datetime-local" class="form-control form-control-sm @error('endingActivity.time') is-invalid @enderror"
+                                        wire:model="endingActivity.time">
+                                    @error('endingActivity.time')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-7">
+                                    <label class="form-label mb-1" style="font-size: 12px;">Note</label>
+                                    <input type="text" class="form-control form-control-sm"
+                                        wire:model="endingActivity.note" placeholder="Optional note…">
+                                </div>
+                                <div class="col-12 d-flex gap-2 justify-content-end">
+                                    <button type="button" class="btn btn-light-secondary btn-sm" wire:click="cancelEndActivity">Cancel</button>
+                                    <button type="button" class="btn btn-danger btn-sm" wire:click="submitEndActivity"
+                                        wire:loading.attr="disabled" wire:target="submitEndActivity">
+                                        <i class="bi bi-stop-fill me-1"></i> End Emergency Event
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         @endif
                     </div>
 
-                    <div class="fw-bold mb-1" style="font-size: 13px;">Add Activities</div>
+                    <div class="fw-bold mb-1" style="font-size: 13px;">Add Emergency Events</div>
+                    <div class="mb-2" style="max-width: 260px;">
+                        <label class="form-label mb-1" style="font-size: 12px;">Time <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control form-control-sm @error('actionTime') is-invalid @enderror"
+                            wire:model="actionTime">
+                        @error('actionTime')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
                     @foreach($pauseActivityRows as $i => $row)
                     <div class="d-flex gap-2 align-items-start mb-2" wire:key="pause-activity-row-{{ $i }}">
                         <div class="flex-grow-1">
@@ -537,13 +633,14 @@
                             'resume'    => 'bg-info text-dark',
                             'terminate' => 'bg-danger',
                         ];
+                        $actionLabels = ['terminate' => 'End'];
                         $sourceLabels = ['input' => 'Used', 'output' => 'Produced', 'side_product' => 'Side Product'];
                     @endphp
                     <div class="d-flex flex-column gap-3">
                         @foreach($eventHistory['logs'] as $log)
                         <div class="border rounded p-3">
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span class="badge {{ $actionBadges[$log['action']] ?? 'bg-secondary' }}">{{ ucfirst($log['action']) }}</span>
+                                <span class="badge {{ $actionBadges[$log['action']] ?? 'bg-secondary' }}">{{ $actionLabels[$log['action']] ?? ucfirst($log['action']) }}</span>
                                 <span style="font-size: 12px;">{{ $log['from'] }} <i class="bi bi-arrow-right"></i> {{ $log['to'] }}</span>
                                 <span class="text-muted ms-auto" style="font-size: 12px;">
                                     {{ $log['at'] }}{{ $log['by'] ? ' · ' . $log['by'] : '' }}
@@ -556,11 +653,11 @@
                             @endif
                             @if(!empty($log['activities']))
                             <div class="mt-1" style="font-size: 12px;">
-                                <span class="text-muted">Activities:</span>
+                                <span class="text-muted">Emergency events:</span>
                                 @foreach($log['activities'] as $activity)
-                                <span class="badge bg-light-primary me-1"
-                                    title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}">
-                                    {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min' : '' }}
+                                <span class="badge bg-primary me-1"
+                                    title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}{{ $activity['ended_at'] ? ' — ended ' . $activity['ended_at'] : '' }}{{ $activity['end_note'] ? ' — ' . $activity['end_note'] : '' }}">
+                                    {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min expected' : '' }}{{ $activity['actual_duration'] !== null ? ' · ' . $activity['actual_duration'] . ' min actual' : '' }}
                                 </span>
                                 @endforeach
                             </div>
@@ -587,7 +684,7 @@
                                     <tbody>
                                         @foreach($log['quantities'] as $qty)
                                         <tr>
-                                            <td><span class="badge bg-light-primary">{{ $sourceLabels[$qty['source']] ?? $qty['source'] }}</span></td>
+                                            <td><span class="badge bg-primary">{{ $sourceLabels[$qty['source']] ?? $qty['source'] }}</span></td>
                                             <td>{{ $qty['item_name'] }}</td>
                                             <td>{{ $qty['unit_name'] ?? '—' }}</td>
                                             <td class="text-end">{{ $qty['planned'] + 0 }}</td>
@@ -605,15 +702,15 @@
                         @if(!empty($eventHistory['other_activities']))
                         <div class="border rounded p-3">
                             <div class="fw-bold mb-1" style="font-size: 13px;">
-                                <i class="bi bi-tools me-1 text-primary"></i> Pause Activities
+                                <i class="bi bi-exclamation-triangle me-1 text-primary"></i> Emergency Events
                             </div>
                             <div class="text-muted mb-2" style="font-size: 11px;">
                                 Recorded while paused, before pause logging was available.
                             </div>
                             @foreach($eventHistory['other_activities'] as $activity)
                             <span class="badge bg-primary me-1 mb-1"
-                                title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}">
-                                {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min' : '' }}
+                                title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}{{ $activity['ended_at'] ? ' — ended ' . $activity['ended_at'] : '' }}{{ $activity['end_note'] ? ' — ' . $activity['end_note'] : '' }}">
+                                {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min expected' : '' }}{{ $activity['actual_duration'] !== null ? ' · ' . $activity['actual_duration'] . ' min actual' : '' }}
                             </span>
                             @endforeach
                         </div>
