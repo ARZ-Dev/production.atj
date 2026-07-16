@@ -2,36 +2,100 @@
 
 namespace App\Livewire\Plans;
 
-use App\Models\Capacity;
+use App\Exports\PlanEventsExport;
 use App\Models\Event;
+use App\Models\EventPauseActivity;
+use App\Models\EventQuantity;
+use App\Models\EventStatusLog;
+use App\Models\EventType;
 use App\Models\Line;
 use App\Models\Plan;
 use App\Models\Preparation;
 use App\Models\ProductionLine;
-use App\Models\Recipe;
+use App\Models\RecipeInput;
+use App\Models\RecipeSideProduct;
 use App\Services\ApiService;
+use App\Services\PlanCarryOverService;
+use App\Services\RecipeDurationService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PlanBoard extends Component
 {
+    public const EVENT_STATUS_LABELS = [
+        'in_progress' => 'In Progress',
+        'paused'      => 'Paused',
+        'terminated'  => 'Ended',
+    ];
+
+    public const EVENT_TRANSITIONS = [
+        'start'     => ['from' => [null], 'to' => 'in_progress'],
+        'pause'     => ['from' => ['in_progress'], 'to' => 'paused'],
+        'resume'    => ['from' => ['paused'], 'to' => 'in_progress'],
+        'terminate' => ['from' => ['in_progress', 'paused'], 'to' => 'terminated'],
+    ];
+
     public Plan $plan;
     public $productionLines = [];
     public $unplacedEvents = [];
     public ?string $factoryName = null;
     public ?array $selectedEvent = null;
 
+    // ─── Status-action modal state ────────────────────────────────────────────
+    public ?array $eventAction = null;        // ['action', 'event_id', 'type_name', …]
+    public array $actionInputs = [];          // start: recipe input rows
+    public array $actionOutputs = [];         // terminate: produced item rows
+    public array $actionSideProducts = [];    // terminate: side product rows
+    public ?string $actionNotes = null;       // start/end global notes
+    public ?string $actionReason = null;      // pause/resume reason
+    public ?string $actionTime = null;        // when the action happened (defaults to now)
+    public array $pauseEventTypes = [];       // emergency events: dropdown options
+    public array $pauseActivityRows = [];     // emergency events: rows being added
+    public ?array $endingActivity = null;     // emergency event being ended: ['id', 'time', 'note']
+
+    // ─── History modal state ──────────────────────────────────────────────────
+    public ?array $eventHistory = null;
+
+    /** Per-request cache of items fetched from the API (id => data). */
+    protected array $itemCache = [];
+
+    #[Url(except: 'board')]
+    public string $view = 'board';
+
     protected Collection $allEvents;
 
     protected ApiService $api;
+    protected RecipeDurationService $durationService;
+    protected PlanCarryOverService $carryOverService;
 
-    public function boot(ApiService $api): void
+    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService): void
     {
-        $this->api = $api;
+        $this->api              = $api;
+        $this->durationService  = $durationService;
+        $this->carryOverService = $carryOverService;
     }
 
     public function mount($id): void
+    {
+        $this->loadPlan($id);
+
+        if (!in_array($this->view, ['board', 'list'], true)) {
+            $this->view = 'board';
+        }
+    }
+
+    public function updatedView($value): void
+    {
+        if (!in_array($value, ['board', 'list'], true)) {
+            $this->view = 'board';
+        }
+    }
+
+    protected function loadPlan(int $id): void
     {
         $this->plan = Plan::findOrFail($id);
 
@@ -40,22 +104,107 @@ class PlanBoard extends Component
             ->orderBy('name')
             ->get();
 
+        $this->factoryName = null;
+
         if ($this->plan->factory_id) {
             $warehouses = $this->api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
             $this->factoryName = collect($warehouses)->firstWhere('id', $this->plan->factory_id)['name'] ?? null;
         }
     }
 
+    // ─── Date navigation: jump to the sibling plan (same factory) for the
+    //     previous/next day, if one exists ─────────────────────────────────────
+    public function goToPreviousDay()
+    {
+        return $this->navigateToDate(-1);
+    }
+
+    public function goToNextDay()
+    {
+        return $this->navigateToDate(1);
+    }
+
+    protected function navigateToDate(int $dayOffset)
+    {
+        $targetDate = Carbon::parse($this->plan->date)->addDays($dayOffset);
+
+        $targetPlan = Plan::where('factory_id', $this->plan->factory_id)
+            ->whereDate('date', $targetDate->format('Y-m-d'))
+            ->first();
+
+        if (!$targetPlan) {
+            $this->dispatch('swal:error', [
+                'title' => 'No plan found',
+                'text'  => 'There is no plan for ' . $targetDate->format('d F Y') . ($this->factoryName ? " at {$this->factoryName}" : '') . '.',
+            ]);
+
+            return;
+        }
+
+        return redirect()->route('plans.view', array_filter([
+            'id'   => $targetPlan->id,
+            'view' => $this->view !== 'board' ? $this->view : null,
+        ]));
+    }
+
     protected function loadEvents(): void
     {
-        $events = Event::with('eventType')
+        $events = Event::with('eventType', 'recipe', 'productionLine', 'placeable')
+            ->withExists(['pauseActivities as has_open_emergencies' => fn($q) => $q->whereNull('ended_at')])
             ->where('plan_id', $this->plan->id)
             ->orderBy('from_time')
             ->get();
 
-        $this->allEvents = $events;
-
         $this->unplacedEvents = $events->whereNull('placeable_id')->values();
+
+        $this->allEvents = $events->concat($this->carryOverEvents());
+    }
+
+    /**
+     * Placed events from earlier days (same factory) still running when
+     * this board's day starts — they spill into this board from 00:00 up
+     * to their end (or the whole day, for events spanning several days).
+     */
+    protected function carryOverEvents(): Collection
+    {
+        if (!$this->plan->factory_id) {
+            return collect();
+        }
+
+        $dayStart = Carbon::parse($this->plan->date)->startOfDay();
+
+        return Event::with('eventType', 'recipe', 'productionLine', 'placeable')
+            ->where('plan_id', '!=', $this->plan->id)
+            ->whereNotNull('placeable_id')
+            ->whereNotNull('from_time')
+            ->whereNotNull('to_time')
+            ->where('from_time', '<', $dayStart)
+            ->where('to_time', '>', $dayStart)
+            ->whereHas('plan', fn($q) => $q->where('factory_id', $this->plan->factory_id))
+            ->get()
+            ->each(fn(Event $e) => $e->setAttribute('is_carry_over', true));
+    }
+
+    protected function adjacentPlan(string $direction): ?Plan
+    {
+        $query = Plan::where('factory_id', $this->plan->factory_id);
+
+        return $direction === 'prev'
+            ? $query->whereDate('date', '<', $this->plan->date)->orderByDesc('date')->first()
+            : $query->whereDate('date', '>', $this->plan->date)->orderBy('date')->first();
+    }
+
+    // ─── List view ────────────────────────────────────────────────────────────
+
+    /**
+     * Every event on this board (placed, unplaced and carry-over) in
+     * chronological order, for the list view.
+     */
+    public function listRows(): Collection
+    {
+        return $this->allEvents
+            ->sortBy(fn(Event $e) => [$e->is_carry_over ? 0 : 1, $this->eventFromHour($e)])
+            ->values();
     }
 
     // ─── Calendar layout ──────────────────────────────────────────────────────
@@ -77,7 +226,7 @@ class PlanBoard extends Component
                     ->where('production_line_id', $pl->id)
                     ->where('placeable_type', $placeableClass)
                     ->where('placeable_id', $lane['id'])
-                    ->sortBy('from_time')
+                    ->sortBy(fn(Event $e) => $this->eventFromHour($e))
                     ->values();
 
                 $laneRows[] = [
@@ -135,17 +284,26 @@ class PlanBoard extends Component
             return 0.0;
         }
 
-        $from = Carbon::parse($event->from_time);
+        $dayStart = Carbon::parse($this->plan->date)->startOfDay()->getTimestamp();
+        $from     = Carbon::parse($event->from_time)->getTimestamp();
 
-        return $from->hour + $from->minute / 60;
+        // Clamp into this board's 24h window — carry-overs start before it
+        // and render from midnight.
+        return max(0, min(($from - $dayStart) / 60, 24 * 60)) / 60;
     }
 
     protected function eventSpanHours(Event $event): float
     {
         if ($event->from_time && $event->to_time) {
-            $minutes = Carbon::parse($event->from_time)->diffInMinutes(Carbon::parse($event->to_time));
+            $dayStart = Carbon::parse($this->plan->date)->startOfDay()->getTimestamp();
+            $dayEnd   = $dayStart + 24 * 60 * 60;
 
-            return max($minutes, 15) / 60;
+            // Only the part inside this board's day is drawn; the rest
+            // renders on the neighbouring days' boards.
+            $from = max(Carbon::parse($event->from_time)->getTimestamp(), $dayStart);
+            $to   = min(Carbon::parse($event->to_time)->getTimestamp(), $dayEnd);
+
+            return max(($to - $from) / 60, 15) / 60;
         }
 
         $minutes = $event->calculated_duration ?: $event->planned_duration;
@@ -153,7 +311,7 @@ class PlanBoard extends Component
         return $minutes ? max((float) $minutes, 15) / 60 : 1.0;
     }
 
-    public function dropEvent(int $eventId, int $productionLineId, string $placeableAlias, int $placeableId, int $hour): void
+    public function dropEvent(int $eventId, int $productionLineId, string $placeableAlias, int $placeableId, int $slot): void
     {
         $event = Event::with('eventType')
             ->where('plan_id', $this->plan->id)
@@ -173,14 +331,12 @@ class PlanBoard extends Component
             return;
         }
 
-        $hour    = max(0, min(23, $hour));
-        $newFrom = sprintf('%02d:00:00', $hour);
-
-        if ($event->from_time && $event->to_time) {
-            $spanMinutes     = Carbon::parse($event->from_time)->diffInMinutes(Carbon::parse($event->to_time));
-            $event->to_time  = Carbon::parse($newFrom)->addMinutes($spanMinutes)->format('H:i:s');
-        }
-        $event->from_time = $newFrom;
+        // The board is divided into 15-minute slots (96 per day); the drop
+        // reports which slot the card landed on.
+        $slot    = max(0, min(95, $slot));
+        $newFrom = Carbon::parse($this->plan->date)->startOfDay()
+            ->addMinutes($slot * 15)
+            ->format('Y-m-d H:i:s');
 
         $laneChanged = (int) $event->production_line_id !== $productionLineId
             || $event->placeable_type !== $placeableClass
@@ -190,15 +346,33 @@ class PlanBoard extends Component
         $event->placeable_type     = $placeableClass;
         $event->placeable_id       = $placeableId;
 
-        if ($laneChanged) {
-            $event->calculated_duration = null;
+        $hasRecipe = (bool) $event->eventType?->has_recipe;
 
-            if ($event->eventType?->has_recipe && $event->recipe_id && $event->item_id) {
-                $event->calculated_duration = $this->computeDuration($event, $placeableClass, $placeableId);
-            }
+        if ($hasRecipe && $laneChanged) {
+            $event->calculated_duration = ($event->recipe_id && $event->item_id)
+                ? $this->durationService->compute($event, $placeableClass, $placeableId)
+                : null;
         }
 
+        $event->from_time = $newFrom;
+
+        $durationMinutes = $hasRecipe ? $event->calculated_duration : $event->planned_duration;
+        $event->to_time   = $durationMinutes
+            ? Carbon::parse($newFrom)->addMinutes((int) $durationMinutes)->format('Y-m-d H:i:s')
+            : null;
+
+        // Runs past midnight → link the event to the plan of the day it
+        // ends on, creating that plan (and month plan) when missing.
+        // Moved back before midnight → the link is cleared.
+        ['to_plan_id' => $toPlanId, 'created' => $createdPlans] =
+            $this->carryOverService->carryOverLink($this->plan, $event->from_time, $event->to_time);
+
+        $event->to_plan_id = $toPlanId;
         $event->save();
+
+        if ($message = $this->carryOverService->describeCreatedPlans($createdPlans)) {
+            $this->dispatch('carryOverPlanCreated', message: "This event runs past midnight — {$message}");
+        }
     }
 
     public function unplaceEvent(int $eventId): void
@@ -209,13 +383,768 @@ class PlanBoard extends Component
         $event->placeable_type      = null;
         $event->placeable_id        = null;
         $event->calculated_duration = null;
+        $event->from_time           = null;
+        $event->to_time             = null;
+        $event->to_plan_id          = null;
         $event->save();
+    }
+
+    // ─── Event lifecycle ──────────────────────────────────────────────────────
+
+    public function updateEventStatus(int $eventId, string $action): void
+    {
+        authorizeRequest('production.event-create');
+
+        if (!isset(self::EVENT_TRANSITIONS[$action])) {
+            return;
+        }
+
+        $event = Event::with('eventType', 'recipe.inputs', 'recipe.sideProducts')
+            ->where('plan_id', $this->plan->id)
+            ->findOrFail($eventId);
+
+        if (!$this->assertTransitionAllowed($event, $action)) {
+            return;
+        }
+
+        // Resuming or ending requires every emergency event to be closed first.
+        if (in_array($action, ['resume', 'terminate'], true) && $this->blockedByOpenEmergencies($event, $action)) {
+            return;
+        }
+
+        $this->resetActionForm();
+
+        $needsRecipeModal = (bool) $event->eventType?->has_recipe && $event->recipe;
+
+        // Pause/resume always collect a reason; start/terminate only when the
+        // event type has a recipe whose quantities must be recorded.
+        if ($action === 'pause' || $action === 'resume' || $needsRecipeModal) {
+            match ($action) {
+                'start'     => $this->prepareStartModal($event),
+                'terminate' => $this->prepareTerminateModal($event),
+                'pause'     => $this->preparePauseModal($event),
+                'resume'    => $this->prepareResumeModal($event),
+            };
+
+            $this->dispatch('openEventActionModal');
+
+            return;
+        }
+
+        // Nothing extra to record — apply and log immediately.
+        DB::transaction(fn() => $this->applyStatusChange($event, $action));
+    }
+
+    protected function assertTransitionAllowed(Event $event, string $action): bool
+    {
+        $current = $event->status ?: null;
+
+        if (in_array($current, self::EVENT_TRANSITIONS[$action]['from'], true)) {
+            return true;
+        }
+
+        $label = $current ? (self::EVENT_STATUS_LABELS[$current] ?? $current) : 'Planned';
+        $verb  = $action === 'terminate' ? 'end' : $action;
+
+        $this->dispatch('swal:error', [
+            'title' => 'Action not allowed',
+            'text'  => "You can't {$verb} an event while it is \"{$label}\".",
+        ]);
+
+        return false;
+    }
+
+    protected function openEmergencyCount(int $eventId): int
+    {
+        return EventPauseActivity::where('event_id', $eventId)
+            ->whereNull('ended_at')
+            ->count();
+    }
+
+    /**
+     * Resume/end are blocked while emergency events are still ongoing, so
+     * every one of them gets an end time and note.
+     */
+    protected function blockedByOpenEmergencies(Event $event, string $action): bool
+    {
+        $count = $this->openEmergencyCount($event->id);
+
+        if ($count === 0) {
+            return false;
+        }
+
+        $verb   = $action === 'terminate' ? 'ending' : 'resuming';
+        $plural = $count > 1;
+
+        $this->dispatch('swal:error', [
+            'title' => 'Ongoing emergency events',
+            'text'  => "This event has {$count} ongoing emergency event" . ($plural ? 's' : '')
+                . '. Use the "Emergency" button to end ' . ($plural ? 'them' : 'it')
+                . " before {$verb} the event.",
+        ]);
+
+        return true;
+    }
+
+    protected function resetActionForm(): void
+    {
+        $this->eventAction        = null;
+        $this->actionInputs       = [];
+        $this->actionOutputs      = [];
+        $this->actionSideProducts = [];
+        $this->actionNotes        = null;
+        $this->actionReason       = null;
+        $this->actionTime         = now()->format('Y-m-d\TH:i');
+        $this->pauseEventTypes    = [];
+        $this->pauseActivityRows  = [];
+        $this->endingActivity     = null;
+
+        $this->resetValidation();
+    }
+
+    protected function baseActionPayload(Event $event, string $action): array
+    {
+        return [
+            'action'     => $action,
+            'event_id'   => $event->id,
+            'event_name' => $event->name,
+            'type_name'  => $event->eventType?->name ?? 'No type',
+            'color'      => $event->eventType?->color ?? '#818cf8',
+        ];
+    }
+
+    protected function prepareStartModal(Event $event): void
+    {
+        $this->actionInputs = $event->recipe->inputs
+            ->map(fn(RecipeInput $input) => $this->quantityRow(
+                $input->item_type_id,
+                $input->item_id,
+                $input->item_unit_id,
+                (float) $input->quantity,
+                recipeInputId: $input->id,
+            ))
+            ->values()
+            ->all();
+
+        $this->eventAction = $this->baseActionPayload($event, 'start');
+    }
+
+    protected function prepareTerminateModal(Event $event): void
+    {
+        $recipe = $event->recipe;
+
+        $this->actionOutputs = [$this->quantityRow(
+            $recipe->item_type_id,
+            $event->item_id ?: $recipe->item_id,
+            $recipe->item_unit_id,
+            (float) ($recipe->quantity_per_batch ?? 0),
+        )];
+
+        $this->actionSideProducts = $recipe->sideProducts
+            ->map(fn(RecipeSideProduct $side) => $this->quantityRow(
+                $side->item_type_id,
+                $side->item_id,
+                $side->item_unit_id,
+                (float) $side->quantity,
+                recipeSideProductId: $side->id,
+            ))
+            ->values()
+            ->all();
+
+        $this->eventAction = $this->baseActionPayload($event, 'terminate');
+    }
+
+    protected function preparePauseModal(Event $event): void
+    {
+        $this->eventAction = $this->baseActionPayload($event, 'pause');
+    }
+
+    protected function prepareResumeModal(Event $event): void
+    {
+        $pauseLog = $this->latestPauseLog($event->id);
+        $pausedAt = $pauseLog ? $this->logHappenedAt($pauseLog) : null;
+
+        // Emergency events of this pause; for pauses recorded before status
+        // logging existed (no pause log), fall back to all of the event's.
+        $activities = $pauseLog
+            ? $this->activitiesFor($pauseLog)
+            : $this->eventActivities($event->id);
+
+        $expectedTotal = collect($activities)->sum(fn($a) => (int) ($a['expected_duration'] ?? 0)) ?: null;
+
+        $this->eventAction = array_merge($this->baseActionPayload($event, 'resume'), [
+            'activities'        => $activities,
+            'pause_reason'      => $pauseLog?->reason,
+            'expected_duration' => $expectedTotal,
+            'paused_at'         => $pausedAt?->format('d M Y H:i'),
+            'paused_at_raw'     => $pausedAt?->format('Y-m-d H:i:s'),
+            'actual_duration'   => $pausedAt ? $this->minutesBetween($pausedAt, now()) : null,
+        ]);
+    }
+
+    /**
+     * When a status change happened: the user-entered time, falling back to
+     * the row's insert time for logs recorded before the time field existed.
+     */
+    protected function logHappenedAt(EventStatusLog $log): Carbon
+    {
+        return $log->happened_at ? Carbon::parse($log->happened_at) : $log->created_at;
+    }
+
+    protected function latestPauseLog(int $eventId): ?EventStatusLog
+    {
+        return EventStatusLog::where('event_id', $eventId)
+            ->where('action', 'pause')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Activities (Cleaning, Maintenance, …) recorded under a pause log.
+     */
+    protected function activitiesFor(?EventStatusLog $pauseLog): array
+    {
+        if (!$pauseLog) {
+            return [];
+        }
+
+        return $pauseLog->pauseActivities()
+            ->with('eventType')
+            ->orderBy('id')
+            ->get()
+            ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+            ->all();
+    }
+
+    /**
+     * Every activity ever recorded for an event, across all its pauses.
+     */
+    protected function eventActivities(int $eventId): array
+    {
+        return EventPauseActivity::with('eventType')
+            ->where('event_id', $eventId)
+            ->orderBy('id')
+            ->get()
+            ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+            ->all();
+    }
+
+    protected function activityRow(EventPauseActivity $activity): array
+    {
+        $startedAt = $activity->happened_at ? Carbon::parse($activity->happened_at) : $activity->created_at;
+
+        return [
+            'id'                => $activity->id,
+            'type_name'         => $activity->event_type_name ?: ($activity->eventType?->name ?? '—'),
+            'expected_duration' => $activity->expected_duration,
+            'at'                => $startedAt->format('d M Y H:i'),
+            'by'                => $activity->created_by_name,
+            'ended_at'          => $activity->ended_at ? Carbon::parse($activity->ended_at)->format('d M Y H:i') : null,
+            'end_note'          => $activity->end_note,
+            'actual_duration'   => $activity->ended_at ? $this->minutesBetween($startedAt, $activity->ended_at) : null,
+        ];
+    }
+
+    protected function minutesBetween($from, $to): int
+    {
+        return max(0, (int) round(Carbon::parse($from)->diffInMinutes(Carbon::parse($to))));
+    }
+
+    /**
+     * The user-entered action time, falling back to now.
+     */
+    protected function parsedActionTime(): Carbon
+    {
+        return $this->actionTime ? Carbon::parse($this->actionTime) : now();
+    }
+
+    /**
+     * One row of the quantity tables shown in the start/terminate modals.
+     * Item and unit names come from the items API (cached per request).
+     */
+    protected function quantityRow(?int $itemTypeId, ?int $itemId, ?int $itemUnitId, float $planned, ?int $recipeInputId = null, ?int $recipeSideProductId = null): array
+    {
+        [$itemName, $unitName] = $this->itemAndUnitNames($itemId, $itemUnitId);
+
+        return [
+            'recipe_input_id'        => $recipeInputId,
+            'recipe_side_product_id' => $recipeSideProductId,
+            'item_type_id'           => $itemTypeId,
+            'item_id'                => $itemId,
+            'item_unit_id'           => $itemUnitId,
+            'item_name'              => $itemName,
+            'unit_name'              => $unitName,
+            'planned_quantity'       => $planned,
+            'actual_quantity'        => null,
+            'percentage'             => null,
+        ];
+    }
+
+    protected function itemAndUnitNames(?int $itemId, ?int $itemUnitId): array
+    {
+        if (!$itemId) {
+            return [null, null];
+        }
+
+        if (!array_key_exists($itemId, $this->itemCache)) {
+            $this->itemCache[$itemId] = $this->api->get("/v1/items/{$itemId}")['data'] ?? [];
+        }
+
+        $item = $this->itemCache[$itemId];
+        $unit = collect($item['units'] ?? [])->firstWhere('id', $itemUnitId);
+
+        $unitName = $unit
+            ? ($unit['name'] ?? '') . (!empty($unit['symbol']) ? " ({$unit['symbol']})" : '')
+            : null;
+
+        return [$item['name'] ?? "Item #{$itemId}", $unitName ?: null];
+    }
+
+    /**
+     * Live recalculations while typing in the action modals.
+     */
+    public function updated($property, $value): void
+    {
+        if (preg_match('/^(actionInputs|actionOutputs|actionSideProducts)\.(\d+)\.actual_quantity$/', $property, $matches)) {
+            $rows  = $matches[1];
+            $index = (int) $matches[2];
+
+            $this->{$rows}[$index]['percentage'] = $this->percentageOf(
+                $this->{$rows}[$index]['planned_quantity'] ?? null,
+                $value
+            );
+        }
+
+        // Changing the resume time re-computes the pause's actual duration.
+        if ($property === 'actionTime'
+            && ($this->eventAction['action'] ?? null) === 'resume'
+            && !empty($this->eventAction['paused_at_raw'])
+            && strtotime((string) $value) !== false
+        ) {
+            $this->eventAction['actual_duration'] = $this->minutesBetween($this->eventAction['paused_at_raw'], $value);
+        }
+    }
+
+    /**
+     * Variance between actual and planned: (actual − planned) / planned × 100.
+     * Negative = under the original quantity, positive = over.
+     */
+    protected function percentageOf($planned, $actual): ?float
+    {
+        if ($actual === null || $actual === '' || !is_numeric($actual) || (float) $planned <= 0) {
+            return null;
+        }
+
+        return round(((float) $actual - (float) $planned) / (float) $planned * 100, 2);
+    }
+
+    // ─── Pause activities (Cleaning, Maintenance, … while paused) ─────────────
+
+    public function openPauseActivities(int $eventId): void
+    {
+        authorizeRequest('production.event-create');
+
+        $event = Event::with('eventType')
+            ->where('plan_id', $this->plan->id)
+            ->findOrFail($eventId);
+
+        $isPaused = $event->status === 'paused';
+
+        // Open for paused events (view + add), and for any event that still
+        // has ongoing emergency events, so they can always be ended.
+        if (!$isPaused && $this->openEmergencyCount($event->id) === 0) {
+            $this->dispatch('swal:error', [
+                'title' => 'Action not allowed',
+                'text'  => 'Emergency events can only be added while the event is paused.',
+            ]);
+
+            return;
+        }
+
+        $this->resetActionForm();
+
+        $this->pauseEventTypes = EventType::where('has_recipe', false)
+            ->orderBy('name')
+            ->get(['id', 'name', 'duration'])
+            ->map(fn(EventType $type) => [
+                'id'       => $type->id,
+                'name'     => $type->name,
+                'duration' => $type->duration,
+            ])
+            ->all();
+
+        $this->pauseActivityRows = [['event_type_id' => null]];
+
+        $pauseLog = $this->latestPauseLog($event->id);
+
+        $this->eventAction = array_merge($this->baseActionPayload($event, 'activities'), [
+            'pause_log_id'        => $pauseLog?->id,
+            'paused_at'           => $pauseLog ? $this->logHappenedAt($pauseLog)->format('d M Y H:i') : null,
+            // New emergency events can only be added while paused; otherwise
+            // the modal is just for ending the ongoing ones.
+            'can_add'             => $isPaused,
+            // All activities ever recorded for the event, so earlier pauses
+            // (and legacy pauses without a log) stay visible.
+            'existing_activities' => $this->eventActivities($event->id),
+        ]);
+
+        $this->dispatch('openEventActionModal');
+    }
+
+    public function addPauseActivityRow(): void
+    {
+        $this->pauseActivityRows[] = ['event_type_id' => null];
+    }
+
+    public function removePauseActivityRow(int $index): void
+    {
+        if (count($this->pauseActivityRows) <= 1) {
+            return;
+        }
+
+        unset($this->pauseActivityRows[$index]);
+        $this->pauseActivityRows = array_values($this->pauseActivityRows);
+    }
+
+    // ─── Ending an emergency event (time + note) ──────────────────────────────
+
+    public function beginEndActivity(int $activityId): void
+    {
+        $this->endingActivity = [
+            'id'   => $activityId,
+            'time' => now()->format('Y-m-d\TH:i'),
+            'note' => null,
+        ];
+
+        $this->resetValidation();
+    }
+
+    public function cancelEndActivity(): void
+    {
+        $this->endingActivity = null;
+        $this->resetValidation();
+    }
+
+    public function submitEndActivity(): void
+    {
+        authorizeRequest('production.event-create');
+
+        if (!$this->endingActivity) {
+            return;
+        }
+
+        $this->validate(
+            [
+                'endingActivity.time' => 'required|date',
+                'endingActivity.note' => 'nullable|string',
+            ],
+            ['endingActivity.time.required' => 'Please enter the end time.', 'endingActivity.time.date' => 'Please enter a valid end time.']
+        );
+
+        $activity = EventPauseActivity::whereHas('event', fn($q) => $q->where('plan_id', $this->plan->id))
+            ->whereNull('ended_at')
+            ->findOrFail($this->endingActivity['id']);
+
+        $activity->update([
+            'ended_at' => Carbon::parse($this->endingActivity['time'])->format('Y-m-d H:i:s'),
+            'end_note' => $this->endingActivity['note'] ?: null,
+        ]);
+
+        $this->endingActivity = null;
+
+        // Refresh the list shown in the open modal.
+        if (($this->eventAction['action'] ?? null) === 'activities') {
+            $this->eventAction['existing_activities'] = $this->eventActivities($this->eventAction['event_id']);
+        }
+    }
+
+    protected function submitPauseActivities(Event $event): void
+    {
+        if ($event->status !== 'paused') {
+            $this->dispatch('swal:error', [
+                'title' => 'Action not allowed',
+                'text'  => 'Emergency events can only be added while the event is paused.',
+            ]);
+            $this->closeActionModal();
+
+            return;
+        }
+
+        $allowedIds = collect($this->pauseEventTypes)->pluck('id')->implode(',');
+
+        $this->validate(
+            [
+                'pauseActivityRows'                 => 'required|array|min:1',
+                'pauseActivityRows.*.event_type_id' => "required|in:{$allowedIds}",
+            ],
+            [
+                'pauseActivityRows.*.event_type_id.required' => 'Please select an event type.',
+                'pauseActivityRows.*.event_type_id.in'       => 'Please select a valid event type.',
+            ]
+        );
+
+        $pauseLog = $this->latestPauseLog($event->id);
+
+        DB::transaction(function () use ($event, $pauseLog) {
+            foreach ($this->pauseActivityRows as $row) {
+                $type = collect($this->pauseEventTypes)->firstWhere('id', (int) $row['event_type_id']);
+
+                EventPauseActivity::create([
+                    'event_id'            => $event->id,
+                    'event_status_log_id' => $pauseLog?->id,
+                    'event_type_id'       => (int) $row['event_type_id'],
+                    'event_type_name'     => $type['name'] ?? null,
+                    'expected_duration'   => $type['duration'] ?? null,
+                    'happened_at'         => $this->parsedActionTime(),
+                    'created_by'          => authUser()?->id,
+                    'created_by_name'     => authUser()?->name,
+                ]);
+            }
+        });
+
+        $this->closeActionModal();
+    }
+
+    public function submitEventAction(): void
+    {
+        authorizeRequest('production.event-create');
+
+        if (!$this->eventAction) {
+            return;
+        }
+
+        $action = $this->eventAction['action'];
+
+        $event = Event::with('eventType')
+            ->where('plan_id', $this->plan->id)
+            ->findOrFail($this->eventAction['event_id']);
+
+        $this->validate(
+            ['actionTime' => 'required|date'],
+            ['actionTime.required' => 'Please enter the time.', 'actionTime.date' => 'Please enter a valid time.']
+        );
+
+        // Recording emergency events is not a status transition.
+        if ($action === 'activities') {
+            $this->submitPauseActivities($event);
+
+            return;
+        }
+
+        // The board may have changed since the modal opened.
+        if (!$this->assertTransitionAllowed($event, $action)) {
+            $this->closeActionModal();
+
+            return;
+        }
+
+        if (in_array($action, ['resume', 'terminate'], true) && $this->blockedByOpenEmergencies($event, $action)) {
+            $this->closeActionModal();
+
+            return;
+        }
+
+        match ($action) {
+            'start'     => $this->submitStart($event),
+            'terminate' => $this->submitTerminate($event),
+            'pause'     => $this->submitPause($event),
+            'resume'    => $this->submitResume($event),
+        };
+    }
+
+    protected function submitStart(Event $event): void
+    {
+        $this->validate(
+            ['actionInputs.*.actual_quantity' => 'required|numeric|min:0'],
+            [],
+            ['actionInputs.*.actual_quantity' => 'used quantity']
+        );
+
+        DB::transaction(function () use ($event) {
+            $log = $this->applyStatusChange($event, 'start', [
+                'notes'       => $this->actionNotes,
+                'happened_at' => $this->parsedActionTime(),
+            ]);
+
+            foreach ($this->actionInputs as $row) {
+                $this->storeQuantity($event, $log, 'input', $row);
+            }
+        });
+
+        $this->closeActionModal();
+    }
+
+    protected function submitTerminate(Event $event): void
+    {
+        $this->validate(
+            [
+                'actionOutputs.*.actual_quantity'      => 'required|numeric|min:0',
+                'actionSideProducts.*.actual_quantity' => 'required|numeric|min:0',
+            ],
+            [],
+            [
+                'actionOutputs.*.actual_quantity'      => 'produced quantity',
+                'actionSideProducts.*.actual_quantity' => 'produced quantity',
+            ]
+        );
+
+        DB::transaction(function () use ($event) {
+            $log = $this->applyStatusChange($event, 'terminate', [
+                'notes'       => $this->actionNotes,
+                'happened_at' => $this->parsedActionTime(),
+            ]);
+
+            foreach ($this->actionOutputs as $row) {
+                $this->storeQuantity($event, $log, 'output', $row);
+            }
+
+            foreach ($this->actionSideProducts as $row) {
+                $this->storeQuantity($event, $log, 'side_product', $row);
+            }
+        });
+
+        $this->closeActionModal();
+    }
+
+    protected function submitPause(Event $event): void
+    {
+        DB::transaction(fn() => $this->applyStatusChange($event, 'pause', [
+            'reason'      => $this->actionReason,
+            'happened_at' => $this->parsedActionTime(),
+        ]));
+
+        $this->closeActionModal();
+    }
+
+    protected function submitResume(Event $event): void
+    {
+        $pauseLog = $this->latestPauseLog($event->id);
+        $resumeAt = $this->parsedActionTime();
+
+        $actualDuration = $pauseLog
+            ? $this->minutesBetween($this->logHappenedAt($pauseLog), $resumeAt)
+            : null;
+
+        DB::transaction(function () use ($event, $pauseLog, $resumeAt, $actualDuration) {
+            $this->applyStatusChange($event, 'resume', [
+                'actual_duration' => $actualDuration,
+                'reason'          => $this->actionReason,
+                'happened_at'     => $resumeAt,
+            ]);
+
+            // Close the pause entry with how long it actually lasted.
+            $pauseLog?->update(['actual_duration' => $actualDuration]);
+        });
+
+        $this->closeActionModal();
+    }
+
+    protected function applyStatusChange(Event $event, string $action, array $logData = []): EventStatusLog
+    {
+        $from = $event->status ?: null;
+
+        $event->status = self::EVENT_TRANSITIONS[$action]['to'];
+        $event->save();
+
+        return EventStatusLog::create(array_merge([
+            'event_id'        => $event->id,
+            'action'          => $action,
+            'from_status'     => $from,
+            'to_status'       => $event->status,
+            'happened_at'     => now(),
+            'changed_by'      => authUser()?->id,
+            'changed_by_name' => authUser()?->name,
+        ], $logData));
+    }
+
+    protected function storeQuantity(Event $event, EventStatusLog $log, string $source, array $row): void
+    {
+        EventQuantity::create([
+            'event_id'               => $event->id,
+            'event_status_log_id'    => $log->id,
+            'source'                 => $source,
+            'recipe_input_id'        => $row['recipe_input_id'] ?? null,
+            'recipe_side_product_id' => $row['recipe_side_product_id'] ?? null,
+            'item_type_id'           => $row['item_type_id'],
+            'item_id'                => $row['item_id'],
+            'item_unit_id'           => $row['item_unit_id'],
+            'item_name'              => $row['item_name'],
+            'unit_name'              => $row['unit_name'],
+            'planned_quantity'       => (float) $row['planned_quantity'],
+            'actual_quantity'        => (float) $row['actual_quantity'],
+            'percentage'             => $this->percentageOf($row['planned_quantity'], $row['actual_quantity']),
+        ]);
+    }
+
+    public function closeActionModal(): void
+    {
+        $this->resetActionForm();
+        $this->dispatch('closeEventActionModal');
+    }
+
+    // ─── Event history ────────────────────────────────────────────────────────
+
+    public function showEventHistory(int $eventId): void
+    {
+        // Same visibility rule as showEventDetails: this plan's events plus
+        // carry-overs from the same factory (read only).
+        $event = Event::with([
+                'eventType',
+                'statusLogs' => fn($q) => $q->with('quantities', 'pauseActivities.eventType')->orderByDesc('id'),
+                // Activities recorded without a pause log (pauses that predate
+                // status logging) — shown in their own block.
+                'pauseActivities' => fn($q) => $q->whereNull('event_status_log_id')->with('eventType')->orderBy('id'),
+            ])
+            ->where(function ($query) {
+                $query->where('plan_id', $this->plan->id)
+                    ->orWhereHas('plan', fn($q) => $q->where('factory_id', $this->plan->factory_id));
+            })
+            ->findOrFail($eventId);
+
+        $this->eventHistory = [
+            'event_id'   => $event->id,
+            'event_name' => $event->name,
+            'type_name'  => $event->eventType?->name ?? 'No type',
+            'color'      => $event->eventType?->color ?? '#818cf8',
+            'other_activities' => $event->pauseActivities
+                ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+                ->all(),
+            'logs'       => $event->statusLogs->map(fn(EventStatusLog $log) => [
+                'action'          => $log->action,
+                'from'            => $log->from_status ? (self::EVENT_STATUS_LABELS[$log->from_status] ?? $log->from_status) : 'Planned',
+                'to'              => self::EVENT_STATUS_LABELS[$log->to_status] ?? $log->to_status,
+                'at'              => $this->logHappenedAt($log)->format('d M Y H:i'),
+                'by'              => $log->changed_by_name,
+                'actual_duration' => $log->actual_duration,
+                'reason'          => $log->reason,
+                'notes'           => $log->notes,
+                'activities'      => $log->pauseActivities
+                    ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
+                    ->all(),
+                'quantities'        => $log->quantities->map(fn(EventQuantity $qty) => [
+                    'source'     => $qty->source,
+                    'item_name'  => $qty->item_name ?: ($qty->item_id ? "Item #{$qty->item_id}" : '—'),
+                    'unit_name'  => $qty->unit_name,
+                    'planned'    => (float) $qty->planned_quantity,
+                    'actual'     => (float) $qty->actual_quantity,
+                    'percentage' => $qty->percentage !== null ? (float) $qty->percentage : null,
+                ])->all(),
+            ])->all(),
+        ];
+
+        $this->dispatch('openEventHistoryModal');
     }
 
     public function showEventDetails(int $eventId): void
     {
-        $event = Event::with(['eventType', 'recipe', 'recipeType'])
-            ->where('plan_id', $this->plan->id)
+        // Carry-over cards belong to earlier days' plans of the same
+        // factory, so allow those events here too (view only — see
+        // is_carry_over below).
+        $event = Event::with(['eventType', 'recipe', 'recipeType', 'plan'])
+            ->where(function ($query) {
+                $query->where('plan_id', $this->plan->id)
+                    ->orWhereHas('plan', fn($q) => $q->where('factory_id', $this->plan->factory_id));
+            })
             ->findOrFail($eventId);
 
         $hasRecipe = (bool) ($event->eventType?->has_recipe);
@@ -234,10 +1163,25 @@ class PlanBoard extends Component
             $itemName = $this->api->get("/v1/items/{$event->item_id}")['data']['name'] ?? null;
         }
 
+        $isCarryOver     = (int) $event->plan_id !== (int) $this->plan->id;
+        $crossesMidnight = $this->carryOverService->crossesMidnight($event->from_time, $event->to_time);
+
+        // How many days after its start day the event ends (0 = same day),
+        // for the "+N day(s)" hint next to the end time.
+        $toDayOffset = $crossesMidnight
+            ? (int) Carbon::parse($event->from_time)->startOfDay()
+                ->diffInDays(Carbon::parse($event->to_time)->subSecond()->startOfDay())
+            : 0;
+
         $this->selectedEvent = [
+            'id'                   => $event->id,
             'type_name'            => $event->eventType?->name ?? 'No type',
             'color'                => $event->eventType?->color ?? '#818cf8',
             'has_recipe'           => $hasRecipe,
+            'is_carry_over'        => $isCarryOver,
+            'crosses_midnight'     => $crossesMidnight,
+            'to_day_offset'        => $toDayOffset,
+            'plan_date'            => Carbon::parse($event->plan->date)->format('d M Y'),
             'from_time'            => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : null,
             'to_time'              => $event->to_time ? Carbon::parse($event->to_time)->format('H:i') : null,
             'duration'             => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
@@ -249,10 +1193,28 @@ class PlanBoard extends Component
             'placeable_kind'       => $event->placeable_type === Preparation::class ? 'Preparation' : ($event->placeable_type === Line::class ? 'Line' : null),
             'placeable_name'       => $placeableName,
             'description'          => $event->description,
-            'status'               => $event->status,
+            'status'               => $event->status
+                ? (self::EVENT_STATUS_LABELS[$event->status] ?? ucfirst($event->status))
+                : 'Planned',
         ];
 
         $this->dispatch('openEventModal');
+    }
+
+    public function deleteEvent(int $eventId): void
+    {
+        Event::where('plan_id', $this->plan->id)->where('id', $eventId)->delete();
+
+        $this->selectedEvent = null;
+        $this->dispatch('closeEventDetailsModal');
+    }
+
+    public function exportExcel()
+    {
+        return Excel::download(
+            new PlanEventsExport($this->plan->id),
+            "plan-{$this->plan->id}-events.xlsx"
+        );
     }
 
     protected function classForAlias(string $alias): ?string
@@ -264,43 +1226,13 @@ class PlanBoard extends Component
         };
     }
 
-    protected function computeDuration(Event $event, string $placeableClass, int $placeableId): ?string
-    {
-        $recipe = Recipe::find($event->recipe_id);
-
-        if (!$recipe || !$recipe->quantity_per_batch) {
-            return null;
-        }
-
-        $capacity = Capacity::where('capacityable_type', $placeableClass)
-            ->where('capacityable_id', $placeableId)
-            ->where('item_id', $event->item_id)
-            ->first();
-
-        if (!$capacity || (float) $capacity->capacity <= 0) {
-            return null;
-        }
-
-        $batchCount  = (float) ($event->batch_count ?: 1);
-        $requiredQty = (float) $recipe->quantity_per_batch * $batchCount;
-
-        $units      = $this->api->get("/v1/items/{$event->item_id}")['data']['units'] ?? [];
-        $recipeUnit = collect($units)->firstWhere('id', $recipe->item_unit_id);
-
-        // formula = qty of basic units needed to make 1 of that unit
-        // (the basic unit's own formula is 1) — unit -> basic: multiply.
-        $formula  = (float) ($recipeUnit['formula'] ?? 1) ?: 1;
-        $basicQty = $requiredQty * $formula;
-
-        $durationHours = $basicQty / (float) $capacity->capacity;
-
-        return (string) round($durationHours * 60);
-    }
-
     public function render()
     {
         $this->loadEvents();
 
-        return view('livewire.plans.plan-board');
+        return view('livewire.plans.plan-board', [
+            'prevPlan' => $this->adjacentPlan('prev'),
+            'nextPlan' => $this->adjacentPlan('next'),
+        ]);
     }
 }

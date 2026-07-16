@@ -37,7 +37,7 @@ class ProductionLineIndex extends Component
     {
         authorizeRequest('production.production-line-list');
 
-        $this->departments  = $api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+        $this->departments  = $api->get('/v1/departments', ['module' => 'production', 'filter' => 'production'])['data'] ?? [];
 
         $allWarehouses   = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
         $this->factories = collect($allWarehouses)
@@ -111,7 +111,8 @@ class ProductionLineIndex extends Component
             'department_id'         => $deptId,
         ])['data'] ?? [];
         return collect($all)
-            ->filter(fn($wh) => !empty($wh['type']['is_factory']))
+            ->filter(fn($wh) => !empty($wh['type']['is_factory'])
+                && (int) ($wh['department_id'] ?? $wh['department']['id'] ?? null) === $deptId)
             ->values()
             ->toArray();
     }

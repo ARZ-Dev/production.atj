@@ -21,4 +21,9 @@ class Line extends Model
     {
         return $this->belongsToMany(EventType::class, 'event_type_line');
     }
+
+    public function productionLines()
+    {
+        return $this->belongsToMany(ProductionLine::class, 'line_production_line');
+    }
 }

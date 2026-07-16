@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Line;
+use App\Models\Preparation;
+use App\Models\ProductionLine;
+use App\Models\Shift;
+use App\Models\UserInfo;
 use App\Services\ApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,6 +44,13 @@ class UserController extends Controller
         $data['editing'] = false;
         $data['user'] = null;
 
+        // Shift manager assignments (local production DB)
+        $data['shifts'] = Shift::orderBy('from_time')->get();
+        $data['userInfo'] = null;
+        $data['productionLines'] = [];
+        $data['preparations'] = [];
+        $data['lines'] = [];
+
         return view('users.create', $data);
     }
 
@@ -54,14 +66,21 @@ class UserController extends Controller
             'phone'                 => 'required|string|max:20',
             'role_name'             => 'required|string',
             'password'              => 'required|string|min:8|confirmed',
-            'department_ids'        => 'nullable|array',
-            'department_ids.*'      => 'integer',
-            'warehouse_ids'         => 'nullable|array',
-            'warehouse_ids.*'       => 'integer',
+            'department_id'         => 'nullable|integer',
+            'warehouses_ids'         => 'nullable|array',
+            'warehouses_ids.*'       => 'integer',
             'item_type_ids'         => 'nullable|array',
             'item_type_ids.*'       => 'integer',
             'supervisor_ids'        => 'nullable|array',
             'supervisor_ids.*'      => 'integer',
+            'is_shift_manager'      => 'nullable|boolean',
+            'shift_id'              => 'required_if:is_shift_manager,1|nullable|integer|exists:shifts,id',
+            'production_line_ids'   => 'nullable|array',
+            'production_line_ids.*' => 'integer|exists:production_lines,id',
+            'preparation_ids'       => 'nullable|array',
+            'preparation_ids.*'     => 'integer|exists:preparations,id',
+            'line_ids'              => 'nullable|array',
+            'line_ids.*'            => 'integer|exists:lines,id',
         ]);
 
         $result = $this->api->post('/v1/users', [
@@ -73,8 +92,8 @@ class UserController extends Controller
             'role_name'             => $request->role_name,
             'password'              => $request->password,
             'password_confirmation' => $request->password_confirmation,
-            'department_ids'        => $request->input('department_ids', []),
-            'warehouse_ids'         => $request->input('warehouse_ids', []),
+            'department_id' => $request->input('department_id'),
+            'warehouses_ids'         => $request->input('warehouses_ids', []),
             'item_type_ids'         => $request->input('item_type_ids', []),
             'supervisor_ids'        => $request->input('supervisor_ids', []),
         ]);
@@ -83,6 +102,16 @@ class UserController extends Controller
             return back()->withInput()->withErrors(
                 $result['errors'] ?? ['error' => $result['message'] ?? 'Failed to create user.']
             );
+        }
+
+        $newUserId = $result['data']['id'] ?? $result['data']['user']['id'] ?? null;
+
+        if ($newUserId) {
+            $this->syncShiftManagerInfo((int) $newUserId, $request);
+        } elseif ($request->boolean('is_shift_manager')) {
+            return redirect()->route('users.index')
+                ->with('success', 'User created successfully.')
+                ->with('error', 'Shift manager assignments were not saved because the auth service did not return the new user id. Edit the user to set them.');
         }
 
         return redirect()->route('users.index')
@@ -104,7 +133,7 @@ class UserController extends Controller
 
         $rolesResult = $this->api->get('/v1/users/available-roles', ['module' => 'production']);
 
-        $departmentsResult = $this->api->get('/v1/departments', ['filter' => 'productions']);
+        $departmentsResult = $this->api->get('/v1/departments', ['filter' => 'production']);
 
         $data['user'] = $userResult['data'];
         $data['roles'] = $rolesResult['data'] ?? [];
@@ -112,24 +141,48 @@ class UserController extends Controller
         $data['route'] = route('users.update', $id);
         $data['editing'] = true;
 
+        // Shift manager assignments (local production DB)
+        $data['shifts'] = Shift::orderBy('from_time')->get();
+        $data['userInfo'] = UserInfo::with(['productionLines', 'preparations', 'lines'])->where('user_id', $id)->first();
+
         // Pre-load warehouses and supervisors for existing department selection
         $data['warehouses']  = [];
+        $data['warehouses_ids']  = $data['user']['warehouses_ids'] ?? [];
         $data['itemTypes']   = [];
-        $data['supervisors'] = [];
-        $firstDeptId = $data['user']['department_ids'][0] ?? null;
-        if ($firstDeptId) {
-            $warehousesResult  = $this->api->get("/v1/departments/{$firstDeptId}/warehouses");
+        $data['supervisors_ids'] = $data['user']['supervisors_ids'] ?? [];
+        $data['productionLines'] = [];
+        $data['preparations'] = [];
+        $data['lines']        = [];
+        $departmentId = $data['user']['department_id'] ?? null;
+        if ($departmentId) {
+            $warehousesResult  = $this->api->get("/v1/departments/{$departmentId}/warehouses");
             $data['warehouses'] = $warehousesResult['data'] ?? [];
 
-            $supervisorsResult  = $this->api->get("/v1/departments/{$firstDeptId}/users");
+            $supervisorsResult  = $this->api->get("/v1/departments/{$departmentId}/users");
             $data['supervisors'] = $supervisorsResult['data'] ?? [];
         }
+
+        // Pre-load production lines for the selected warehouses (factories)
+        $warehouseIds = array_map('intval', $data['user']['warehouses_ids'] ?? []);
+        if ($warehouseIds) {
+            $data['productionLines'] = ProductionLine::whereIn('factory_id', $warehouseIds)->get();
+        }
+
+        // Pre-load preparations and lines for the saved production lines
+        $productionLineIds = $data['userInfo']?->productionLines->pluck('id')->all() ?? [];
+        if ($productionLineIds) {
+            $data['preparations'] = Preparation::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get();
+            $data['lines'] = Line::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get();
+        }
+
         // Pre-load item types for all selected warehouses
-        $warehouseIds = $data['user']['warehouse_ids'] ?? [];
         $itemTypes = [];
         $seen = [];
         foreach ($warehouseIds as $wId) {
-            $result = $this->api->get("/warehouses/{$wId}/item-types");
+            $wId = (int) $wId;
+            $result = $this->api->get("/v1/warehouses/{$wId}/item-types");
             foreach ($result['data'] ?? [] as $itemType) {
                 if (!isset($seen[$itemType['id']])) {
                     $seen[$itemType['id']] = true;
@@ -153,14 +206,21 @@ class UserController extends Controller
             'email'             => 'required|email|max:255',
             'phone'             => 'required|string|max:20',
             'role_name'         => 'required|string',
-            'department_ids'    => 'nullable|array',
-            'department_ids.*'  => 'integer',
-            'warehouse_ids'     => 'nullable|array',
-            'warehouse_ids.*'   => 'integer',
+            'department_id'     => 'nullable|integer',
+            'warehouses_ids'     => 'nullable|array',
+            'warehouses_ids.*'   => 'integer',
             'item_type_ids'     => 'nullable|array',
             'item_type_ids.*'   => 'integer',
             'supervisor_ids'    => 'nullable|array',
             'supervisor_ids.*'  => 'integer',
+            'is_shift_manager'      => 'nullable|boolean',
+            'shift_id'              => 'required_if:is_shift_manager,1|nullable|integer|exists:shifts,id',
+            'production_line_ids'   => 'nullable|array',
+            'production_line_ids.*' => 'integer|exists:production_lines,id',
+            'preparation_ids'       => 'nullable|array',
+            'preparation_ids.*'     => 'integer|exists:preparations,id',
+            'line_ids'              => 'nullable|array',
+            'line_ids.*'            => 'integer|exists:lines,id',
         ];
 
         // Password optional on update
@@ -177,8 +237,8 @@ class UserController extends Controller
             'phone'          => $request->phone,
             'role_name'      => $request->role_name,
             'module'         => 'production',
-            'department_ids' => $request->input('department_ids', []),
-            'warehouse_ids'  => $request->input('warehouse_ids', []),
+            'department_id' => $request->input('department_id'),
+            'warehouses_ids'  => $request->input('warehouses_ids', []),
             'item_type_ids'  => $request->input('item_type_ids', []),
             'supervisor_ids' => $request->input('supervisor_ids', []),
         ];
@@ -196,8 +256,32 @@ class UserController extends Controller
             );
         }
 
+        $this->syncShiftManagerInfo($id, $request);
+
         return redirect()->route('users.index')
             ->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Save shift manager assignments in the local production DB.
+     */
+    private function syncShiftManagerInfo(int $userId, Request $request): void
+    {
+        if ($request->boolean('is_shift_manager')) {
+            $userInfo = UserInfo::updateOrCreate(
+                ['user_id' => $userId],
+                [
+                    'is_shift_manager' => true,
+                    'shift_id'         => $request->input('shift_id'),
+                ]
+            );
+
+            $userInfo->productionLines()->sync($request->input('production_line_ids', []));
+            $userInfo->preparations()->sync($request->input('preparation_ids', []));
+            $userInfo->lines()->sync($request->input('line_ids', []));
+        } else {
+            UserInfo::where('user_id', $userId)->delete();
+        }
     }
 
     /**
@@ -228,6 +312,56 @@ class UserController extends Controller
     }
 
     /**
+     * Return production lines for the given warehouses (AJAX, local DB).
+     */
+    public function getProductionLines(Request $request): JsonResponse
+    {
+        $warehouseIds = array_filter((array) $request->input('warehouse_ids', []));
+
+        if (empty($warehouseIds)) {
+            return response()->json([]);
+        }
+
+        return response()->json(
+            ProductionLine::whereIn('factory_id', $warehouseIds)->get(['id', 'name'])
+        );
+    }
+
+    /**
+     * Return preparations for the given production lines (AJAX, local DB).
+     */
+    public function getPreparations(Request $request): JsonResponse
+    {
+        $productionLineIds = array_filter((array) $request->input('production_line_ids', []));
+
+        if (empty($productionLineIds)) {
+            return response()->json([]);
+        }
+
+        return response()->json(
+            Preparation::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get(['id', 'name'])
+        );
+    }
+
+    /**
+     * Return lines for the given production lines (AJAX, local DB).
+     */
+    public function getLines(Request $request): JsonResponse
+    {
+        $productionLineIds = array_filter((array) $request->input('production_line_ids', []));
+
+        if (empty($productionLineIds)) {
+            return response()->json([]);
+        }
+
+        return response()->json(
+            Line::whereHas('productionLines',
+                fn ($q) => $q->whereIn('production_lines.id', $productionLineIds))->get(['id', 'name'])
+        );
+    }
+
+    /**
      * Delete user.
      */
     public function destroy(int $id)
@@ -237,6 +371,8 @@ class UserController extends Controller
         if (!($result['success'] ?? false)) {
             return back()->with('error', $result['message'] ?? 'Failed to delete user.');
         }
+
+        UserInfo::where('user_id', $id)->delete();
 
         return redirect()->route('users.index')
             ->with('success', 'User deleted successfully.');

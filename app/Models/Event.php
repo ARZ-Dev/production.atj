@@ -22,6 +22,14 @@ class Event extends Model
         return $this->belongsTo(Plan::class);
     }
 
+    /**
+     * The plan of the day this event ends on, when it crosses midnight.
+     */
+    public function toPlan()
+    {
+        return $this->belongsTo(Plan::class, 'to_plan_id');
+    }
+
     public function recipe()
     {
         return $this->belongsTo(Recipe::class);
@@ -40,5 +48,20 @@ class Event extends Model
     public function placeable()
     {
         return $this->morphTo();
+    }
+
+    public function statusLogs()
+    {
+        return $this->hasMany(EventStatusLog::class);
+    }
+
+    public function quantities()
+    {
+        return $this->hasMany(EventQuantity::class);
+    }
+
+    public function pauseActivities()
+    {
+        return $this->hasMany(EventPauseActivity::class);
     }
 }

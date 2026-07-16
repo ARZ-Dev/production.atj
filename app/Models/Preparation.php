@@ -21,4 +21,9 @@ class Preparation extends Model
     {
         return $this->belongsToMany(EventType::class, 'event_type_preparation');
     }
+
+    public function productionLines()
+    {
+        return $this->belongsToMany(ProductionLine::class, 'production_line_preparation');
+    }
 }

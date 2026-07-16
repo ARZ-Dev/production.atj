@@ -35,7 +35,7 @@ class PreparationIndex extends Component
     {
         authorizeRequest('production.preparation-list');
 
-        $this->departments = $api->get('/v1/departments', ['module' => 'production'])['data'] ?? [];
+        $this->departments = $api->get('/v1/departments', ['module' => 'production', 'filter' => 'production'])['data'] ?? [];
 
         $allWarehouses    = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
         $this->warehouses = collect($allWarehouses)
@@ -107,7 +107,8 @@ class PreparationIndex extends Component
             'department_id'         => $deptId,
         ])['data'] ?? [];
         return collect($all)
-            ->filter(fn($wh) => !empty($wh['type']['is_internal']))
+            ->filter(fn($wh) => !empty($wh['type']['is_internal'])
+                && (int) ($wh['department_id'] ?? $wh['department']['id'] ?? null) === $deptId)
             ->values()
             ->toArray();
     }

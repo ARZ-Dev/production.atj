@@ -2,7 +2,6 @@
 
 use App\Livewire\Capacities\CapacityManage;
 use App\Livewire\DashboardView;
-use App\Livewire\Events\EventCreate;
 use App\Livewire\EventTypes\EventTypeIndex;
 use App\Livewire\ItemRequests\ItemRequestCreate;
 use App\Livewire\ItemRequests\ItemRequestIndex;
@@ -57,6 +56,9 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     Route::get('/users/departments/{id}/warehouses', [\App\Http\Controllers\UserController::class, 'getWarehouses'])->name('users.warehouses');
     Route::get('/users/warehouses/{id}/item-types', [\App\Http\Controllers\UserController::class, 'getItemTypes'])->name('users.item-types');
     Route::get('/users/departments/{id}/users', [\App\Http\Controllers\UserController::class, 'getDepartmentUsers'])->name('users.department-users');
+    Route::get('/users/production-lines', [\App\Http\Controllers\UserController::class, 'getProductionLines'])->name('users.production-lines');
+    Route::get('/users/production-lines/preparations', [\App\Http\Controllers\UserController::class, 'getPreparations'])->name('users.production-line-preparations');
+    Route::get('/users/production-lines/lines', [\App\Http\Controllers\UserController::class, 'getLines'])->name('users.production-line-lines');
 
 
     // |--------------------------------------------------------------------------
@@ -238,16 +240,6 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     });
 
-
-    // |--------------------------------------------------------------------------
-    // | Events
-    // |--------------------------------------------------------------------------
-    Route::group(['prefix' => 'events'], function () {
-        // Route::get('/', EventIndex::class)->name('events');
-        Route::get('{planId}/create', EventCreate::class)->name('events.create');
-        // Route::get('/edit/{id}', EventCreate::class)->name('events.edit');
-        // Route::get('/view/{id}', EventCreate::class)->name('events.view');
-    });
 
     // |--------------------------------------------------------------------------
     // | Preparations

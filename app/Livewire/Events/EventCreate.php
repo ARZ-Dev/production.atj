@@ -6,10 +6,11 @@ use App\Models\Event;
 use App\Models\EventType;
 use App\Models\Plan;
 use App\Models\Recipe;
-use App\Models\RecipeType;
-use App\Models\Shift;
 use App\Services\ApiService;
+use App\Services\PlanCarryOverService;
+use App\Services\RecipeDurationService;
 use Carbon\Carbon;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class EventCreate extends Component
@@ -19,19 +20,22 @@ class EventCreate extends Component
     public $eventTypes = [];
     public $events = [];
     public $removedEventIds = [];
-    public array $shifts = [];
+    public ?int $editingEventId = null;
 
     // Per-row cascading option lists, keyed by row index.
     public array $itemTypesByRow = [];
     public array $itemsByRow = [];
-    public array $recipeTypesByRow = [];
     public array $recipesByRow = [];
 
     protected ApiService $api;
+    protected RecipeDurationService $durationService;
+    protected PlanCarryOverService $carryOverService;
 
-    public function boot(ApiService $api): void
+    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService): void
     {
-        $this->api = $api;
+        $this->api              = $api;
+        $this->durationService  = $durationService;
+        $this->carryOverService = $carryOverService;
     }
 
     public function mount($planId): void
@@ -41,67 +45,138 @@ class EventCreate extends Component
         $this->planId     = $planId;
         $this->plan       = Plan::with('shift')->findOrFail($planId);
         $this->eventTypes = EventType::orderBy('name')->get();
-        $this->shifts     = Shift::orderBy('from_time')
-            ->get()
-            ->map(fn($s) => [
-                'id'   => $s->id,
-                'name' => $s->name,
-                'from' => Carbon::parse($s->from_time)->format('H:i'),
-                'to'   => Carbon::parse($s->to_time)->format('H:i'),
-            ])
-            ->values()
-            ->toArray();
 
-        $this->loadExistingEvents();
+        $this->openForCreate();
     }
 
-    public function loadExistingEvents(): void
+    #[On('openForCreate')]
+    public function openForCreate(): void
     {
-        $existing = Event::where('plan_id', $this->planId)->get();
+        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipesByRow');
+        $this->editingEventId = null;
+        $this->addEventRow();
+        $this->resetValidation();
+    }
 
-        if ($existing->isEmpty()) {
+    #[On('openForEdit')]
+    public function openForEdit(int $eventId): void
+    {
+        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipesByRow');
+        $this->editingEventId = $eventId;
+
+        $event = Event::where('plan_id', $this->planId)->find($eventId);
+
+        if (!$event) {
+            $this->editingEventId = null;
             $this->addEventRow();
             return;
         }
 
-        foreach ($existing as $event) {
-            $hasRecipe = (bool) ($event->eventType?->has_recipe);
+        $this->events[] = $this->buildRowFromEvent($event);
 
-            $this->events[] = [
-                'id'                    => $event->id,
-                'key'                   => 'event-' . $event->id,
-                'event_type_id'         => $event->event_type_id,
-                'event_type_has_recipe' => $hasRecipe,
-                'item_type_id'          => $event->item_type_id,
-                'item_id'               => $event->item_id,
-                'recipe_type_id'        => $event->recipe_type_id,
-                'recipe_id'             => $event->recipe_id,
-                'batch_count'           => $event->batch_count ?? '',
-                'duration'              => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
-                'from_time'             => $event->from_time ? Carbon::parse($event->from_time)->format('H:i') : '',
-                'to_time'               => $event->to_time   ? Carbon::parse($event->to_time)->format('H:i')   : '',
-                'description'           => $event->description ?? '',
-            ];
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
+        $this->loadCascadeOptionsForRow(0, $event);
 
-            $index = count($this->events) - 1;
+        // Not placed on a line yet — show a live estimate instead of
+        // the persisted (still-null) calculated_duration.
+        if ($hasRecipe && !$event->placeable_type) {
+            $this->recalculateDuration(0);
+        }
 
-            if ($hasRecipe) {
-                $this->itemTypesByRow[$index] = $this->api->get('/v1/item-types')['data'] ?? [];
+        $this->resetValidation();
+    }
 
-                if ($event->item_type_id) {
-                    $this->itemsByRow[$index]     = $this->fetchItemsForType((int) $event->item_type_id);
-                    $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType((int) $event->item_type_id);
-                }
+    private function buildRowFromEvent(Event $event): array
+    {
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
 
-                if ($event->recipe_type_id && $event->item_id) {
-                    $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->recipe_type_id, (int) $event->item_id);
-                }
+        return [
+            'id'                    => $event->id,
+            'key'                   => 'event-' . $event->id,
+            'event_type_id'         => $event->event_type_id,
+            'event_type_has_recipe' => $hasRecipe,
+            'item_type_id'          => $event->item_type_id,
+            'item_id'               => $event->item_id,
+            'recipe_type_id'        => $event->recipe_type_id,
+            'recipe_id'             => $event->recipe_id,
+            'batch_count'           => $event->batch_count ?? '',
+            'duration'              => $hasRecipe ? $event->calculated_duration : $event->planned_duration,
+            'placeable_type'        => $event->placeable_type,
+            'placeable_id'          => $event->placeable_id,
+            'production_line_id'    => $event->production_line_id,
+            'from_time_raw'         => $event->from_time,
+            'scheduled_label'       => $this->scheduledLabel($event),
+            'description'           => $event->description ?? '',
+        ];
+    }
+
+    private function scheduledLabel(Event $event): ?string
+    {
+        if (!$event->from_time) {
+            return null;
+        }
+
+        $label = Carbon::parse($event->from_time)->format('H:i');
+
+        if ($event->to_time) {
+            $label .= ' – ' . Carbon::parse($event->to_time)->format('H:i');
+
+            // Ends on a later calendar day (an end at exactly 00:00 still
+            // belongs to the start day).
+            $plusDays = (int) Carbon::parse($event->from_time)->startOfDay()
+                ->diffInDays(Carbon::parse($event->to_time)->subSecond()->startOfDay());
+
+            if ($plusDays >= 1) {
+                $label .= " (+{$plusDays}d)";
             }
         }
+
+        return $label;
+    }
+
+    private function loadCascadeOptionsForRow(int $index, Event $event): void
+    {
+        $hasRecipe = (bool) ($event->eventType?->has_recipe);
+
+        $this->itemTypesByRow[$index] = $this->allowedItemTypesFor($event->eventType);
+
+        if (!$hasRecipe) {
+            return;
+        }
+
+        if ($event->item_type_id) {
+            $this->itemsByRow[$index] = $this->fetchItemsForType((int) $event->item_type_id);
+        }
+
+        if ($event->item_id) {
+            $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->item_id);
+        }
+    }
+
+    // ─── Item types assigned to an event type, filtering the full external
+    //     item-types list; falls back to the unfiltered list if the event
+    //     type has none assigned (e.g. legacy event types). ─────────────────
+    private function allowedItemTypesFor(?EventType $eventType): array
+    {
+        $itemTypes  = $this->api->get('/v1/item-types')['data'] ?? [];
+        $allowedIds = $eventType?->item_type_ids ?? [];
+
+//        if (empty($allowedIds)) {
+//            return $itemTypes;
+//        }
+
+        return collect($itemTypes)
+            ->filter(fn($type) => in_array($type['id'], $allowedIds))
+            ->values()
+            ->toArray();
     }
 
     public function addEventRow(): void
     {
+        if ($this->editingEventId !== null) {
+            return;
+        }
+
         $this->events[] = [
             'id'                    => null,
             'key'                   => 'new-' . uniqid(),
@@ -113,14 +188,21 @@ class EventCreate extends Component
             'recipe_id'             => null,
             'batch_count'           => '',
             'duration'              => null,
-            'from_time'             => '',
-            'to_time'               => '',
+            'placeable_type'        => null,
+            'placeable_id'          => null,
+            'production_line_id'    => null,
+            'from_time_raw'         => null,
+            'scheduled_label'       => null,
             'description'           => '',
         ];
     }
 
     public function removeEventRow(int $index): void
     {
+        if ($this->editingEventId !== null) {
+            return;
+        }
+
         $event = $this->events[$index] ?? null;
 
         if (!$event) {
@@ -149,35 +231,9 @@ class EventCreate extends Component
         return $this->api->get('/v1/items', ['item_type' => $typeName, 'is_active' => true])['data'] ?? [];
     }
 
-    private function fetchRecipeTypesForItemType(int $itemTypeId): array
+    private function fetchRecipes(int $itemId): array
     {
-        // A recipe type is offered here if at least one of its recipes is
-        // expected to output ($recipe->item_type_id) the selected item type —
-        // not based on RecipeType::item_type_ids (that lists ingredient types).
-        $recipeTypeIds = Recipe::where('item_type_id', $itemTypeId)
-            ->whereNotNull('recipe_type_id')
-            ->distinct()
-            ->pluck('recipe_type_id');
-
-        return RecipeType::whereIn('id', $recipeTypeIds)
-            ->orderBy('name')
-            ->get()
-            ->toArray();
-    }
-
-    private function calculateToTime(?string $fromTime, $durationMinutes): ?string
-    {
-        if (!$fromTime || !$durationMinutes) {
-            return null;
-        }
-
-        return Carbon::parse($fromTime)->addMinutes((int) $durationMinutes)->format('H:i');
-    }
-
-    private function fetchRecipes(int $recipeTypeId, int $itemId): array
-    {
-        return Recipe::where('recipe_type_id', $recipeTypeId)
-            ->where('item_id', $itemId)
+        return Recipe::where('item_id', $itemId)
             ->where('status', true)
             ->orderBy('name')
             ->get()
@@ -200,32 +256,11 @@ class EventCreate extends Component
         $this->events[$index]['recipe_id']               = null;
         $this->events[$index]['batch_count']             = '';
 
-        unset($this->itemsByRow[$index], $this->recipeTypesByRow[$index], $this->recipesByRow[$index]);
+        unset($this->itemsByRow[$index], $this->recipesByRow[$index]);
 
-        if ($hasRecipe) {
-            $this->events[$index]['duration'] = null;
-            $this->events[$index]['to_time']  = '';
-            $this->itemTypesByRow[$index]     = $this->api->get('/v1/item-types')['data'] ?? [];
-        } else {
-            $this->events[$index]['duration'] = $eventType?->duration;
-            $this->events[$index]['to_time']  = $this->calculateToTime(
-                $this->events[$index]['from_time'] ?? null,
-                $eventType?->duration
-            ) ?? '';
-            unset($this->itemTypesByRow[$index]);
-        }
-    }
+        $this->itemTypesByRow[$index] = $this->allowedItemTypesFor($eventType);
 
-    public function onFromTimeChanged(int $index, $value): void
-    {
-        $this->events[$index]['from_time'] = $value;
-
-        if (empty($this->events[$index]['event_type_has_recipe'])) {
-            $this->events[$index]['to_time'] = $this->calculateToTime(
-                $value,
-                $this->events[$index]['duration'] ?? null
-            ) ?? '';
-        }
+        $this->events[$index]['duration'] = $hasRecipe ? null : $eventType?->duration;
     }
 
     public function onItemTypeChanged(int $index, $itemTypeId): void
@@ -236,14 +271,14 @@ class EventCreate extends Component
         $this->events[$index]['item_id']        = null;
         $this->events[$index]['recipe_type_id'] = null;
         $this->events[$index]['recipe_id']      = null;
+        $this->events[$index]['duration']       = null;
 
         unset($this->recipesByRow[$index]);
 
         if ($itemTypeId) {
-            $this->itemsByRow[$index]       = $this->fetchItemsForType($itemTypeId);
-            $this->recipeTypesByRow[$index] = $this->fetchRecipeTypesForItemType($itemTypeId);
+            $this->itemsByRow[$index] = $this->fetchItemsForType($itemTypeId);
         } else {
-            unset($this->itemsByRow[$index], $this->recipeTypesByRow[$index]);
+            unset($this->itemsByRow[$index]);
         }
     }
 
@@ -251,37 +286,61 @@ class EventCreate extends Component
     {
         $itemId = $itemId !== '' ? (int) $itemId : null;
 
-        $this->events[$index]['item_id']    = $itemId;
-        $this->events[$index]['recipe_id']  = null;
-
-        $recipeTypeId = $this->events[$index]['recipe_type_id'] ?? null;
-
-        if ($recipeTypeId && $itemId) {
-            $this->recipesByRow[$index] = $this->fetchRecipes((int) $recipeTypeId, $itemId);
-        } else {
-            unset($this->recipesByRow[$index]);
-        }
-    }
-
-    public function onRecipeTypeChanged(int $index, $recipeTypeId): void
-    {
-        $recipeTypeId = $recipeTypeId !== '' ? (int) $recipeTypeId : null;
-
-        $this->events[$index]['recipe_type_id'] = $recipeTypeId;
+        $this->events[$index]['item_id']        = $itemId;
+        $this->events[$index]['recipe_type_id'] = null;
         $this->events[$index]['recipe_id']      = null;
 
-        $itemId = $this->events[$index]['item_id'] ?? null;
-
-        if ($recipeTypeId && $itemId) {
-            $this->recipesByRow[$index] = $this->fetchRecipes($recipeTypeId, (int) $itemId);
+        if ($itemId) {
+            $this->recipesByRow[$index] = $this->fetchRecipes($itemId);
         } else {
             unset($this->recipesByRow[$index]);
         }
+
+        $this->recalculateDuration($index);
     }
 
     public function onRecipeChanged(int $index, $recipeId): void
     {
-        $this->events[$index]['recipe_id'] = $recipeId !== '' ? (int) $recipeId : null;
+        $recipeId = $recipeId !== '' ? (int) $recipeId : null;
+
+        $this->events[$index]['recipe_id'] = $recipeId;
+        // The dropdown is gone — the recipe type is carried along from the
+        // chosen recipe so it still gets stored and shown on the board.
+        $this->events[$index]['recipe_type_id'] = $recipeId
+            ? Recipe::find($recipeId)?->recipe_type_id
+            : null;
+
+        $this->recalculateDuration($index);
+    }
+
+    public function onBatchCountChanged(int $index, $batchCount): void
+    {
+        $this->events[$index]['batch_count'] = $batchCount;
+
+        $this->recalculateDuration($index);
+    }
+
+    /**
+     * Preview a recipe event's duration as soon as recipe, item and batch
+     * count are known — using any capacity defined for that item as an
+     * estimate, since the event isn't placed on a specific line/preparation
+     * yet. It's recalculated against the actual line once dropped on the
+     * calendar (see PlanBoard::dropEvent).
+     */
+    private function recalculateDuration(int $index): void
+    {
+        $event = $this->events[$index] ?? null;
+
+        if (!$event || empty($event['event_type_has_recipe'])) {
+            return;
+        }
+
+        if (!$event['recipe_id'] || !$event['item_id']) {
+            $this->events[$index]['duration'] = null;
+            return;
+        }
+
+        $this->events[$index]['duration'] = $this->durationService->computeEstimate(Event::make($event));
     }
 
     protected function rules(): array
@@ -292,14 +351,12 @@ class EventCreate extends Component
             $hasRecipe = !empty($event['event_type_has_recipe']);
 
             $rules["events.{$index}.event_type_id"] = 'required|exists:event_types,id';
-            $rules["events.{$index}.from_time"]      = 'required|date_format:H:i';
-            $rules["events.{$index}.to_time"]        = 'nullable|date_format:H:i';
             $rules["events.{$index}.description"]    = 'nullable|string|max:1000';
 
             $requiredIfRecipe = $hasRecipe ? 'required' : 'nullable';
             $rules["events.{$index}.item_type_id"]   = "{$requiredIfRecipe}|integer";
             $rules["events.{$index}.item_id"]        = "{$requiredIfRecipe}|integer";
-            $rules["events.{$index}.recipe_type_id"] = "{$requiredIfRecipe}|integer|exists:recipe_types,id";
+            $rules["events.{$index}.recipe_type_id"] = 'nullable|integer|exists:recipe_types,id';
             $rules["events.{$index}.recipe_id"]      = "{$requiredIfRecipe}|integer|exists:recipes,id";
             $rules["events.{$index}.batch_count"]    = "{$requiredIfRecipe}|string|max:255";
         }
@@ -310,135 +367,63 @@ class EventCreate extends Component
     protected $messages = [
         'events.*.event_type_id.required'  => 'Event type is required.',
         'events.*.event_type_id.exists'    => 'Selected event type is invalid.',
-        'events.*.from_time.required'      => 'From time is required.',
-        'events.*.from_time.date_format'   => 'Invalid time format (H:i).',
-        'events.*.to_time.date_format'     => 'Invalid time format (H:i).',
         'events.*.item_type_id.required'   => 'Item type is required.',
         'events.*.item_id.required'        => 'Item is required.',
-        'events.*.recipe_type_id.required' => 'Recipe type is required.',
         'events.*.recipe_id.required'      => 'Recipe is required.',
         'events.*.batch_count.required'    => 'Batch number is required.',
     ];
 
-    private function validateShiftTimes(): bool
+    /**
+     * For an event that's already placed on the calendar, recompute its
+     * duration (recipe events: from batch/recipe/capacity; otherwise: from
+     * the event type) and shift its to_time accordingly, since the from_time
+     * placement itself doesn't change here.
+     */
+    private function recomputePlacedDuration(array $event, bool $hasRecipe): array
     {
-        if (!$this->plan->shift) {
-            return true;
+        $duration = $hasRecipe ? null : $event['duration'];
+
+        if (!empty($event['placeable_type']) && !empty($event['placeable_id'])) {
+            if ($hasRecipe && $event['recipe_id'] && $event['item_id']) {
+                $duration = $this->durationService->compute(
+                    Event::make($event),
+                    $event['placeable_type'],
+                    (int) $event['placeable_id']
+                );
+            }
+
+            $toTime = ($event['from_time_raw'] && $duration)
+                ? Carbon::parse($event['from_time_raw'])->addMinutes((int) $duration)->format('Y-m-d H:i:s')
+                : null;
+        } else {
+            $toTime = null;
         }
 
-        $shiftFrom  = Carbon::parse($this->plan->shift->from_time);
-        $shiftTo    = Carbon::parse($this->plan->shift->to_time);
-        $shiftLabel = $shiftFrom->format('H:i') . ' – ' . $shiftTo->format('H:i');
-        $hasErrors  = false;
-
-        foreach ($this->events as $index => $event) {
-            if (empty($event['from_time'])) {
-                continue;
-            }
-
-            $eventFrom = Carbon::parse($event['from_time']);
-            $eventTo   = !empty($event['to_time']) ? Carbon::parse($event['to_time']) : null;
-
-            if ($eventFrom->lt($shiftFrom) || $eventFrom->gt($shiftTo)) {
-                $this->addError("events.{$index}.from_time", "Must be within shift hours ({$shiftLabel}).");
-                $hasErrors = true;
-            }
-
-            if ($eventTo) {
-                if ($eventTo->gt($shiftTo)) {
-                    $this->addError("events.{$index}.to_time", "Must be within shift hours ({$shiftLabel}).");
-                    $hasErrors = true;
-                }
-                if ($eventTo->lte($eventFrom)) {
-                    $this->addError("events.{$index}.to_time", 'Must be after the from time.');
-                    $hasErrors = true;
-                }
-            }
-        }
-
-        return !$hasErrors;
-    }
-
-    private function validateNoOverlap(): bool
-    {
-        $count     = count($this->events);
-        $hasErrors = false;
-
-        for ($i = 0; $i < $count; $i++) {
-            $a = $this->events[$i];
-            if (empty($a['from_time'])) {
-                continue;
-            }
-
-            $aFrom = Carbon::parse($a['from_time']);
-            $aTo   = !empty($a['to_time']) ? Carbon::parse($a['to_time']) : null;
-
-            for ($j = $i + 1; $j < $count; $j++) {
-                $b = $this->events[$j];
-                if (empty($b['from_time'])) {
-                    continue;
-                }
-
-                $bFrom = Carbon::parse($b['from_time']);
-                $bTo   = !empty($b['to_time']) ? Carbon::parse($b['to_time']) : null;
-
-                $overlaps = false;
-
-                if ($aTo && $bTo) {
-                    // Both have ranges: overlap when aFrom < bTo AND bFrom < aTo
-                    $overlaps = $aFrom->lt($bTo) && $bFrom->lt($aTo);
-                } elseif ($aTo) {
-                    // A is a range, B is a point
-                    $overlaps = $bFrom->gte($aFrom) && $bFrom->lt($aTo);
-                } elseif ($bTo) {
-                    // B is a range, A is a point
-                    $overlaps = $aFrom->gte($bFrom) && $aFrom->lt($bTo);
-                } else {
-                    // Both are points — overlap only if identical
-                    $overlaps = $aFrom->eq($bFrom);
-                }
-
-                if ($overlaps) {
-                    $this->addError(
-                        "events.{$i}.from_time",
-                        "Event #" . ($i + 1) . " overlaps with event #" . ($j + 1) . "."
-                    );
-                    $this->addError(
-                        "events.{$j}.from_time",
-                        "Event #" . ($j + 1) . " overlaps with event #" . ($i + 1) . "."
-                    );
-                    $hasErrors = true;
-                }
-            }
-        }
-
-        return !$hasErrors;
+        return [
+            'calculated_duration' => $hasRecipe ? $duration : null,
+            'planned_duration'    => $hasRecipe ? null : $duration,
+            'to_time'             => $toTime,
+        ];
     }
 
     public function submit(): void
     {
         $this->validate();
 
-        if (!$this->validateShiftTimes()) {
-            return;
-        }
-
-        if (!$this->validateNoOverlap()) {
-            return;
-        }
-
         $typeNames = EventType::whereIn('id',
             array_filter(array_column($this->events, 'event_type_id'))
         )->pluck('name', 'id');
 
+        \DB::beginTransaction();
         try {
-            \DB::beginTransaction();
 
             if (!empty($this->removedEventIds)) {
                 Event::whereIn('id', $this->removedEventIds)
                     ->where('plan_id', $this->planId)
                     ->delete();
             }
+
+            $createdPlans = collect();
 
             foreach ($this->events as $event) {
                 $hasRecipe = !empty($event['event_type_has_recipe']);
@@ -447,22 +432,34 @@ class EventCreate extends Component
                     'plan_id'        => $this->planId,
                     'event_type_id'  => $event['event_type_id'],
                     'name'           => $typeNames[$event['event_type_id']] ?? '',
-                    'from_time'      => $event['from_time'],
-                    'to_time'        => $event['to_time'] ?: null,
                     'description'    => $event['description'] ?: null,
-                    'item_type_id'   => $hasRecipe ? $event['item_type_id'] : null,
+                    'item_type_id'   => $event['item_type_id'] ?: null,
                     'item_id'        => $hasRecipe ? $event['item_id'] : null,
                     'recipe_type_id' => $hasRecipe ? $event['recipe_type_id'] : null,
                     'recipe_id'      => $hasRecipe ? $event['recipe_id'] : null,
                     'batch_count'    => $hasRecipe ? $event['batch_count'] : null,
-                    'planned_duration' => $hasRecipe ? null : $event['duration'],
-                ];
+                ] + $this->recomputePlacedDuration($event, $hasRecipe);
+
+                // A duration change can push a placed event past midnight
+                // (or pull it back): to_plan_id links it to the plan of the
+                // day it now ends on, creating that plan — and, on a month
+                // boundary, its month plan — when missing.
+                ['to_plan_id' => $toPlanId, 'created' => $created] = $this->carryOverService->carryOverLink(
+                    $this->plan,
+                    $event['from_time_raw'] ?? null,
+                    $data['to_time']
+                );
+
+                $data['to_plan_id'] = $toPlanId;
+                $createdPlans       = $createdPlans->merge($created);
 
                 if (!empty($event['id'])) {
                     Event::where('id', $event['id'])
                         ->where('plan_id', $this->planId)
                         ->update($data);
                 } else {
+                    // New events start unplaced — their time slot is set by
+                    // dragging them onto the plan board calendar.
                     Event::create($data);
                 }
             }
@@ -470,8 +467,12 @@ class EventCreate extends Component
             \DB::commit();
             $this->removedEventIds = [];
 
-            redirect()->route('plans.view', $this->planId)
-                ->with('success', 'Events saved successfully.');
+            if ($message = $this->carryOverService->describeCreatedPlans($createdPlans)) {
+                session()->flash('success', "An event runs past midnight — {$message}");
+            }
+
+            // Full page reload so the plan board re-renders with the saved event(s).
+            $this->redirect(route('plans.view', $this->planId));
 
         } catch (\Exception $e) {
             \DB::rollBack();
