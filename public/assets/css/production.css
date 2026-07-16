@@ -459,5 +459,41 @@
     border-top-right-radius: 0; border-bottom-right-radius: 0;
 }
 
+/* Read-only cards on the Actual/Downtime grids */
+.pbc-card--static { cursor: pointer; }
+.pbc-card--static:active { cursor: pointer; }
+.pbc-card--static .pbc-card-type,
+.pbc-card--static .pbc-card-duration {
+    position: relative; z-index: 1;
+    text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+/* Still running: open right edge */
+.pbc-card--running {
+    border-right: 3px dotted rgba(255,255,255,.9);
+    border-top-right-radius: 0; border-bottom-right-radius: 0;
+}
+/* Emergency overlay segments inside an actual-time card */
+.pbc-card-seg {
+    position: absolute; top: 0; bottom: 0;
+    background: repeating-linear-gradient(45deg,
+        rgba(220,53,69,.95) 0, rgba(220,53,69,.95) 6px,
+        rgba(165,29,42,.95) 6px, rgba(165,29,42,.95) 12px);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
+    pointer-events: none;
+}
+
+/* Board mode legend (Actual / Downtime) */
+.pbc-legend { display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pbc-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; }
+.pbc-legend-swatch {
+    display: inline-block; width: 14px; height: 10px; border-radius: 3px;
+    border: 1px solid rgba(0,0,0,.12);
+}
+.pbc-legend-swatch--emergency {
+    background: repeating-linear-gradient(45deg,
+        rgba(220,53,69,.95) 0, rgba(220,53,69,.95) 4px,
+        rgba(165,29,42,.95) 4px, rgba(165,29,42,.95) 8px);
+}
+
 /* Plan board header: previous/next day navigation */
 .pb-day-nav { display: inline-flex; align-items: center; border-radius: 20px; }

@@ -66,6 +66,11 @@ class PlanBoard extends Component
     #[Url(except: 'board')]
     public string $view = 'board';
 
+    // Which board grid is shown: planned (editable), actual (real run times
+    // with emergency segments) or downtime (emergency events only).
+    #[Url(except: 'planned')]
+    public string $boardMode = 'planned';
+
     protected Collection $allEvents;
 
     protected ApiService $api;
@@ -86,12 +91,23 @@ class PlanBoard extends Component
         if (!in_array($this->view, ['board', 'list'], true)) {
             $this->view = 'board';
         }
+
+        if (!in_array($this->boardMode, ['planned', 'actual', 'downtime'], true)) {
+            $this->boardMode = 'planned';
+        }
     }
 
     public function updatedView($value): void
     {
         if (!in_array($value, ['board', 'list'], true)) {
             $this->view = 'board';
+        }
+    }
+
+    public function updatedBoardMode($value): void
+    {
+        if (!in_array($value, ['planned', 'actual', 'downtime'], true)) {
+            $this->boardMode = 'planned';
         }
     }
 
@@ -149,7 +165,7 @@ class PlanBoard extends Component
 
     protected function loadEvents(): void
     {
-        $events = Event::with('eventType', 'recipe', 'productionLine', 'placeable')
+        $events = Event::with('eventType', 'recipe', 'productionLine', 'placeable', 'statusLogs', 'pauseActivities')
             ->withExists(['pauseActivities as has_open_emergencies' => fn($q) => $q->whereNull('ended_at')])
             ->where('plan_id', $this->plan->id)
             ->orderBy('from_time')
@@ -173,7 +189,7 @@ class PlanBoard extends Component
 
         $dayStart = Carbon::parse($this->plan->date)->startOfDay();
 
-        return Event::with('eventType', 'recipe', 'productionLine', 'placeable')
+        return Event::with('eventType', 'recipe', 'productionLine', 'placeable', 'statusLogs', 'pauseActivities')
             ->where('plan_id', '!=', $this->plan->id)
             ->whereNotNull('placeable_id')
             ->whereNotNull('from_time')
@@ -214,24 +230,15 @@ class PlanBoard extends Component
         $rows = [];
 
         foreach ($this->productionLines as $pl) {
-            $lanes = collect($pl->preparations->map(fn($p) => ['type' => 'preparation', 'id' => $p->id, 'name' => $p->name]))
-                ->concat($pl->lines->map(fn($l) => ['type' => 'line', 'id' => $l->id, 'name' => $l->name]))
-                ->values();
-
             $laneRows = [];
-            foreach ($lanes as $lane) {
-                $placeableClass = $this->classForAlias($lane['type']);
-
-                $laneEvents = $this->allEvents
-                    ->where('production_line_id', $pl->id)
-                    ->where('placeable_type', $placeableClass)
-                    ->where('placeable_id', $lane['id'])
-                    ->sortBy(fn(Event $e) => $this->eventFromHour($e))
-                    ->values();
-
+            foreach ($this->laneList($pl) as $lane) {
                 $laneRows[] = [
                     'lane'   => $lane,
-                    'layout' => $this->layoutTracks($laneEvents),
+                    'layout' => $this->layoutTracks(
+                        $this->laneEvents($pl->id, $lane)
+                            ->sortBy(fn(Event $e) => $this->eventFromHour($e))
+                            ->values()
+                    ),
                 ];
             }
 
@@ -242,6 +249,21 @@ class PlanBoard extends Component
         }
 
         return $rows;
+    }
+
+    protected function laneList($productionLine): Collection
+    {
+        return collect($productionLine->preparations->map(fn($p) => ['type' => 'preparation', 'id' => $p->id, 'name' => $p->name]))
+            ->concat($productionLine->lines->map(fn($l) => ['type' => 'line', 'id' => $l->id, 'name' => $l->name]))
+            ->values();
+    }
+
+    protected function laneEvents(int $productionLineId, array $lane): Collection
+    {
+        return $this->allEvents
+            ->where('production_line_id', $productionLineId)
+            ->where('placeable_type', $this->classForAlias($lane['type']))
+            ->where('placeable_id', $lane['id']);
     }
 
     protected function layoutTracks(Collection $events): array
@@ -309,6 +331,237 @@ class PlanBoard extends Component
         $minutes = $event->calculated_duration ?: $event->planned_duration;
 
         return $minutes ? max((float) $minutes, 15) / 60 : 1.0;
+    }
+
+    // ─── Actual & Downtime grids ──────────────────────────────────────────────
+
+    /**
+     * Lane rows for the read-only grids: 'actual' shows events at their real
+     * run times (start → end status logs) with emergency events as red
+     * segments; 'downtime' shows only the emergency events.
+     */
+    public function readonlyLaneRows(string $mode): array
+    {
+        $rows = [];
+
+        foreach ($this->productionLines as $pl) {
+            $laneRows = [];
+            foreach ($this->laneList($pl) as $lane) {
+                $events = $this->laneEvents($pl->id, $lane);
+
+                $items = $mode === 'actual'
+                    ? $this->actualItems($events)
+                    : $this->downtimeItems($events);
+
+                $laneRows[] = [
+                    'lane'   => $lane,
+                    'layout' => $this->packTracks($items),
+                ];
+            }
+
+            $rows[] = [
+                'production_line' => $pl,
+                'lanes'           => $laneRows,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The real run window of an event: first start log → last end log, or
+     * "still running" (now) when it hasn't been ended yet.
+     */
+    protected function actualWindow(Event $event): ?array
+    {
+        $startLog = $event->statusLogs->firstWhere('action', 'start');
+
+        if (!$startLog) {
+            return null;
+        }
+
+        $endLog  = $event->statusLogs->where('action', 'terminate')->last();
+        $running = !$endLog;
+
+        $start = $this->logHappenedAt($startLog);
+        $end   = $endLog ? $this->logHappenedAt($endLog) : now();
+
+        if ($end->lte($start)) {
+            $end = $start->copy()->addMinutes(15);
+        }
+
+        return [$start, $end, $running];
+    }
+
+    protected function actualItems(Collection $events): array
+    {
+        $items = [];
+
+        foreach ($events as $event) {
+            $window = $this->actualWindow($event);
+
+            if (!$window) {
+                continue;
+            }
+
+            [$start, $end, $running] = $window;
+
+            $hours = $this->hoursWindow($start, $end);
+
+            if (!$hours) {
+                continue;
+            }
+
+            [$fromHour, $spanHours] = $hours;
+
+            $segments       = [];
+            $emergencyCount = 0;
+
+            foreach ($event->pauseActivities as $activity) {
+                $segStart = $activity->happened_at ? Carbon::parse($activity->happened_at) : $activity->created_at;
+                $segEnd   = $activity->ended_at ? Carbon::parse($activity->ended_at) : now();
+
+                $segHours = $this->hoursWindow($segStart, $segEnd);
+
+                if (!$segHours) {
+                    continue;
+                }
+
+                [$segFromHour, $segSpanHours] = $segHours;
+
+                // Position relative to the card, clamped inside it.
+                $left  = ($segFromHour - $fromHour) / $spanHours * 100;
+                $width = $segSpanHours / $spanHours * 100;
+
+                if ($left >= 100 || $left + $width <= 0) {
+                    continue;
+                }
+
+                $left  = max($left, 0);
+                $width = min($width, 100 - $left);
+
+                $typeName = $activity->event_type_name ?: ($activity->eventType?->name ?? 'Emergency');
+
+                $segments[] = [
+                    'left'  => round($left, 2),
+                    'width' => round(max($width, 1), 2),
+                    'title' => $typeName . ': ' . $segStart->format('H:i') . ' – ' . ($activity->ended_at ? $segEnd->format('H:i') : 'ongoing'),
+                ];
+                $emergencyCount++;
+            }
+
+            $items[] = [
+                'key'       => 'actual-' . $event->id . ($event->is_carry_over ?? false ? '-carry' : ''),
+                'event_id'  => $event->id,
+                'color'     => $event->eventType?->color ?? '#818cf8',
+                'label'     => $event->eventType?->name ?? 'No type',
+                'sub'       => $start->format('H:i') . ' – ' . ($running ? 'now' : $end->format('H:i')),
+                'title'     => ($event->eventType?->name ?? 'No type')
+                    . ' — actual ' . $start->format('d M H:i') . ' – ' . ($running ? 'still running' : $end->format('d M H:i'))
+                    . ($emergencyCount ? " · {$emergencyCount} emergency event" . ($emergencyCount > 1 ? 's' : '') : ''),
+                'running'   => $running,
+                'fromHour'  => $fromHour,
+                'spanHours' => $spanHours,
+                'segments'  => $segments,
+            ];
+        }
+
+        return $items;
+    }
+
+    protected function downtimeItems(Collection $events): array
+    {
+        $items = [];
+
+        foreach ($events as $event) {
+            foreach ($event->pauseActivities as $activity) {
+                $start   = $activity->happened_at ? Carbon::parse($activity->happened_at) : $activity->created_at;
+                $ongoing = !$activity->ended_at;
+                $end     = $activity->ended_at ? Carbon::parse($activity->ended_at) : now();
+
+                $hours = $this->hoursWindow($start, $end);
+
+                if (!$hours) {
+                    continue;
+                }
+
+                [$fromHour, $spanHours] = $hours;
+
+                $typeName = $activity->event_type_name ?: ($activity->eventType?->name ?? 'Emergency');
+
+                $items[] = [
+                    'key'       => 'downtime-' . $activity->id,
+                    'event_id'  => $event->id,
+                    'color'     => '#dc3545',
+                    'label'     => $typeName,
+                    'sub'       => $start->format('H:i') . ' – ' . ($ongoing ? 'ongoing' : $end->format('H:i')),
+                    'title'     => $typeName . ' — ' . ($event->eventType?->name ?? $event->name)
+                        . ' · ' . $start->format('d M H:i') . ' – ' . ($ongoing ? 'ongoing' : $end->format('d M H:i'))
+                        . ($activity->end_note ? ' · ' . $activity->end_note : ''),
+                    'running'   => $ongoing,
+                    'fromHour'  => $fromHour,
+                    'spanHours' => $spanHours,
+                    'segments'  => [],
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Converts a datetime window to board hours, clipped to this board's
+     * 24h day; null when the window falls entirely outside it.
+     */
+    protected function hoursWindow($from, $to): ?array
+    {
+        $dayStart = Carbon::parse($this->plan->date)->startOfDay()->getTimestamp();
+        $dayEnd   = $dayStart + 24 * 60 * 60;
+
+        $fromTs = max(Carbon::parse($from)->getTimestamp(), $dayStart);
+        $toTs   = min(Carbon::parse($to)->getTimestamp(), $dayEnd);
+
+        if ($toTs <= $fromTs) {
+            return null;
+        }
+
+        return [
+            ($fromTs - $dayStart) / 3600,
+            max(($toTs - $fromTs) / 3600, 0.25),
+        ];
+    }
+
+    /**
+     * Same track packing as layoutTracks, for pre-computed item arrays.
+     */
+    protected function packTracks(array $items): array
+    {
+        usort($items, fn($a, $b) => $a['fromHour'] <=> $b['fromHour']);
+
+        $trackEnds = [];
+
+        foreach ($items as &$item) {
+            $end   = $item['fromHour'] + $item['spanHours'];
+            $track = null;
+
+            foreach ($trackEnds as $i => $endHour) {
+                if ($item['fromHour'] >= $endHour - 0.001) {
+                    $track         = $i;
+                    $trackEnds[$i] = $end;
+                    break;
+                }
+            }
+
+            if ($track === null) {
+                $trackEnds[] = $end;
+                $track       = count($trackEnds) - 1;
+            }
+
+            $item['track'] = $track;
+        }
+        unset($item);
+
+        return ['tracks' => max(count($trackEnds), 1), 'items' => $items];
     }
 
     public function dropEvent(int $eventId, int $productionLineId, string $placeableAlias, int $placeableId, int $slot): void
