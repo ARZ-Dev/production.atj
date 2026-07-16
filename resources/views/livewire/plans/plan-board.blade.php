@@ -463,10 +463,18 @@
 
                     @elseif($eventAction['action'] === 'activities')
 
+                    @if($eventAction['can_add'])
                     <div class="d-flex align-items-center gap-2 mb-3" style="font-size: 12px;">
                         <span class="badge bg-warning text-dark">Paused</span>
                         <span class="text-muted">since {{ $eventAction['paused_at'] ?? '—' }}</span>
                     </div>
+                    @else
+                    <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 12px;">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        This event still has ongoing emergency events — end them below.
+                        New emergency events can only be added while the event is paused.
+                    </div>
+                    @endif
 
                     <div class="mb-3">
                         <div class="fw-bold mb-1" style="font-size: 13px;">Recorded Emergency Events</div>
@@ -548,6 +556,7 @@
                         @endif
                     </div>
 
+                    @if($eventAction['can_add'])
                     <div class="fw-bold mb-1" style="font-size: 13px;">Add Emergency Events</div>
                     <div class="mb-2" style="max-width: 260px;">
                         <label class="form-label mb-1" style="font-size: 12px;">Time <span class="text-danger">*</span></label>
@@ -587,16 +596,21 @@
                     <button type="button" class="btn btn-light-primary btn-sm" wire:click="addPauseActivityRow">
                         <i class="bi bi-plus-circle me-1"></i> Add another
                     </button>
+                    @endif
 
                     @endif
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">
+                        {{ $eventAction['action'] === 'activities' && !$eventAction['can_add'] ? 'Close' : 'Cancel' }}
+                    </button>
+                    @if($eventAction['action'] !== 'activities' || $eventAction['can_add'])
                     <button type="button" class="btn {{ $actionMeta['btn'] }}" wire:click="submitEventAction"
                         wire:loading.attr="disabled" wire:target="submitEventAction">
                         <span wire:loading wire:target="submitEventAction" class="spinner-border spinner-border-sm me-1"></span>
                         {{ $actionMeta['submit'] }}
                     </button>
+                    @endif
                 </div>
                 @endif
             </div>
@@ -652,14 +666,23 @@
                             </div>
                             @endif
                             @if(!empty($log['activities']))
-                            <div class="mt-1" style="font-size: 12px;">
+                            <div class="mt-2" style="font-size: 12px;">
                                 <span class="text-muted">Emergency events:</span>
-                                @foreach($log['activities'] as $activity)
-                                <span class="badge bg-primary me-1"
-                                    title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}{{ $activity['ended_at'] ? ' — ended ' . $activity['ended_at'] : '' }}{{ $activity['end_note'] ? ' — ' . $activity['end_note'] : '' }}">
-                                    {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min expected' : '' }}{{ $activity['actual_duration'] !== null ? ' · ' . $activity['actual_duration'] . ' min actual' : '' }}
-                                </span>
-                                @endforeach
+                                <div class="d-flex flex-column gap-1 mt-1">
+                                    @foreach($log['activities'] as $activity)
+                                    <div>
+                                        <span class="badge bg-primary me-1">{{ $activity['type_name'] }}</span>
+                                        <span class="text-muted">
+                                            {{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}{{ $activity['expected_duration'] ? ' · expected ' . $activity['expected_duration'] . ' min' : '' }}{{ $activity['ended_at'] ? ' · ended ' . $activity['ended_at'] : '' }}{{ $activity['actual_duration'] !== null ? ' · actual ' . $activity['actual_duration'] . ' min' : '' }}
+                                        </span>
+                                        @if($activity['end_note'])
+                                        <div class="ms-1" style="font-size: 11px;">
+                                            <i class="bi bi-chat-left-text me-1 text-muted"></i>{{ $activity['end_note'] }}
+                                        </div>
+                                        @endif
+                                    </div>
+                                    @endforeach
+                                </div>
                             </div>
                             @endif
                             @if($log['reason'])
@@ -707,12 +730,21 @@
                             <div class="text-muted mb-2" style="font-size: 11px;">
                                 Recorded while paused, before pause logging was available.
                             </div>
-                            @foreach($eventHistory['other_activities'] as $activity)
-                            <span class="badge bg-primary me-1 mb-1"
-                                title="Added {{ $activity['at'] }}{{ $activity['by'] ? ' by ' . $activity['by'] : '' }}{{ $activity['ended_at'] ? ' — ended ' . $activity['ended_at'] : '' }}{{ $activity['end_note'] ? ' — ' . $activity['end_note'] : '' }}">
-                                {{ $activity['type_name'] }}{{ $activity['expected_duration'] ? ' · ' . $activity['expected_duration'] . ' min expected' : '' }}{{ $activity['actual_duration'] !== null ? ' · ' . $activity['actual_duration'] . ' min actual' : '' }}
-                            </span>
-                            @endforeach
+                            <div class="d-flex flex-column gap-1" style="font-size: 12px;">
+                                @foreach($eventHistory['other_activities'] as $activity)
+                                <div>
+                                    <span class="badge bg-primary me-1">{{ $activity['type_name'] }}</span>
+                                    <span class="text-muted">
+                                        {{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}{{ $activity['expected_duration'] ? ' · expected ' . $activity['expected_duration'] . ' min' : '' }}{{ $activity['ended_at'] ? ' · ended ' . $activity['ended_at'] : '' }}{{ $activity['actual_duration'] !== null ? ' · actual ' . $activity['actual_duration'] . ' min' : '' }}
+                                    </span>
+                                    @if($activity['end_note'])
+                                    <div class="ms-1" style="font-size: 11px;">
+                                        <i class="bi bi-chat-left-text me-1 text-muted"></i>{{ $activity['end_note'] }}
+                                    </div>
+                                    @endif
+                                </div>
+                                @endforeach
+                            </div>
                         </div>
                         @endif
                     </div>

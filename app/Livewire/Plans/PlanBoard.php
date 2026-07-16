@@ -150,6 +150,7 @@ class PlanBoard extends Component
     protected function loadEvents(): void
     {
         $events = Event::with('eventType', 'recipe', 'productionLine', 'placeable')
+            ->withExists(['pauseActivities as has_open_emergencies' => fn($q) => $q->whereNull('ended_at')])
             ->where('plan_id', $this->plan->id)
             ->orderBy('from_time')
             ->get();
@@ -406,6 +407,11 @@ class PlanBoard extends Component
             return;
         }
 
+        // Resuming or ending requires every emergency event to be closed first.
+        if (in_array($action, ['resume', 'terminate'], true) && $this->blockedByOpenEmergencies($event, $action)) {
+            return;
+        }
+
         $this->resetActionForm();
 
         $needsRecipeModal = (bool) $event->eventType?->has_recipe && $event->recipe;
@@ -446,6 +452,38 @@ class PlanBoard extends Component
         ]);
 
         return false;
+    }
+
+    protected function openEmergencyCount(int $eventId): int
+    {
+        return EventPauseActivity::where('event_id', $eventId)
+            ->whereNull('ended_at')
+            ->count();
+    }
+
+    /**
+     * Resume/end are blocked while emergency events are still ongoing, so
+     * every one of them gets an end time and note.
+     */
+    protected function blockedByOpenEmergencies(Event $event, string $action): bool
+    {
+        $count = $this->openEmergencyCount($event->id);
+
+        if ($count === 0) {
+            return false;
+        }
+
+        $verb   = $action === 'terminate' ? 'ending' : 'resuming';
+        $plural = $count > 1;
+
+        $this->dispatch('swal:error', [
+            'title' => 'Ongoing emergency events',
+            'text'  => "This event has {$count} ongoing emergency event" . ($plural ? 's' : '')
+                . '. Use the "Emergency" button to end ' . ($plural ? 'them' : 'it')
+                . " before {$verb} the event.",
+        ]);
+
+        return true;
     }
 
     protected function resetActionForm(): void
@@ -710,10 +748,14 @@ class PlanBoard extends Component
             ->where('plan_id', $this->plan->id)
             ->findOrFail($eventId);
 
-        if ($event->status !== 'paused') {
+        $isPaused = $event->status === 'paused';
+
+        // Open for paused events (view + add), and for any event that still
+        // has ongoing emergency events, so they can always be ended.
+        if (!$isPaused && $this->openEmergencyCount($event->id) === 0) {
             $this->dispatch('swal:error', [
                 'title' => 'Action not allowed',
-                'text'  => 'Activities can only be added while the event is paused.',
+                'text'  => 'Emergency events can only be added while the event is paused.',
             ]);
 
             return;
@@ -737,7 +779,10 @@ class PlanBoard extends Component
 
         $this->eventAction = array_merge($this->baseActionPayload($event, 'activities'), [
             'pause_log_id'        => $pauseLog?->id,
-            'paused_at'           => $pauseLog ? $pauseLog->created_at->format('d M Y H:i') : null,
+            'paused_at'           => $pauseLog ? $this->logHappenedAt($pauseLog)->format('d M Y H:i') : null,
+            // New emergency events can only be added while paused; otherwise
+            // the modal is just for ending the ongoing ones.
+            'can_add'             => $isPaused,
             // All activities ever recorded for the event, so earlier pauses
             // (and legacy pauses without a log) stay visible.
             'existing_activities' => $this->eventActivities($event->id),
@@ -818,7 +863,7 @@ class PlanBoard extends Component
         if ($event->status !== 'paused') {
             $this->dispatch('swal:error', [
                 'title' => 'Action not allowed',
-                'text'  => 'Activities can only be added while the event is paused.',
+                'text'  => 'Emergency events can only be added while the event is paused.',
             ]);
             $this->closeActionModal();
 
@@ -888,6 +933,12 @@ class PlanBoard extends Component
 
         // The board may have changed since the modal opened.
         if (!$this->assertTransitionAllowed($event, $action)) {
+            $this->closeActionModal();
+
+            return;
+        }
+
+        if (in_array($action, ['resume', 'terminate'], true) && $this->blockedByOpenEmergencies($event, $action)) {
             $this->closeActionModal();
 
             return;

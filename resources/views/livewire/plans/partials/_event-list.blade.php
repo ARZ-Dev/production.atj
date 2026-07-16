@@ -97,6 +97,17 @@
                             <span class="text-muted" style="font-size: 11px;" title="Manage this event from the previous day's plan">—</span>
                             @else
                             @hasPermission('production.event-create')
+                            @if($statusKey === 'paused' || ($event->has_open_emergencies ?? false))
+                            <button type="button" class="btn btn-light-primary btn-sm"
+                                wire:click.stop="openPauseActivities({{ $event->id }})"
+                                wire:loading.attr="disabled" wire:target="openPauseActivities"
+                                title="{{ $statusKey === 'paused' ? 'Record emergency events during this pause (cleaning, maintenance, …)' : 'This event still has ongoing emergency events — end them here' }}">
+                                <i class="bi bi-exclamation-triangle"></i> Emergency
+                                @if($event->has_open_emergencies ?? false)
+                                <span class="badge bg-danger ms-1">!</span>
+                                @endif
+                            </button>
+                            @endif
                             @if($statusKey === '')
                             <button type="button" class="btn btn-light-success btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'start')"
@@ -116,12 +127,6 @@
                                 <i class="bi bi-stop-fill"></i> End
                             </button>
                             @elseif($statusKey === 'paused')
-                            <button type="button" class="btn btn-light-primary btn-sm"
-                                wire:click.stop="openPauseActivities({{ $event->id }})"
-                                wire:loading.attr="disabled" wire:target="openPauseActivities"
-                                title="Record emergency events during this pause (cleaning, maintenance, …)">
-                                <i class="bi bi-exclamation-triangle"></i> Emergency
-                            </button>
                             <button type="button" class="btn btn-light-success btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'resume')"
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
