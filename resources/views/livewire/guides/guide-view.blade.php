@@ -1,146 +1,142 @@
-<div>
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h5 class="card-title mb-0">
-                        <i class="bi bi-journal-text me-1"></i>
-                        @if($guide)
-                            {{ $guide->getName($lang) }}
-                        @else
-                            {{ $lang === 'pr' ? 'Guia' : 'Guide' }}
-                        @endif
-                    </h5>
-                    <div class="d-flex align-items-center gap-2">
-                        @if($guide)
-                        <button type="button" class="btn btn-light text-muted" wire:click="backToList">
-                            <i class="bi bi-arrow-left me-1"></i> {{ $lang === 'pr' ? 'Todos os guias' : 'All guides' }}
-                        </button>
-                        @endif
+<div class="guide-portal" id="guidePortal">
 
-                        <div class="btn-group" role="group" aria-label="Language">
-                            <button type="button" class="btn btn-sm {{ $lang === 'en' ? 'btn-primary' : 'btn-outline-primary' }}"
-                                wire:click="setLang('en')">
-                                English
-                            </button>
-                            <button type="button" class="btn btn-sm {{ $lang === 'pr' ? 'btn-primary' : 'btn-outline-primary' }}"
-                                wire:click="setLang('pr')">
-                                Português
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <button type="button" class="guide-mobile-toggle" aria-label="Toggle guide menu"
+        onclick="document.getElementById('guidePortal').classList.toggle('sidebar-open')">
+        <i class="bi bi-list"></i>
+    </button>
+    <div class="guide-backdrop"
+        onclick="document.getElementById('guidePortal').classList.remove('sidebar-open')"></div>
 
-            @if(!$guide)
-            {{-- Guide list grouped by category --}}
+    {{-- ── Left panel ─────────────────────────────────── --}}
+    <aside class="guide-sidebar">
+        <a href="{{ route('dashboard') }}" class="guide-back">
+            <i class="bi bi-arrow-left"></i>
+            {{ $lang === 'pr' ? 'Voltar ao painel' : 'Back to dashboard' }}
+        </a>
+
+        <div class="guide-search">
+            <input type="text" wire:model.live.debounce.300ms="search"
+                placeholder="{{ $lang === 'pr' ? 'Pesquisar guias...' : 'Search guides...' }}">
+            <i class="bi bi-search"></i>
+        </div>
+
+        <div class="guide-lang">
+            <button type="button" class="{{ $lang === 'en' ? 'active' : '' }}" wire:click="setLang('en')">
+                <svg width="17" height="17" viewBox="0 0 32 32" aria-hidden="true">
+                    <clipPath id="gv-flag-uk"><circle cx="16" cy="16" r="16"/></clipPath>
+                    <g clip-path="url(#gv-flag-uk)">
+                        <rect width="32" height="32" fill="#012169"/>
+                        <path d="M0 0 L32 32 M32 0 L0 32" stroke="#fff" stroke-width="6"/>
+                        <path d="M0 0 L32 32 M32 0 L0 32" stroke="#C8102E" stroke-width="3"/>
+                        <path d="M16 0 V32 M0 16 H32" stroke="#fff" stroke-width="10"/>
+                        <path d="M16 0 V32 M0 16 H32" stroke="#C8102E" stroke-width="5"/>
+                    </g>
+                </svg>
+                English
+            </button>
+            <button type="button" class="{{ $lang === 'pr' ? 'active' : '' }}" wire:click="setLang('pr')">
+                <svg width="17" height="17" viewBox="0 0 32 32" aria-hidden="true">
+                    <clipPath id="gv-flag-pt"><circle cx="16" cy="16" r="16"/></clipPath>
+                    <g clip-path="url(#gv-flag-pt)">
+                        <rect width="32" height="32" fill="#D80027"/>
+                        <rect width="13" height="32" fill="#046A38"/>
+                        <circle cx="13" cy="16" r="5.5" fill="#FFDA44"/>
+                    </g>
+                </svg>
+                Português
+            </button>
+        </div>
+
+        <nav class="guide-nav">
             @forelse($categories as $category)
-            @if($category->guides->isNotEmpty())
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-folder2-open me-1"></i> {{ $category->getName($lang) }}</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        @foreach($category->guides as $g)
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded p-3 h-100 d-flex justify-content-between align-items-center"
-                                role="button" wire:click="selectGuide({{ $g->id }})">
-                                <div>
-                                    <h6 class="mb-1">{{ $g->getName($lang) }}</h6>
-                                    <span class="text-muted fs-12">
-                                        {{ $g->sections_count }} {{ $lang === 'pr' ? ($g->sections_count === 1 ? 'seção' : 'seções') : Str::plural('section', $g->sections_count) }}
-                                    </span>
-                                </div>
-                                <i class="bi bi-chevron-right text-muted"></i>
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-            @endif
+            <div class="guide-cat-label">{{ $category->getName($lang) }}</div>
+
+            @foreach($category->guides as $g)
+            <button type="button" wire:click="selectGuide({{ $g->id }})" wire:key="guide-nav-{{ $g->id }}"
+                class="guide-nav-item {{ $selectedGuideId === $g->id ? 'active' : '' }}">
+                {{ $g->getName($lang) }}
+            </button>
+            @endforeach
             @empty
-            <div class="card">
-                <div class="card-body text-center text-muted py-5">
-                    <i class="bi bi-journal-x fs-1 d-block mb-2"></i>
+            <div class="guide-nav-empty">
+                <i class="bi bi-search"></i>
+                @if(trim($search) !== '')
+                    {{ $lang === 'pr' ? 'Nenhum guia corresponde à sua pesquisa.' : 'No guides match your search.' }}
+                @else
                     {{ $lang === 'pr' ? 'Nenhum guia disponível ainda.' : 'No guides available yet.' }}
-                </div>
+                @endif
             </div>
             @endforelse
+        </nav>
+    </aside>
 
-            @else
-            {{-- Guide content --}}
-            <div class="row">
-                <div class="col-lg-3 mb-3">
-                    <div class="card position-sticky" style="top: 90px;">
-                        <div class="card-header">
-                            <h6 class="mb-0">{{ $lang === 'pr' ? 'Seções' : 'Sections' }}</h6>
-                        </div>
-                        <div class="card-body p-2">
-                            @if($guide->sections->isEmpty())
-                            <p class="text-muted fs-13 mb-0 px-2 py-1">
-                                {{ $lang === 'pr' ? 'Nenhuma seção ainda.' : 'No sections yet.' }}
-                            </p>
-                            @else
-                            <ul class="nav flex-column">
-                                @foreach($guide->sections as $section)
-                                <li class="nav-item">
-                                    <a class="nav-link px-2 py-2 d-flex align-items-center gap-2"
-                                        href="#guide-section-{{ $section->id }}">
-                                        <span class="badge bg-light-primary rounded-pill">{{ $loop->iteration }}</span>
-                                        {{ $section->getName($lang) }}
-                                    </a>
-                                </li>
-                                @endforeach
-                            </ul>
-                            @endif
-                        </div>
+    {{-- ── Content ────────────────────────────────────── --}}
+    <main class="guide-main">
+        @if($guide)
+
+        @if($guide->category)
+        <div class="guide-cat-crumb">{{ $guide->category->getName($lang) }}</div>
+        @endif
+
+        <h1 class="guide-title">{{ $guide->getName($lang) }}</h1>
+
+        @forelse($guide->sections as $section)
+        <div class="guide-section-card" wire:key="guide-section-{{ $section->id }}">
+            <h2 class="guide-section-title">{{ $section->getName($lang) }}</h2>
+
+            @forelse($section->blocks as $block)
+            <div class="guide-block" wire:key="guide-block-{{ $block->id }}">
+                @if($block->getTitle($lang))
+                <h3 class="guide-block-title">{{ $block->getTitle($lang) }}</h3>
+                @endif
+
+                @if($block->getSubtitle($lang))
+                <p class="guide-block-subtitle">{{ $block->getSubtitle($lang) }}</p>
+                @endif
+
+                @if($block->getContent($lang))
+                <div class="ql-snow">
+                    <div class="ql-editor guide-rich">
+                        {!! $block->getContent($lang) !!}
                     </div>
                 </div>
-
-                <div class="col-lg-9">
-                    @forelse($guide->sections as $section)
-                    <div class="card mb-3" id="guide-section-{{ $section->id }}">
-                        <div class="card-header d-flex align-items-center gap-2">
-                            <span class="badge bg-primary rounded-pill">{{ $loop->iteration }}</span>
-                            <h5 class="mb-0">{{ $section->getName($lang) }}</h5>
-                        </div>
-                        <div class="card-body">
-                            @forelse($section->blocks as $block)
-                            <div class="{{ $loop->last ? '' : 'border-bottom pb-4 mb-4' }}">
-                                @if($block->getTitle($lang))
-                                <h5 class="mb-1">{{ $block->getTitle($lang) }}</h5>
-                                @endif
-                                @if($block->getSubtitle($lang))
-                                <p class="text-muted mb-2">{{ $block->getSubtitle($lang) }}</p>
-                                @endif
-                                @if($block->getContent($lang))
-                                <div class="ql-snow">
-                                    <div class="ql-editor p-0" style="min-height:auto;">
-                                        {!! $block->getContent($lang) !!}
-                                    </div>
-                                </div>
-                                @endif
-                            </div>
-                            @empty
-                            <p class="text-muted mb-0">
-                                {{ $lang === 'pr' ? 'Nenhum conteúdo nesta seção ainda.' : 'No content in this section yet.' }}
-                            </p>
-                            @endforelse
-                        </div>
-                    </div>
-                    @empty
-                    <div class="card">
-                        <div class="card-body text-center text-muted py-5">
-                            <i class="bi bi-journal fs-1 d-block mb-2"></i>
-                            {{ $lang === 'pr' ? 'Este guia ainda não tem conteúdo.' : 'This guide has no content yet.' }}
-                        </div>
-                    </div>
-                    @endforelse
-                </div>
+                @endif
             </div>
-            @endif
+            @empty
+            <p class="guide-block-subtitle mb-0">
+                {{ $lang === 'pr' ? 'Nenhum conteúdo nesta seção ainda.' : 'No content in this section yet.' }}
+            </p>
+            @endforelse
         </div>
-    </div>
+        @empty
+        <div class="guide-section-card">
+            <p class="guide-block-subtitle mb-0">
+                {{ $lang === 'pr' ? 'Este guia ainda não tem conteúdo.' : 'This guide has no content yet.' }}
+            </p>
+        </div>
+        @endforelse
+
+        @else
+        <div class="guide-welcome">
+            <div class="guide-welcome-icon">
+                <i class="bi bi-journal-text"></i>
+            </div>
+            <h2>{{ $lang === 'pr' ? 'Bem-vindo ao Guia do Usuário' : 'Welcome to the User Guide' }}</h2>
+            <p>
+                {{ $lang === 'pr'
+                    ? 'Selecione um guia no menu à esquerda para ver as instruções passo a passo.'
+                    : 'Select a guide from the menu on the left to see step-by-step instructions.' }}
+            </p>
+        </div>
+        @endif
+    </main>
+
+    @script
+    <script>
+        $wire.on('guide-selected', () => {
+            document.querySelector('.guide-main')?.scrollTo({ top: 0 });
+            document.getElementById('guidePortal')?.classList.remove('sidebar-open');
+        });
+    </script>
+    @endscript
 </div>

@@ -10,6 +10,7 @@ class GuideView extends Component
 {
     public $selectedGuideId = null;
     public string $lang = 'en';
+    public string $search = '';
 
     public function mount($id = null)
     {
@@ -23,11 +24,7 @@ class GuideView extends Component
     {
         Guide::findOrFail($id);
         $this->selectedGuideId = (int) $id;
-    }
-
-    public function backToList()
-    {
-        $this->selectedGuideId = null;
+        $this->dispatch('guide-selected');
     }
 
     public function setLang(string $lang)
@@ -39,26 +36,29 @@ class GuideView extends Component
 
     public function render()
     {
-        $guide = null;
-        $categories = collect();
+        $categories = GuideCategory::with(['guides' => function ($q) {
+                $q->orderBy('name_en');
 
-        if ($this->selectedGuideId) {
-            $guide = Guide::with(['category', 'sections.blocks'])->find($this->selectedGuideId);
+                if (trim($this->search) !== '') {
+                    $term = '%' . trim($this->search) . '%';
+                    $q->where(fn($qq) => $qq->where('name_en', 'like', $term)->orWhere('name_pr', 'like', $term));
+                }
+            }])
+            ->orderBy('name_en')
+            ->get()
+            ->filter(fn($category) => $category->guides->isNotEmpty());
 
-            if (!$guide) {
-                $this->selectedGuideId = null;
-            }
-        }
+        $guide = $this->selectedGuideId
+            ? Guide::with(['category', 'sections.blocks'])->find($this->selectedGuideId)
+            : null;
 
-        if (!$guide) {
-            $categories = GuideCategory::with(['guides' => fn($q) => $q->withCount('sections')->orderBy('name_en')])
-                ->orderBy('name_en')
-                ->get();
+        if ($this->selectedGuideId && !$guide) {
+            $this->selectedGuideId = null;
         }
 
         return view('livewire.guides.guide-view', [
             'guide' => $guide,
             'categories' => $categories,
-        ]);
+        ])->layout('components.layouts.guide');
     }
 }

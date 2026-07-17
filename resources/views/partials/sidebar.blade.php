@@ -443,13 +443,6 @@
                                             </a>
                                         </li>
 
-                                        <li class="pe-slide-item">
-                                            <a href="{{ route('guides.view') }}"
-                                                class="pe-nav-link {{ request()->is('admin/guides/view*') ? 'active' : '' }}">
-                                                View Guide
-                                            </a>
-                                        </li>
-
                                     </ul>
                                 </li>
 
