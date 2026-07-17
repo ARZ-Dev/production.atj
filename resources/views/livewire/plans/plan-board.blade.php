@@ -72,6 +72,46 @@
 
     @else
 
+    <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Board mode">
+            <button type="button" class="btn {{ $boardMode === 'planned' ? 'btn-primary' : 'btn-light' }}"
+                wire:click="$set('boardMode', 'planned')" title="Planned times — drag & drop to schedule">
+                <i class="bi bi-calendar-check me-1"></i> Planned
+            </button>
+            <button type="button" class="btn {{ $boardMode === 'actual' ? 'btn-primary' : 'btn-light' }}"
+                wire:click="$set('boardMode', 'actual')" title="Real run times, with emergency events in red">
+                <i class="bi bi-activity me-1"></i> Actual
+            </button>
+            <button type="button" class="btn {{ $boardMode === 'downtime' ? 'btn-primary' : 'btn-light' }}"
+                wire:click="$set('boardMode', 'downtime')" title="Emergency events only">
+                <i class="bi bi-exclamation-triangle me-1"></i> Downtime
+            </button>
+        </div>
+        @if($boardMode === 'actual')
+        <div class="pbc-legend">
+            <span class="pbc-legend-item"><span class="pbc-legend-swatch" style="background:#818cf8;"></span> Actual run time</span>
+            <span class="pbc-legend-item"><span class="pbc-legend-swatch pbc-legend-swatch--emergency"></span> Emergency event</span>
+            <span class="text-muted" style="font-size: 11px;">Only events that have been started appear here.</span>
+        </div>
+        @elseif($boardMode === 'downtime')
+        <div class="pbc-legend">
+            <span class="pbc-legend-item"><span class="pbc-legend-swatch pbc-legend-swatch--emergency"></span> Emergency event (cleaning, maintenance, …)</span>
+        </div>
+        @endif
+    </div>
+
+    @if($boardMode !== 'planned')
+
+    @include('livewire.plans.partials._readonly-grid', [
+        'rows'         => $this->readonlyLaneRows($boardMode),
+        'mode'         => $boardMode,
+        'emptyMessage' => $boardMode === 'actual'
+            ? 'No events have been started on this day yet — start an event from the list view and it will appear here with its real run time.'
+            : 'No emergency events have been recorded on this day.',
+    ])
+
+    @else
+
     <div class="pbc-wrap">
         <div class="pbc-tray">
             <div class="pbc-tray-head">
@@ -150,6 +190,8 @@
             </div>
         </div>
     </div>
+
+    @endif
     @endif
 
     <!-- Event Details Modal -->
