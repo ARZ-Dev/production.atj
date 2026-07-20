@@ -223,6 +223,35 @@ class PlanBoard extends Component
             ->values();
     }
 
+    /**
+     * Actual run times for the list view, from the status logs: the first
+     * "start" and the last "end" (terminate). Delay is how many minutes the
+     * actual start ran past the planned from_time (positive = late, negative
+     * = early, null = not started or not scheduled).
+     */
+    public function eventActualTimes(Event $event): array
+    {
+        $startLog = $event->statusLogs->firstWhere('action', 'start');
+        $endLog   = $event->statusLogs->where('action', 'terminate')->last();
+
+        $actualStart = $startLog ? $this->logHappenedAt($startLog) : null;
+        $actualEnd   = $endLog ? $this->logHappenedAt($endLog) : null;
+
+        $delay = null;
+        if ($actualStart && $event->from_time) {
+            $delay = (int) round(
+                ($actualStart->getTimestamp() - Carbon::parse($event->from_time)->getTimestamp()) / 60
+            );
+        }
+
+        return [
+            'start'   => $actualStart,
+            'end'     => $actualEnd,
+            'running' => $startLog && !$endLog,
+            'delay'   => $delay,
+        ];
+    }
+
     // ─── Calendar layout ──────────────────────────────────────────────────────
 
     public function laneRows(): array

@@ -290,6 +290,19 @@
 }
 .ec-type-select.is-invalid { border-color: #dc3545 !important; }
 
+/* selectpicker widths inside the event popup */
+.ec-type-select-wrap { flex: 1; min-width: 0; }
+.ec-type-select-wrap .bootstrap-select,
+.ec-card-body .bootstrap-select { width: 100% !important; }
+/* Match the tinted event-type control look on its selectpicker button */
+.ec-type-select-wrap .bootstrap-select > .btn {
+    border-radius: 8px !important; font-size: 13px; font-weight: 500;
+    border-color: rgba(130,130,180,.2) !important;
+    background-color: rgba(129,140,248,.04) !important;
+}
+.ec-type-select-wrap.is-invalid .bootstrap-select > .btn { border-color: #dc3545 !important; }
+.ec-card-body .bootstrap-select > .btn { font-size: 13px; }
+
 .ec-badge-new  { background: rgba(52,211,153,.12);  color: #34d399; border-radius: 5px; padding: 3px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .ec-badge-saved{ background: rgba(129,140,248,.12); color: #818cf8; border-radius: 5px; padding: 3px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; }
 

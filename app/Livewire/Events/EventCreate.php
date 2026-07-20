@@ -215,6 +215,25 @@ class EventCreate extends Component
 
         unset($this->events[$index]);
         $this->events = array_values($this->events);
+
+        // Keep the per-row option maps aligned with the re-indexed rows.
+        $this->itemTypesByRow = $this->reindexAfterRemoval($this->itemTypesByRow, $index);
+        $this->itemsByRow     = $this->reindexAfterRemoval($this->itemsByRow, $index);
+        $this->recipesByRow   = $this->reindexAfterRemoval($this->recipesByRow, $index);
+    }
+
+    private function reindexAfterRemoval(array $map, int $removedIndex): array
+    {
+        $result = [];
+
+        foreach ($map as $i => $value) {
+            if ($i === $removedIndex) {
+                continue;
+            }
+            $result[$i > $removedIndex ? $i - 1 : $i] = $value;
+        }
+
+        return $result;
     }
 
     // ─── Cascading option fetchers ───────────────────────────────────────────
@@ -261,13 +280,32 @@ class EventCreate extends Component
         $this->itemTypesByRow[$index] = $this->allowedItemTypesFor($eventType);
 
         $this->events[$index]['duration'] = $hasRecipe ? null : $eventType?->duration;
+
+        // Refresh the dependent selectpickers on the client (they are
+        // wire:ignore'd, so Livewire won't re-render their options).
+        $this->dispatch('ec-cascade',
+            key: $this->events[$index]['key'] ?? null,
+            hasRecipe: $hasRecipe,
+            itemTypes: array_values($this->itemTypesByRow[$index] ?? []),
+            items: [],
+            recipes: [],
+        );
     }
 
     public function onItemTypeChanged(int $index, $itemTypeId): void
     {
         $itemTypeId = $itemTypeId !== '' ? (int) $itemTypeId : null;
 
-        $this->events[$index]['item_type_id']   = $itemTypeId;
+        $this->events[$index]['item_type_id'] = $itemTypeId;
+
+        // For non-recipe events the item type is just metadata — it must not
+        // reset the item/recipe cascade or the event type's own duration.
+        $hasRecipe = !empty($this->events[$index]['event_type_has_recipe']);
+
+        if (!$hasRecipe) {
+            return;
+        }
+
         $this->events[$index]['item_id']        = null;
         $this->events[$index]['recipe_type_id'] = null;
         $this->events[$index]['recipe_id']      = null;
@@ -280,6 +318,12 @@ class EventCreate extends Component
         } else {
             unset($this->itemsByRow[$index]);
         }
+
+        $this->dispatch('ec-cascade',
+            key: $this->events[$index]['key'] ?? null,
+            items: array_values($this->itemsByRow[$index] ?? []),
+            recipes: [],
+        );
     }
 
     public function onItemChanged(int $index, $itemId): void
@@ -295,6 +339,11 @@ class EventCreate extends Component
         } else {
             unset($this->recipesByRow[$index]);
         }
+
+        $this->dispatch('ec-cascade',
+            key: $this->events[$index]['key'] ?? null,
+            recipes: array_values($this->recipesByRow[$index] ?? []),
+        );
 
         $this->recalculateDuration($index);
     }
