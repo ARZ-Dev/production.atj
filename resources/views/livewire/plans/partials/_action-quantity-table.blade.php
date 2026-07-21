@@ -1,10 +1,20 @@
 {{--
-    Quantity rows for the status-action modal.
+    Quantity rows for the status-action modal, grouped by item type
+    (Raw Material, Packaging, …). The original row index is preserved as the
+    group key so the wire:model bindings keep pointing at the right row.
+
     Expects: $rows (array), $model (Livewire property name),
              $actualLabel, $percentLabel
 --}}
+@php
+    $groups = [];
+    foreach ($rows as $i => $row) {
+        $groupName = $row['item_type_name'] ?? 'Other';
+        $groups[$groupName][$i] = $row;
+    }
+@endphp
 <div class="table-responsive">
-    <table class="table table-sm align-middle mb-2">
+    <table class="table table-sm align-middle mb-2 aqt-table">
         <thead>
             <tr>
                 <th>Item</th>
@@ -14,8 +24,15 @@
                 <th style="width: 130px;">{{ $percentLabel }}</th>
             </tr>
         </thead>
-        <tbody>
-            @foreach($rows as $i => $row)
+        @foreach($groups as $groupName => $groupRows)
+        <tbody wire:key="{{ $model }}-group-{{ $loop->index }}">
+            <tr class="aqt-group-row">
+                <td colspan="5" class="aqt-group-title">
+                    <i class="bi bi-tag-fill me-1"></i>{{ $groupName }}
+                    <span class="aqt-group-count">{{ count($groupRows) }}</span>
+                </td>
+            </tr>
+            @foreach($groupRows as $i => $row)
             <tr wire:key="{{ $model }}-row-{{ $i }}">
                 <td>{{ $row['item_name'] ?? '—' }}</td>
                 <td>{{ $row['unit_name'] ?? '—' }}</td>
@@ -41,5 +58,6 @@
             </tr>
             @endforeach
         </tbody>
+        @endforeach
     </table>
 </div>
