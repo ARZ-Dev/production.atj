@@ -352,7 +352,7 @@
                         'rows'         => $actionInputs,
                         'model'        => 'actionInputs',
                         'actualLabel'  => 'Used Qty',
-                        'percentLabel' => '% Used',
+                        'percentLabel' => '% Difference',
                     ])
                     @else
                     <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
@@ -497,9 +497,12 @@
                             @enderror
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Reason</label>
-                            <textarea class="form-control" rows="3" wire:model="actionReason"
-                                placeholder="Optional resume notes…"></textarea>
+                            <label class="form-label">Reason <span class="text-danger">*</span></label>
+                            <textarea class="form-control @error('actionReason') is-invalid @enderror" rows="3"
+                                wire:model="actionReason" placeholder="Why is this event being resumed?"></textarea>
+                            @error('actionReason')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
                     </div>
 
@@ -535,7 +538,12 @@
                                 <tbody>
                                     @foreach($eventAction['existing_activities'] as $activity)
                                     <tr wire:key="existing-activity-{{ $activity['id'] }}">
-                                        <td>{{ $activity['type_name'] }}</td>
+                                        <td>
+                                            {{ $activity['type_name'] }}
+                                            @if($activity['reason'])
+                                            <div class="text-muted" style="font-size: 11px;"><i class="bi bi-chat-left-text me-1"></i>{{ $activity['reason'] }}</div>
+                                            @endif
+                                        </td>
                                         <td>{{ $activity['expected_duration'] ? $activity['expected_duration'] . ' min' : '—' }}</td>
                                         <td>{{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}</td>
                                         <td>
@@ -605,6 +613,14 @@
                         <input type="datetime-local" class="form-control form-control-sm @error('actionTime') is-invalid @enderror"
                             wire:model="actionTime">
                         @error('actionTime')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label mb-1" style="font-size: 12px;">Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control form-control-sm @error('actionReason') is-invalid @enderror" rows="2"
+                            wire:model="actionReason" placeholder="Why are these emergency events happening?"></textarea>
+                        @error('actionReason')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
@@ -717,6 +733,11 @@
                                         <span class="text-muted">
                                             {{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}{{ $activity['expected_duration'] ? ' · expected ' . $activity['expected_duration'] . ' min' : '' }}{{ $activity['ended_at'] ? ' · ended ' . $activity['ended_at'] : '' }}{{ $activity['actual_duration'] !== null ? ' · actual ' . $activity['actual_duration'] . ' min' : '' }}
                                         </span>
+                                        @if($activity['reason'])
+                                        <div class="ms-1" style="font-size: 11px;">
+                                            <span class="text-muted">Reason:</span> {{ $activity['reason'] }}
+                                        </div>
+                                        @endif
                                         @if($activity['end_note'])
                                         <div class="ms-1" style="font-size: 11px;">
                                             <i class="bi bi-chat-left-text me-1 text-muted"></i>{{ $activity['end_note'] }}
@@ -779,6 +800,11 @@
                                     <span class="text-muted">
                                         {{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}{{ $activity['expected_duration'] ? ' · expected ' . $activity['expected_duration'] . ' min' : '' }}{{ $activity['ended_at'] ? ' · ended ' . $activity['ended_at'] : '' }}{{ $activity['actual_duration'] !== null ? ' · actual ' . $activity['actual_duration'] . ' min' : '' }}
                                     </span>
+                                    @if($activity['reason'])
+                                    <div class="ms-1" style="font-size: 11px;">
+                                        <span class="text-muted">Reason:</span> {{ $activity['reason'] }}
+                                    </div>
+                                    @endif
                                     @if($activity['end_note'])
                                     <div class="ms-1" style="font-size: 11px;">
                                         <i class="bi bi-chat-left-text me-1 text-muted"></i>{{ $activity['end_note'] }}

@@ -20,18 +20,19 @@
             <div class="ec-card-head">
                 <span class="ec-seq-dot">{{ $loop->iteration }}</span>
 
-                <select
-                    class="form-select form-select-sm ec-type-select @error('events.'.$index.'.event_type_id') is-invalid @enderror"
-                    wire:model="events.{{ $index }}.event_type_id"
-                    wire:change="onEventTypeChanged({{ $index }}, $event.target.value)">
-                    <option value="">— Select event type —</option>
-                    @foreach($eventTypes as $type)
-                    <option value="{{ $type->id }}"
-                        @selected((int)($event['event_type_id'] ?? 0) === $type->id)>
-                        {{ $type->name }}
-                    </option>
-                    @endforeach
-                </select>
+                <div wire:ignore class="ec-type-select-wrap @error('events.'.$index.'.event_type_id') is-invalid @enderror">
+                    <select id="ec_event_type_{{ $event['key'] }}" data-key="{{ $event['key'] }}"
+                        class="selectpicker ec-event-type-select" data-width="100%"
+                        data-live-search="true" title="— Select event type —"
+                        wire:model="events.{{ $index }}.event_type_id">
+                        @foreach($eventTypes as $type)
+                        <option value="{{ $type->id }}"
+                            @selected((int)($event['event_type_id'] ?? 0) === $type->id)>
+                            {{ $type->name }}
+                        </option>
+                        @endforeach
+                    </select>
+                </div>
 
                 <span class="{{ !empty($event['id']) ? 'ec-badge-saved' : 'ec-badge-new' }}">
                     {{ !empty($event['id']) ? 'Saved' : 'New' }}
@@ -63,56 +64,64 @@
 
             <div class="ec-card-body">
 
-                @if(!empty($event['event_type_has_recipe']))
+                @php $rowKey = $event['key']; $rowHasRecipe = !empty($event['event_type_has_recipe']); @endphp
                 <div class="row g-2 mb-2">
+                    {{-- Item Type: always present so its selectpicker DOM stays stable --}}
                     <div class="col-6 col-md-3">
-                        <div class="ec-field-label">Item Type <span class="text-danger">*</span></div>
-                        <select class="form-select form-select-sm @error('events.'.$index.'.item_type_id') is-invalid @enderror"
-                            wire:model="events.{{ $index }}.item_type_id"
-                            wire:change="onItemTypeChanged({{ $index }}, $event.target.value)">
-                            <option value="">— Select —</option>
-                            @foreach($itemTypesByRow[$index] ?? [] as $type)
-                            <option value="{{ $type['id'] }}" @selected((int)($event['item_type_id'] ?? 0) === $type['id'])>
-                                {{ $type['name'] }}
-                            </option>
-                            @endforeach
-                        </select>
+                        <div class="ec-field-label">Item Type @if($rowHasRecipe)<span class="text-danger">*</span>@endif</div>
+                        <div wire:ignore>
+                            <select id="ec_item_type_{{ $rowKey }}" data-key="{{ $rowKey }}"
+                                class="selectpicker ec-item-type-select" data-width="100%"
+                                data-live-search="true" title="— Select —"
+                                wire:model="events.{{ $index }}.item_type_id">
+                                @foreach($itemTypesByRow[$index] ?? [] as $type)
+                                <option value="{{ $type['id'] }}" @selected((int)($event['item_type_id'] ?? 0) === $type['id'])>
+                                    {{ $type['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
                         @error('events.' . $index . '.item_type_id')
-                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                            <div class="text-danger small mt-1">{{ $message }}</div>
                         @enderror
                     </div>
 
+                    @if($rowHasRecipe)
                     <div class="col-6 col-md-3">
                         <div class="ec-field-label">Item <span class="text-danger">*</span></div>
-                        <select class="form-select form-select-sm @error('events.'.$index.'.item_id') is-invalid @enderror"
-                            wire:model="events.{{ $index }}.item_id"
-                            wire:change="onItemChanged({{ $index }}, $event.target.value)">
-                            <option value="">— Select —</option>
-                            @foreach($itemsByRow[$index] ?? [] as $item)
-                            <option value="{{ $item['id'] }}" @selected((int)($event['item_id'] ?? 0) === $item['id'])>
-                                {{ $item['name'] }}
-                            </option>
-                            @endforeach
-                        </select>
+                        <div wire:ignore>
+                            <select id="ec_item_{{ $rowKey }}" data-key="{{ $rowKey }}"
+                                class="selectpicker ec-item-select" data-width="100%"
+                                data-live-search="true" title="— Select —"
+                                wire:model="events.{{ $index }}.item_id">
+                                @foreach($itemsByRow[$index] ?? [] as $item)
+                                <option value="{{ $item['id'] }}" @selected((int)($event['item_id'] ?? 0) === $item['id'])>
+                                    {{ $item['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
                         @error('events.' . $index . '.item_id')
-                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                            <div class="text-danger small mt-1">{{ $message }}</div>
                         @enderror
                     </div>
 
                     <div class="col-6 col-md-3">
                         <div class="ec-field-label">Recipe <span class="text-danger">*</span></div>
-                        <select class="form-select form-select-sm @error('events.'.$index.'.recipe_id') is-invalid @enderror"
-                            wire:model="events.{{ $index }}.recipe_id"
-                            wire:change="onRecipeChanged({{ $index }}, $event.target.value)">
-                            <option value="">— Select —</option>
-                            @foreach($recipesByRow[$index] ?? [] as $recipe)
-                            <option value="{{ $recipe['id'] }}" @selected((int)($event['recipe_id'] ?? 0) === $recipe['id'])>
-                                {{ $recipe['name'] }}
-                            </option>
-                            @endforeach
-                        </select>
+                        <div wire:ignore>
+                            <select id="ec_recipe_{{ $rowKey }}" data-key="{{ $rowKey }}"
+                                class="selectpicker ec-recipe-select" data-width="100%"
+                                data-live-search="true" title="— Select —"
+                                wire:model="events.{{ $index }}.recipe_id">
+                                @foreach($recipesByRow[$index] ?? [] as $recipe)
+                                <option value="{{ $recipe['id'] }}" @selected((int)($event['recipe_id'] ?? 0) === $recipe['id'])>
+                                    {{ $recipe['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
                         @error('events.' . $index . '.recipe_id')
-                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                            <div class="text-danger small mt-1">{{ $message }}</div>
                         @enderror
                     </div>
 
@@ -135,32 +144,14 @@
                             Duration will be calculated when the event is placed on a production/preparation line.
                         </div>
                     </div>
-                </div>
-                @else
-                <div class="row g-2 mb-2">
-                    <div class="col-6 col-md-3">
-                        <div class="ec-field-label">Item Type</div>
-                        <select class="form-select form-select-sm @error('events.'.$index.'.item_type_id') is-invalid @enderror"
-                            wire:model="events.{{ $index }}.item_type_id">
-                            <option value="">— Select —</option>
-                            @foreach($itemTypesByRow[$index] ?? [] as $type)
-                            <option value="{{ $type['id'] }}" @selected((int)($event['item_type_id'] ?? 0) === $type['id'])>
-                                {{ $type['name'] }}
-                            </option>
-                            @endforeach
-                        </select>
-                        @error('events.' . $index . '.item_type_id')
-                            <div class="invalid-feedback d-block">{{ $message }}</div>
-                        @enderror
-                    </div>
-
+                    @else
                     <div class="col-6 col-md-3">
                         <div class="ec-field-label">Duration</div>
                         <input type="text" class="form-control form-control-sm" disabled
                                value="{{ $event['duration'] ? $event['duration'] . ' min' : '—' }}">
                     </div>
+                    @endif
                 </div>
-                @endif
 
                 <div>
                     <div class="ec-field-label">Description</div>
@@ -197,4 +188,71 @@
         </button>
     </div>
     @endif
+
+    @script
+    <script>
+
+        const ecRowIndex = (el) => $('.ec-card').index($(el).closest('.ec-card'));
+
+        const ecInitPicker = (el) => {
+            const $el = $(el);
+            if (!$el.data('selectpicker')) $el.selectpicker();
+        };
+
+        // Replace a dependent picker's options (and clear its selection).
+        const ecApplyOptions = (id, options) => {
+            const $el = $('#' + $.escapeSelector(id));
+            // console.log('ecApplyOptions', id, options, $el, '#' + $.escapeSelector(id));
+            if (!$el.length || typeof setOptions !== 'function') return;
+            setOptions($el, options || []);
+            $el.selectpicker('val', '');
+        };
+
+        const EC_SELECTS = '.ec-event-type-select, .ec-item-type-select, .ec-item-select, .ec-recipe-select';
+
+        // Boot: initialise pickers already in the DOM.
+        $('.ec-card .selectpicker').each(function () { ecInitPicker(this); });
+
+        // New rows / recipe fields that Livewire adds to the DOM.
+        Livewire.hook('morph.added', ({ el }) => {
+            if (el.nodeType !== 1) return;
+            $(el).find('.selectpicker').addBack('.selectpicker').filter(EC_SELECTS)
+                .each(function () { ecInitPicker(this); });
+        });
+
+        // Pickers measure to zero width while the modal is hidden — refresh
+        // them once it is shown.
+        $(document).on('shown.bs.modal', '#eventCreateModal', function () {
+            $('#eventCreateModal .selectpicker').selectpicker();
+        });
+
+        // ── Cascades: a change calls its server handler, which dispatches
+        //    "ec-cascade" with the dependent options for this row. ────────────
+        $(document).on('change', '.ec-event-type-select', function () {
+            if ($(this).val() === '') return;
+            $wire.call('onEventTypeChanged', ecRowIndex(this), $(this).val());
+        });
+        $(document).on('change', '.ec-item-type-select', function () {
+            if ($(this).val() === '') return;
+            $wire.call('onItemTypeChanged', ecRowIndex(this), $(this).val());
+        });
+        $(document).on('change', '.ec-item-select', function () {
+            if ($(this).val() === '') return;
+            $wire.call('onItemChanged', ecRowIndex(this), $(this).val());
+        });
+        $(document).on('change', '.ec-recipe-select', function () {
+            if ($(this).val() === '') return;
+            $wire.call('onRecipeChanged', ecRowIndex(this), $(this).val());
+        });
+
+        $wire.on('ec-cascade', (e) => {
+            if (!e || !e.key) return;
+
+            if (e.itemTypes !== undefined) ecApplyOptions('ec_item_type_' + e.key, e.itemTypes);
+            if (e.items      !== undefined) ecApplyOptions('ec_item_'      + e.key, e.items);
+            if (e.recipes    !== undefined) ecApplyOptions('ec_recipe_'    + e.key, e.recipes);
+        });
+
+    </script>
+    @endscript
 </div>

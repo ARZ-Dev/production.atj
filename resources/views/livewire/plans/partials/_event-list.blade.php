@@ -22,7 +22,8 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="white-space: nowrap;">Time</th>
+                        <th style="white-space: nowrap;">Planned</th>
+                        <th style="white-space: nowrap;">Actual</th>
                         <th>Event</th>
                         <th>Recipe</th>
                         <th>Duration</th>
@@ -55,16 +56,55 @@
 
                         $statusKey = $event->status ?: '';
                         $status    = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'badge' => 'bg-secondary'];
+
+                        $actual = $this->eventActualTimes($event);
+
+                        $fmtDelay = function ($mins) {
+                            $m = abs((int) $mins);
+                            if ($m >= 60) {
+                                $h = intdiv($m, 60); $r = $m % 60;
+                                return $r ? "{$h}h {$r}m" : "{$h}h";
+                            }
+                            return "{$m}m";
+                        };
                     @endphp
                     <tr wire:key="pbl-row-{{ $event->id }}{{ $isCarryOver ? '-carry' : '' }}"
                         wire:click="showEventDetails({{ $event->id }})"
                         style="cursor: pointer;" class="{{ $isCarryOver ? 'opacity-75' : '' }}">
                         <td style="white-space: nowrap;">
-                            <span class="fw-semibold">{{ $event->from_time ? \Carbon\Carbon::parse($event->from_time)->format('H:i') : '—' }}</span>{{ $event->to_time ? ' – ' . \Carbon\Carbon::parse($event->to_time)->format('H:i') : '' }}
+                            @if($event->from_time)
+                            <div class="text-muted" style="font-size: 11px;"><i class="bi bi-calendar3 me-1"></i>{{ \Carbon\Carbon::parse($event->from_time)->format('d M Y') }}</div>
+                            <div><span class="fw-semibold">{{ \Carbon\Carbon::parse($event->from_time)->format('H:i') }}</span>{{ $event->to_time ? ' – ' . \Carbon\Carbon::parse($event->to_time)->format('H:i') : '' }}</div>
                             @if($isCarryOver)
                             <div class="text-muted" style="font-size: 11px;"><i class="bi bi-arrow-bar-right"></i> started {{ \Carbon\Carbon::parse($event->from_time)->format('d M') }}</div>
                             @elseif($continuesNextDay)
                             <div class="text-muted" style="font-size: 11px;">ends {{ \Carbon\Carbon::parse($event->to_time)->format('d M') }} <i class="bi bi-arrow-bar-right"></i></div>
+                            @endif
+                            @else
+                            <span class="badge bg-light-secondary text-secondary">Not placed</span>
+                            @endif
+                        </td>
+                        <td style="white-space: nowrap;">
+                            @if($actual['start'])
+                            <div class="text-muted" style="font-size: 11px;"><i class="bi bi-calendar-check me-1"></i>{{ $actual['start']->format('d M Y') }}</div>
+                            <div>
+                                <span class="fw-semibold">{{ $actual['start']->format('H:i') }}</span>@if($actual['running'])<span class="text-success fw-semibold"> – running</span>@elseif($actual['end']) – {{ $actual['end']->format('H:i') }}@endif
+                            </div>
+                            @if($actual['delay'] !== null)
+                                @if($actual['delay'] > 0)
+                                <span class="badge bg-danger-subtle text-danger" style="font-size: 10px;" title="Started {{ $fmtDelay($actual['delay']) }} after the planned time">
+                                    <i class="bi bi-hourglass-split me-1"></i>{{ $fmtDelay($actual['delay']) }} late
+                                </span>
+                                @elseif($actual['delay'] < 0)
+                                <span class="badge bg-success-subtle text-success" style="font-size: 10px;" title="Started {{ $fmtDelay($actual['delay']) }} before the planned time">
+                                    <i class="bi bi-lightning-charge me-1"></i>{{ $fmtDelay($actual['delay']) }} early
+                                </span>
+                                @else
+                                <span class="badge bg-light-secondary text-secondary" style="font-size: 10px;">on time</span>
+                                @endif
+                            @endif
+                            @else
+                            <span class="text-muted">—</span>
                             @endif
                         </td>
                         <td>

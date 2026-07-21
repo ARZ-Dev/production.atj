@@ -63,6 +63,9 @@ class PlanBoard extends Component
     /** Per-request cache of items fetched from the API (id => data). */
     protected array $itemCache = [];
 
+    /** Per-request cache of item type names (id => name), lazily loaded. */
+    protected ?array $itemTypeNames = null;
+
     #[Url(except: 'board')]
     public string $view = 'board';
 
@@ -221,6 +224,35 @@ class PlanBoard extends Component
         return $this->allEvents
             ->sortBy(fn(Event $e) => [$e->is_carry_over ? 0 : 1, $this->eventFromHour($e)])
             ->values();
+    }
+
+    /**
+     * Actual run times for the list view, from the status logs: the first
+     * "start" and the last "end" (terminate). Delay is how many minutes the
+     * actual start ran past the planned from_time (positive = late, negative
+     * = early, null = not started or not scheduled).
+     */
+    public function eventActualTimes(Event $event): array
+    {
+        $startLog = $event->statusLogs->firstWhere('action', 'start');
+        $endLog   = $event->statusLogs->where('action', 'terminate')->last();
+
+        $actualStart = $startLog ? $this->logHappenedAt($startLog) : null;
+        $actualEnd   = $endLog ? $this->logHappenedAt($endLog) : null;
+
+        $delay = null;
+        if ($actualStart && $event->from_time) {
+            $delay = (int) round(
+                ($actualStart->getTimestamp() - Carbon::parse($event->from_time)->getTimestamp()) / 60
+            );
+        }
+
+        return [
+            'start'   => $actualStart,
+            'end'     => $actualEnd,
+            'running' => $startLog && !$endLog,
+            'delay'   => $delay,
+        ];
     }
 
     // ─── Calendar layout ──────────────────────────────────────────────────────
@@ -889,6 +921,7 @@ class PlanBoard extends Component
         return [
             'id'                => $activity->id,
             'type_name'         => $activity->event_type_name ?: ($activity->eventType?->name ?? '—'),
+            'reason'            => $activity->reason,
             'expected_duration' => $activity->expected_duration,
             'at'                => $startedAt->format('d M Y H:i'),
             'by'                => $activity->created_by_name,
@@ -923,6 +956,7 @@ class PlanBoard extends Component
             'recipe_input_id'        => $recipeInputId,
             'recipe_side_product_id' => $recipeSideProductId,
             'item_type_id'           => $itemTypeId,
+            'item_type_name'         => $this->itemTypeName($itemTypeId),
             'item_id'                => $itemId,
             'item_unit_id'           => $itemUnitId,
             'item_name'              => $itemName,
@@ -931,6 +965,25 @@ class PlanBoard extends Component
             'actual_quantity'        => null,
             'percentage'             => null,
         ];
+    }
+
+    /**
+     * Resolve an item type id to its name (Raw Material, Packaging, …) from
+     * the external item-types list, loaded once per request.
+     */
+    protected function itemTypeName(?int $itemTypeId): ?string
+    {
+        if (!$itemTypeId) {
+            return null;
+        }
+
+        if ($this->itemTypeNames === null) {
+            $this->itemTypeNames = collect($this->api->get('/v1/item-types')['data'] ?? [])
+                ->pluck('name', 'id')
+                ->all();
+        }
+
+        return $this->itemTypeNames[$itemTypeId] ?? null;
     }
 
     protected function itemAndUnitNames(?int $itemId, ?int $itemUnitId): array
@@ -1127,10 +1180,12 @@ class PlanBoard extends Component
 
         $this->validate(
             [
+                'actionReason'                      => 'required|string|max:1000',
                 'pauseActivityRows'                 => 'required|array|min:1',
                 'pauseActivityRows.*.event_type_id' => "required|in:{$allowedIds}",
             ],
             [
+                'actionReason.required'                      => 'Please enter a reason.',
                 'pauseActivityRows.*.event_type_id.required' => 'Please select an event type.',
                 'pauseActivityRows.*.event_type_id.in'       => 'Please select a valid event type.',
             ]
@@ -1147,6 +1202,7 @@ class PlanBoard extends Component
                     'event_status_log_id' => $pauseLog?->id,
                     'event_type_id'       => (int) $row['event_type_id'],
                     'event_type_name'     => $type['name'] ?? null,
+                    'reason'              => $this->actionReason,
                     'expected_duration'   => $type['duration'] ?? null,
                     'happened_at'         => $this->parsedActionTime(),
                     'created_by'          => authUser()?->id,
@@ -1271,6 +1327,11 @@ class PlanBoard extends Component
 
     protected function submitResume(Event $event): void
     {
+        $this->validate(
+            ['actionReason' => 'required|string|max:1000'],
+            ['actionReason.required' => 'Please enter a reason.']
+        );
+
         $pauseLog = $this->latestPauseLog($event->id);
         $resumeAt = $this->parsedActionTime();
 

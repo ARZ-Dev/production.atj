@@ -290,6 +290,19 @@
 }
 .ec-type-select.is-invalid { border-color: #dc3545 !important; }
 
+/* selectpicker widths inside the event popup */
+.ec-type-select-wrap { flex: 1; min-width: 0; }
+.ec-type-select-wrap .bootstrap-select,
+.ec-card-body .bootstrap-select { width: 100% !important; }
+/* Match the tinted event-type control look on its selectpicker button */
+.ec-type-select-wrap .bootstrap-select > .btn {
+    border-radius: 8px !important; font-size: 13px; font-weight: 500;
+    border-color: rgba(130,130,180,.2) !important;
+    background-color: rgba(129,140,248,.04) !important;
+}
+.ec-type-select-wrap.is-invalid .bootstrap-select > .btn { border-color: #dc3545 !important; }
+.ec-card-body .bootstrap-select > .btn { font-size: 13px; }
+
 .ec-badge-new  { background: rgba(52,211,153,.12);  color: #34d399; border-radius: 5px; padding: 3px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .ec-badge-saved{ background: rgba(129,140,248,.12); color: #818cf8; border-radius: 5px; padding: 3px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; }
 
@@ -480,6 +493,26 @@
         rgba(165,29,42,.95) 6px, rgba(165,29,42,.95) 12px);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
     pointer-events: none;
+}
+
+/* Status-action modal: item-type grouped quantity table */
+.aqt-table > tbody + tbody { border-top: 0; }
+.aqt-group-row td { padding: 0 !important; border: 0; }
+.aqt-group-title {
+    background: rgba(129,140,248,.10);
+    color: #4f46e5;
+    font-size: 13px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .6px;
+    padding: 8px 10px !important;
+    border-left: 3px solid #818cf8;
+    border-radius: 4px;
+}
+.aqt-group-title .bi { opacity: .8; }
+.aqt-group-count {
+    display: inline-block; margin-left: 8px;
+    background: rgba(129,140,248,.20); color: #4f46e5;
+    border-radius: 10px; padding: 1px 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0;
 }
 
 /* Board mode legend (Actual / Downtime) */
