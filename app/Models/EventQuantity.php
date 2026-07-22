@@ -22,6 +22,11 @@ class EventQuantity extends Model
         return $this->belongsTo(EventStatusLog::class, 'event_status_log_id');
     }
 
+    public function pauseActivity()
+    {
+        return $this->belongsTo(EventPauseActivity::class, 'event_pause_activity_id');
+    }
+
     public function recipeInput()
     {
         return $this->belongsTo(RecipeInput::class);
