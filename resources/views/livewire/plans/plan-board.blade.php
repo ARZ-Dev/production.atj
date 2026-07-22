@@ -543,6 +543,14 @@
                                             @if($activity['reason'])
                                             <div class="text-muted" style="font-size: 11px;"><i class="bi bi-chat-left-text me-1"></i>{{ $activity['reason'] }}</div>
                                             @endif
+                                            @if(!empty($activity['items']))
+                                            <div class="text-muted" style="font-size: 11px;">
+                                                <i class="bi bi-box-seam me-1"></i>
+                                                @foreach($activity['items'] as $usedItem)
+                                                {{ $usedItem['item_name'] }} {{ $usedItem['quantity'] + 0 }}{{ $usedItem['unit_name'] ? ' ' . $usedItem['unit_name'] : '' }}@if(!$loop->last), @endif
+                                                @endforeach
+                                            </div>
+                                            @endif
                                         </td>
                                         <td>{{ $activity['expected_duration'] ? $activity['expected_duration'] . ' min' : '—' }}</td>
                                         <td>{{ $activity['at'] }}{{ $activity['by'] ? ' · ' . $activity['by'] : '' }}</td>
@@ -625,30 +633,90 @@
                         @enderror
                     </div>
                     @foreach($pauseActivityRows as $i => $row)
-                    <div class="d-flex gap-2 align-items-start mb-2" wire:key="pause-activity-row-{{ $i }}">
-                        <div class="flex-grow-1">
-                            <select class="form-select form-select-sm @error("pauseActivityRows.{$i}.event_type_id") is-invalid @enderror"
-                                wire:model.live="pauseActivityRows.{{ $i }}.event_type_id">
-                                <option value="">Select event type…</option>
-                                @foreach($pauseEventTypes as $type)
-                                <option value="{{ $type['id'] }}">{{ $type['name'] }}</option>
+                    <div class="border rounded p-2 mb-2" wire:key="pause-activity-row-{{ $i }}">
+                        <div class="d-flex gap-2 align-items-start">
+                            <div class="flex-grow-1">
+                                <select class="form-select form-select-sm @error("pauseActivityRows.{$i}.event_type_id") is-invalid @enderror"
+                                    wire:model.live="pauseActivityRows.{{ $i }}.event_type_id">
+                                    <option value="">Select event type…</option>
+                                    @foreach($pauseEventTypes as $type)
+                                    <option value="{{ $type['id'] }}">{{ $type['name'] }}</option>
+                                    @endforeach
+                                </select>
+                                @error("pauseActivityRows.{$i}.event_type_id")
+                                <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div style="width: 140px;">
+                                @php $rowType = collect($pauseEventTypes)->firstWhere('id', (int) ($row['event_type_id'] ?? 0)); @endphp
+                                <input type="text" class="form-control form-control-sm" disabled
+                                    title="Expected duration"
+                                    value="{{ $rowType && $rowType['duration'] ? $rowType['duration'] . ' min' : '—' }}">
+                            </div>
+                            <button type="button" class="btn btn-light-danger btn-sm"
+                                wire:click="removePauseActivityRow({{ $i }})"
+                                @if(count($pauseActivityRows) <= 1) disabled @endif>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+
+                        @if(!empty($row['items']))
+                        @php
+                            $itemGroups = [];
+                            foreach ($row['items'] as $j => $emItem) {
+                                $itemGroups[$emItem['item_type_name'] ?? 'Other'][$j] = $emItem;
+                            }
+                        @endphp
+                        <div class="text-muted mt-2 mb-1" style="font-size: 11px;">
+                            <i class="bi bi-box-seam me-1"></i>Enter the quantity used for any item consumed — leave the rest empty.
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0 aqt-table" style="font-size: 12px;">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th style="width: 180px;">Unit</th>
+                                        <th style="width: 130px;">Qty Used</th>
+                                    </tr>
+                                </thead>
+                                @foreach($itemGroups as $groupName => $groupItems)
+                                <tbody wire:key="pa-{{ $i }}-group-{{ $loop->index }}">
+                                    <tr class="aqt-group-row">
+                                        <td colspan="3" class="aqt-group-title">
+                                            <i class="bi bi-tag-fill me-1"></i>{{ $groupName }}
+                                            <span class="aqt-group-count">{{ count($groupItems) }}</span>
+                                        </td>
+                                    </tr>
+                                    @foreach($groupItems as $j => $emItem)
+                                    <tr wire:key="pa-{{ $i }}-item-{{ $j }}">
+                                        <td>{{ $emItem['item_name'] ?? '—' }}</td>
+                                        <td>
+                                            <select class="form-select form-select-sm"
+                                                wire:model="pauseActivityRows.{{ $i }}.items.{{ $j }}.item_unit_id">
+                                                @foreach($emItem['units'] ?? [] as $unit)
+                                                <option value="{{ $unit['id'] }}">{{ $unit['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" step="any" min="0" placeholder="0"
+                                                class="form-control form-control-sm @error("pauseActivityRows.{$i}.items.{$j}.quantity") is-invalid @enderror"
+                                                wire:model="pauseActivityRows.{{ $i }}.items.{{ $j }}.quantity">
+                                            @error("pauseActivityRows.{$i}.items.{$j}.quantity")
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
                                 @endforeach
-                            </select>
-                            @error("pauseActivityRows.{$i}.event_type_id")
-                            <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            </table>
                         </div>
-                        <div style="width: 140px;">
-                            @php $rowType = collect($pauseEventTypes)->firstWhere('id', (int) ($row['event_type_id'] ?? 0)); @endphp
-                            <input type="text" class="form-control form-control-sm" disabled
-                                title="Expected duration"
-                                value="{{ $rowType && $rowType['duration'] ? $rowType['duration'] . ' min' : '—' }}">
+                        @elseif(!empty($row['event_type_id']))
+                        <div class="text-muted mt-2" style="font-size: 11px;">
+                            <i class="bi bi-info-circle me-1"></i>No item types are configured for this event type.
                         </div>
-                        <button type="button" class="btn btn-light-danger btn-sm"
-                            wire:click="removePauseActivityRow({{ $i }})"
-                            @if(count($pauseActivityRows) <= 1) disabled @endif>
-                            <i class="bi bi-trash"></i>
-                        </button>
+                        @endif
                     </div>
                     @endforeach
                     <button type="button" class="btn btn-light-primary btn-sm" wire:click="addPauseActivityRow">
@@ -738,6 +806,14 @@
                                             <span class="text-muted">Reason:</span> {{ $activity['reason'] }}
                                         </div>
                                         @endif
+                                        @if(!empty($activity['items']))
+                                        <div class="ms-1" style="font-size: 11px;">
+                                            <span class="text-muted">Items used:</span>
+                                            @foreach($activity['items'] as $usedItem)
+                                            {{ $usedItem['item_name'] }} {{ $usedItem['quantity'] + 0 }}{{ $usedItem['unit_name'] ? ' ' . $usedItem['unit_name'] : '' }}@if(!$loop->last), @endif
+                                            @endforeach
+                                        </div>
+                                        @endif
                                         @if($activity['end_note'])
                                         <div class="ms-1" style="font-size: 11px;">
                                             <i class="bi bi-chat-left-text me-1 text-muted"></i>{{ $activity['end_note'] }}
@@ -803,6 +879,14 @@
                                     @if($activity['reason'])
                                     <div class="ms-1" style="font-size: 11px;">
                                         <span class="text-muted">Reason:</span> {{ $activity['reason'] }}
+                                    </div>
+                                    @endif
+                                    @if(!empty($activity['items']))
+                                    <div class="ms-1" style="font-size: 11px;">
+                                        <span class="text-muted">Items used:</span>
+                                        @foreach($activity['items'] as $usedItem)
+                                        {{ $usedItem['item_name'] }} {{ $usedItem['quantity'] + 0 }}{{ $usedItem['unit_name'] ? ' ' . $usedItem['unit_name'] : '' }}@if(!$loop->last), @endif
+                                        @endforeach
                                     </div>
                                     @endif
                                     @if($activity['end_note'])

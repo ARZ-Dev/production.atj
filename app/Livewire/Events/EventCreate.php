@@ -482,7 +482,8 @@ class EventCreate extends Component
                     'event_type_id'  => $event['event_type_id'],
                     'name'           => $typeNames[$event['event_type_id']] ?? '',
                     'description'    => $event['description'] ?: null,
-                    'item_type_id'   => $event['item_type_id'] ?: null,
+                    // Item type only applies to recipe event types.
+                    'item_type_id'   => $hasRecipe ? ($event['item_type_id'] ?: null) : null,
                     'item_id'        => $hasRecipe ? $event['item_id'] : null,
                     'recipe_type_id' => $hasRecipe ? $event['recipe_type_id'] : null,
                     'recipe_id'      => $hasRecipe ? $event['recipe_id'] : null,

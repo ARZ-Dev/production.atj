@@ -894,7 +894,7 @@ class PlanBoard extends Component
         }
 
         return $pauseLog->pauseActivities()
-            ->with('eventType')
+            ->with('eventType', 'quantities')
             ->orderBy('id')
             ->get()
             ->map(fn(EventPauseActivity $activity) => $this->activityRow($activity))
@@ -906,7 +906,7 @@ class PlanBoard extends Component
      */
     protected function eventActivities(int $eventId): array
     {
-        return EventPauseActivity::with('eventType')
+        return EventPauseActivity::with('eventType', 'quantities')
             ->where('event_id', $eventId)
             ->orderBy('id')
             ->get()
@@ -928,6 +928,11 @@ class PlanBoard extends Component
             'ended_at'          => $activity->ended_at ? Carbon::parse($activity->ended_at)->format('d M Y H:i') : null,
             'end_note'          => $activity->end_note,
             'actual_duration'   => $activity->ended_at ? $this->minutesBetween($startedAt, $activity->ended_at) : null,
+            'items'             => $activity->quantities->map(fn(EventQuantity $qty) => [
+                'item_name' => $qty->item_name ?: ($qty->item_id ? "Item #{$qty->item_id}" : '—'),
+                'unit_name' => $qty->unit_name,
+                'quantity'  => (float) $qty->actual_quantity,
+            ])->all(),
         ];
     }
 
@@ -1021,6 +1026,11 @@ class PlanBoard extends Component
             );
         }
 
+        // Picking an emergency event type loads the items it may consume.
+        if (preg_match('/^pauseActivityRows\.(\d+)\.event_type_id$/', $property, $matches)) {
+            $this->loadPauseActivityItems((int) $matches[1], $value);
+        }
+
         // Changing the resume time re-computes the pause's actual duration.
         if ($property === 'actionTime'
             && ($this->eventAction['action'] ?? null) === 'resume'
@@ -1079,7 +1089,7 @@ class PlanBoard extends Component
             ])
             ->all();
 
-        $this->pauseActivityRows = [['event_type_id' => null]];
+        $this->pauseActivityRows = [$this->blankPauseActivityRow()];
 
         $pauseLog = $this->latestPauseLog($event->id);
 
@@ -1099,7 +1109,91 @@ class PlanBoard extends Component
 
     public function addPauseActivityRow(): void
     {
-        $this->pauseActivityRows[] = ['event_type_id' => null];
+        $this->pauseActivityRows[] = $this->blankPauseActivityRow();
+    }
+
+    protected function blankPauseActivityRow(): array
+    {
+        return ['event_type_id' => null, 'items' => []];
+    }
+
+    /**
+     * Items that may be consumed during an emergency event, taken from the
+     * item types configured on the selected event type.
+     */
+    protected function loadPauseActivityItems(int $index, $eventTypeId): void
+    {
+        if (!isset($this->pauseActivityRows[$index])) {
+            return;
+        }
+
+        $eventType = $eventTypeId ? EventType::find((int) $eventTypeId) : null;
+
+        if (!$eventType) {
+            $this->pauseActivityRows[$index]['items'] = [];
+
+            return;
+        }
+
+        $rows = [];
+
+        foreach ($eventType->item_type_ids ?? [] as $itemTypeId) {
+            $typeName = $this->itemTypeName((int) $itemTypeId);
+
+            foreach ($this->itemsForItemType((int) $itemTypeId) as $item) {
+                $units = $this->unitsForItem($item);
+                $basic = collect($units)->firstWhere('basic', true) ?: ($units[0] ?? null);
+
+                $rows[] = [
+                    'item_type_id'   => (int) $itemTypeId,
+                    'item_type_name' => $typeName ?: 'Other',
+                    'item_id'        => $item['id'] ?? null,
+                    'item_name'      => $item['name'] ?? null,
+                    'units'          => collect($units)->map(fn($u) => [
+                        'id'    => $u['id'] ?? null,
+                        'label' => ($u['name'] ?? '') . (!empty($u['symbol']) ? " ({$u['symbol']})" : ''),
+                    ])->values()->all(),
+                    'item_unit_id'   => $basic['id'] ?? null,
+                    'quantity'       => null,
+                ];
+            }
+        }
+
+        $this->pauseActivityRows[$index]['items'] = $rows;
+    }
+
+    protected function itemsForItemType(int $itemTypeId): array
+    {
+        $typeName = $this->itemTypeName($itemTypeId);
+
+        if (!$typeName) {
+            return [];
+        }
+
+        return $this->api->get('/v1/items', ['item_type' => $typeName, 'is_active' => true])['data'] ?? [];
+    }
+
+    /**
+     * Units for an item — from the list payload when it carries them, else
+     * from the item endpoint (cached per request).
+     */
+    protected function unitsForItem(array $item): array
+    {
+        if (!empty($item['units']) && is_array($item['units'])) {
+            return $item['units'];
+        }
+
+        $itemId = $item['id'] ?? null;
+
+        if (!$itemId) {
+            return [];
+        }
+
+        if (!array_key_exists($itemId, $this->itemCache)) {
+            $this->itemCache[$itemId] = $this->api->get("/v1/items/{$itemId}")['data'] ?? [];
+        }
+
+        return $this->itemCache[$itemId]['units'] ?? [];
     }
 
     public function removePauseActivityRow(int $index): void
@@ -1183,11 +1277,13 @@ class PlanBoard extends Component
                 'actionReason'                      => 'required|string|max:1000',
                 'pauseActivityRows'                 => 'required|array|min:1',
                 'pauseActivityRows.*.event_type_id' => "required|in:{$allowedIds}",
+                'pauseActivityRows.*.items.*.quantity' => 'nullable|numeric|min:0',
             ],
             [
                 'actionReason.required'                      => 'Please enter a reason.',
                 'pauseActivityRows.*.event_type_id.required' => 'Please select an event type.',
                 'pauseActivityRows.*.event_type_id.in'       => 'Please select a valid event type.',
+                'pauseActivityRows.*.items.*.quantity.numeric' => 'Quantity must be a number.',
             ]
         );
 
@@ -1197,7 +1293,7 @@ class PlanBoard extends Component
             foreach ($this->pauseActivityRows as $row) {
                 $type = collect($this->pauseEventTypes)->firstWhere('id', (int) $row['event_type_id']);
 
-                EventPauseActivity::create([
+                $activity = EventPauseActivity::create([
                     'event_id'            => $event->id,
                     'event_status_log_id' => $pauseLog?->id,
                     'event_type_id'       => (int) $row['event_type_id'],
@@ -1208,10 +1304,44 @@ class PlanBoard extends Component
                     'created_by'          => authUser()?->id,
                     'created_by_name'     => authUser()?->name,
                 ]);
+
+                $this->storeEmergencyQuantities($event, $pauseLog, $activity, $row['items'] ?? []);
             }
         });
 
         $this->closeActionModal();
+    }
+
+    /**
+     * Persist only the emergency items the user actually entered a quantity
+     * for — the table lists every candidate item, most stay empty.
+     */
+    protected function storeEmergencyQuantities(Event $event, ?EventStatusLog $pauseLog, EventPauseActivity $activity, array $items): void
+    {
+        foreach ($items as $item) {
+            $quantity = $item['quantity'] ?? null;
+
+            if ($quantity === null || $quantity === '' || (float) $quantity <= 0) {
+                continue;
+            }
+
+            $unitLabel = collect($item['units'] ?? [])->firstWhere('id', (int) ($item['item_unit_id'] ?? 0))['label'] ?? null;
+
+            EventQuantity::create([
+                'event_id'                => $event->id,
+                'event_status_log_id'     => $pauseLog?->id,
+                'event_pause_activity_id' => $activity->id,
+                'source'                  => 'emergency',
+                'item_type_id'            => $item['item_type_id'] ?? null,
+                'item_id'                 => $item['item_id'] ?? null,
+                'item_unit_id'            => $item['item_unit_id'] ?? null,
+                'item_name'               => $item['item_name'] ?? null,
+                'unit_name'               => $unitLabel,
+                'planned_quantity'        => null,
+                'actual_quantity'         => (float) $quantity,
+                'percentage'              => null,
+            ]);
+        }
     }
 
     public function submitEventAction(): void
@@ -1404,10 +1534,10 @@ class PlanBoard extends Component
         // carry-overs from the same factory (read only).
         $event = Event::with([
                 'eventType',
-                'statusLogs' => fn($q) => $q->with('quantities', 'pauseActivities.eventType')->orderByDesc('id'),
+                'statusLogs' => fn($q) => $q->with('quantities', 'pauseActivities.eventType', 'pauseActivities.quantities')->orderByDesc('id'),
                 // Activities recorded without a pause log (pauses that predate
                 // status logging) — shown in their own block.
-                'pauseActivities' => fn($q) => $q->whereNull('event_status_log_id')->with('eventType')->orderBy('id'),
+                'pauseActivities' => fn($q) => $q->whereNull('event_status_log_id')->with('eventType', 'quantities')->orderBy('id'),
             ])
             ->where(function ($query) {
                 $query->where('plan_id', $this->plan->id)

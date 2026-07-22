@@ -66,9 +66,10 @@
 
                 @php $rowKey = $event['key']; $rowHasRecipe = !empty($event['event_type_has_recipe']); @endphp
                 <div class="row g-2 mb-2">
-                    {{-- Item Type: always present so its selectpicker DOM stays stable --}}
+                    {{-- Item type only applies to recipe event types --}}
+                    @if($rowHasRecipe)
                     <div class="col-6 col-md-3">
-                        <div class="ec-field-label">Item Type @if($rowHasRecipe)<span class="text-danger">*</span>@endif</div>
+                        <div class="ec-field-label">Item Type <span class="text-danger">*</span></div>
                         <div wire:ignore>
                             <select id="ec_item_type_{{ $rowKey }}" data-key="{{ $rowKey }}"
                                 class="selectpicker ec-item-type-select" data-width="100%"
@@ -86,7 +87,6 @@
                         @enderror
                     </div>
 
-                    @if($rowHasRecipe)
                     <div class="col-6 col-md-3">
                         <div class="ec-field-label">Item <span class="text-danger">*</span></div>
                         <div wire:ignore>

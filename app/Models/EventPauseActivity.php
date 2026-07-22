@@ -29,4 +29,12 @@ class EventPauseActivity extends Model
     {
         return $this->belongsTo(EventType::class);
     }
+
+    /**
+     * Items consumed while carrying out this emergency event.
+     */
+    public function quantities()
+    {
+        return $this->hasMany(EventQuantity::class, 'event_pause_activity_id');
+    }
 }
