@@ -38,6 +38,14 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @hasPermission('production.itemTransfer-view')
+                                    <a href="{{ route('item-transfers.view', [$transfer->id, 1]) }}"
+                                        class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
+                                        data-bs-custom-class="tooltip-white" data-bs-placement="top"
+                                        data-bs-title="View">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    @endhasPermission
                                     @if ($transfer->status === 'pending')
                                         @hasPermission('production.itemTransfer-approve')
                                         <a href="{{ route('item-transfers.approve-load', $transfer->id) }}"

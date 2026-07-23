@@ -32,14 +32,14 @@
                                 <td><span class="badge bg-success">Approved</span></td>
                                 @endif
                                 <td>
-                                    {{--  @hasPermission('production.itemStockIn-view')
+                                    @hasPermission('production.itemStockIn-view')
                                     <a href="{{ route('item-stock-ins.view',[ $stockIn->id , $viewStatus = 1]) }}"
                                         class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                         data-bs-title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    @endhasPermission --}}
+                                    @endhasPermission
                                     @if ($stockIn->status === 'pending')
                                      @hasPermission('production.itemStockIn-approve')
                                     <button type="button" class="btn btn-light-success icon-btn-sm approve-button"

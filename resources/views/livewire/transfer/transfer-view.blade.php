@@ -1,65 +1,111 @@
 <div>
-  <div class="row">
-    <div class="col-md-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Transfer Details</h6>
-          <a href="{{ route('transfers') }}" class="btn btn-light-light text-muted">
-            <i class="bi bi-arrow-left me-1"></i>Back
-          </a>
+    @php
+        $statusMap = [
+            'pending'  => ['amber', 'bi-hourglass-split'],
+            'loaded'   => ['blue',  'bi-truck'],
+            'approved' => ['green', 'bi-check-circle'],
+        ];
+        [$statusClass, $statusIcon] = $statusMap[$transfer->status] ?? ['muted', 'bi-circle'];
+        $showReceived = $transfer->status === 'approved';
+    @endphp
+
+    {{-- Header --}}
+    <div class="pv-header">
+        <div>
+            <div class="pv-title">Transfer #{{ $transfer->id }}</div>
+            <div class="pv-chips">
+                <span class="pv-chip {{ $statusClass }}">
+                    <i class="bi {{ $statusIcon }} chip-icon"></i>
+                    {{ ucfirst($transfer->status) }}
+                </span>
+                <span class="pv-chip muted">
+                    <i class="bi bi-calendar3 chip-icon"></i>
+                    {{ $transfer->created_at?->format('d M Y, H:i') }}
+                </span>
+            </div>
         </div>
-        <div class="card-body">
-          <div class="row justify-content-between mb-10">
-            <div class="col-12 text-start">
-              @if ($transfer->status =='pending')
-              <span class="badge bg-warning mb-4">{{ $transfer->status }}</span>
-              @else
-              <span class="badge bg-success mb-4">{{ $transfer->status }}</span>
-              @endif
-              <h5 class="mb-0"># {{ $transfer->id }}</h5>
-            </div>
-          </div>
-          <div class="row g-5 border-bottom border-dashed py-4">
-            <div class="col-md-4">
-              <h5 class="mb-4">Transfer Related To:</h5>
-              <p><span class="fw-semibold">Company:</span> {{ $transfer->company->name }}</p>
-              <p><span class="fw-semibold">From Warehouse:</span> {{ $transfer->warehouseFrom->name }}</p>
-              <p><span class="fw-semibold">To Warehouse:</span> {{ $transfer->warehouseTo->name }}</p>
-              <p><span class="fw-semibold">Created At:</span> {{ $transfer->created_at }}</p>
-            </div>
-          </div>
-          @if ($transfer->reportItems->isNotEmpty())
-          <div class="py-4">
-            <div class="mt-4">
-              <h5>Transfer Details</h5>
-              <div class="table-responsive">
-                <table class="table table-hover align-middle table-sm">
-                  <thead class="table-light">
+        <a href="{{ route('item-transfers') }}" class="btn btn-light btn-sm flex-shrink-0">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    {{-- From → To route --}}
+    <div class="sv-route mb-4">
+        <div class="sv-node from">
+            <div class="s-label"><i class="bi bi-box-arrow-up-right me-1"></i> From Warehouse</div>
+            <div class="s-val">{{ $warehouseFromName }}</div>
+        </div>
+        <div class="sv-arrow"><i class="bi bi-arrow-right"></i></div>
+        <div class="sv-node to">
+            <div class="s-label"><i class="bi bi-box-arrow-in-down-right me-1"></i> To Warehouse</div>
+            <div class="s-val">{{ $warehouseToName }}</div>
+        </div>
+    </div>
+
+    {{-- Summary --}}
+    <div class="pv-stats">
+        <div class="pv-stat pv-stat--primary">
+            <div class="s-label">Line Items</div>
+            <div class="s-val">{{ count($rows) }}</div>
+        </div>
+        <div class="pv-stat pv-stat--info">
+            <div class="s-label">Status</div>
+            <div class="s-val s-val--sm">{{ ucfirst($transfer->status) }}</div>
+        </div>
+        <div class="pv-stat pv-stat--success">
+            <div class="s-label">Created</div>
+            <div class="s-val s-val--sm">{{ $transfer->created_at?->format('d M Y') }}</div>
+        </div>
+    </div>
+
+    {{-- Items --}}
+    <div class="pv-board">
+        <div class="pv-board-head">
+            <i class="bi bi-arrow-left-right text-primary"></i>
+            <div class="pv-board-title">Transfer Items</div>
+            <span class="sv-board-count">{{ count($rows) }}</span>
+        </div>
+
+        @if(count($rows) > 0)
+        <div class="table-responsive">
+            <table class="table sv-table align-middle">
+                <thead>
                     <tr>
-                      <th style="width: 60px;" class="text-center">#</th>
-                      <th style="width: 200px;">Item</th>
-                      <th style="width: 200px;">Unit</th>
-                      <th>Quantity</th>
+                        <th style="width:56px;">#</th>
+                        <th>Item</th>
+                        <th>Unit</th>
+                        <th class="text-end">Loaded Qty</th>
+                        @if($showReceived)
+                        <th class="text-end">Received Qty</th>
+                        @endif
                     </tr>
-                  </thead>
-                  <tbody>
-                    @foreach ($transfer->reportItems as $index => $reportItem)
+                </thead>
+                <tbody>
+                    @foreach($rows as $index => $row)
                     <tr>
-                      <td class="text-center text-muted">{{ $index + 1 }}</td>
-                      <td class="fw-semibold">{{ $reportItem->item->name }}</td>
-                      <td>{{ $reportItem->itemUnit?->unit }}</td>
-                      <td>{{ $reportItem->quantity }}</td>
+                        <td><span class="sv-seq">{{ $index + 1 }}</span></td>
+                        <td class="fw-semibold">{{ $row['item'] }}</td>
+                        <td><span class="sv-unit">{{ $row['unit'] }}</span></td>
+                        <td class="text-end"><span class="sv-qty">{{ $row['quantity'] }}</span></td>
+                        @if($showReceived)
+                        <td class="text-end">
+                            @if($row['received'] !== null)
+                            <span class="sv-qty">{{ $row['received'] }}</span>
+                            @else
+                            <span class="sv-qty-muted">—</span>
+                            @endif
+                        </td>
+                        @endif
                     </tr>
                     @endforeach
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          @endif
+                </tbody>
+            </table>
         </div>
-      </div>
+        @else
+        <div class="pv-empty">
+            <i class="bi bi-inbox"></i>
+            <p class="mb-0 text-muted">No items on this transfer.</p>
+        </div>
+        @endif
     </div>
-  </div>
-</div>
 </div>

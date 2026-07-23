@@ -3,11 +3,11 @@
 namespace App\Livewire\StockIn;
 
 
-use App\Models\ReportItem;
 use App\Models\StockIn;
 use App\Models\WarehouseInventory;
 use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -40,8 +40,20 @@ class StockInIndex extends Component
         authorizeRequest('production.itemStockIn-delete');
 
         $stockIn = StockIn::findOrFail($id);
-        $stockIn->reportItems()->delete();
-        $stockIn->delete();
+
+        DB::transaction(function () use ($stockIn) {
+            // Release the reservation if it was never approved
+            if ($stockIn->status === 'pending') {
+                foreach ($stockIn->reportItems as $item) {
+                    WarehouseInventory::releasePendingIn(
+                        $item->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                    );
+                }
+            }
+
+            $stockIn->reportItems()->delete();
+            $stockIn->delete();
+        });
 
         return to_route('item-stock-ins')->with('success', 'Stock In deleted successfully.');
     }
@@ -52,25 +64,25 @@ class StockInIndex extends Component
         authorizeRequest('production.itemStockIn-approve');
 
         $stockIn = StockIn::findOrFail($id);
-        $stockIn->status = 'approved';
-        $items = ReportItem::where('stock_in_id', $stockIn->id)->get();
 
-        foreach ($items as $item) {
-            $inventory = WarehouseInventory::where('warehouse_id', $stockIn->warehouse_id)
-                ->where('item_id', $item->item_id)
-                ->where('item_unit_id', $item->item_unit_id)
-                ->first();
-
-            if ($inventory) {
-                $inventory->quantity += $item->quantity;
-                $inventory->save();
-            }
+        if ($stockIn->status === 'approved') {
+            return to_route('item-stock-ins')->with('error', 'Stock In is already approved.');
         }
 
-        $stockIn->save();
+        DB::transaction(function () use ($stockIn) {
+            foreach ($stockIn->reportItems as $item) {
+                // Move the reserved incoming quantity into actual stock
+                WarehouseInventory::confirmIn(
+                    $stockIn->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                );
+            }
+
+            $stockIn->update(['status' => 'approved']);
+        });
 
         return to_route('item-stock-ins')->with('success', 'Stock In approved successfully.');
     }
+
     public function render()
     {
         return view('livewire.stock-in.stock-in-index');

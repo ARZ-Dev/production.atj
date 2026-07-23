@@ -7,6 +7,7 @@ use App\Models\WarehouseInventory;
 use App\Services\ApiService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -17,13 +18,14 @@ class StockOutCreate extends Component
     public bool $editing  = false;
     public $id;
     public $viewStatus;
+    public $stockOut;
     public $notes;
     public $warehouse_id;
 
-    public $warehouses   = [];
-    public $allItems     = [];   // raw material items from API
-    public $rawMaterials = [];   // row data
-    public $rowUnits     = [];   // units per row keyed by index
+    public $warehouses    = [];
+    public $allItems      = [];   // items for the selected warehouse from API
+    public $stockOutItems = [];   // row data
+    public $rowUnits      = [];   // units per row keyed by index
 
     protected ApiService $api;
 
@@ -34,27 +36,26 @@ class StockOutCreate extends Component
 
     public function mount(ApiService $api, $id = null, $viewStatus = null): void
     {
-        authorizeRequest('production.stockOut-create');
         $this->viewStatus = $viewStatus;
+
+        authorizeRequest($viewStatus == 1 ? 'production.itemStockOut-view' : 'production.stockOut-create');
 
         $this->warehouses = $api->get('/v1/warehouses', [
             'related_to_production' => true,
-        ])['data'] ?? [];
-
-        $this->allItems = $api->get('/v1/items', [
-            'item_type' => 'Raw Material',
-            'is_active'  => true,
         ])['data'] ?? [];
 
         if ($id) {
             $this->id      = $id;
             $this->editing = true;
 
-            $stockOut           = StockOut::with('inputs')->findOrFail($id);
+            $stockOut           = StockOut::with('reportItems')->findOrFail($id);
+            $this->stockOut     = $stockOut;
             $this->warehouse_id = $stockOut->warehouse_id;
             $this->notes        = $stockOut->notes;
 
-            $this->rawMaterials = $stockOut->inputs->map(fn($input) => [
+            $this->getWarehouseItems($this->warehouse_id, dispatch: false);
+
+            $this->stockOutItems = $stockOut->reportItems->map(fn($input) => [
                 'id'           => $input->id,
                 'item_id'      => $input->item_id,
                 'item_unit_id' => $input->item_unit_id,
@@ -62,7 +63,7 @@ class StockOutCreate extends Component
             ])->toArray();
 
             // Pre-load units for each existing row
-            foreach ($this->rawMaterials as $index => $row) {
+            foreach ($this->stockOutItems as $index => $row) {
                 $this->rowUnits[$index] = $row['item_id']
                     ? $this->fetchUnitsForItem($row['item_id'])
                     : [];
@@ -78,6 +79,27 @@ class StockOutCreate extends Component
         return $response['data']['units'] ?? [];
     }
 
+    #[On('getWarehouseItems')]
+    public function getWarehouseItems($warehouseId, $dispatch = true): void
+    {
+        $this->allItems = $this->api->get("/v1/warehouses/{$warehouseId}/items")['data'] ?? [];
+
+        if ($dispatch) {
+            $this->dispatch('setWarehouseItems',  $this->allItems);
+        }
+    }
+
+    #[On('getItemUnits')]
+    public function getItemUnits($itemId, $index, $dispatch = true): void
+    {
+        $units = $this->fetchUnitsForItem((int) $itemId);
+        $this->rowUnits[$index] = $units;
+
+        if ($dispatch) {
+            $this->dispatch('setItemUnits', $index, $units);
+        }
+    }
+
     public function updatedRawMaterials($value, $key): void
     {
         if (str_ends_with($key, '.item_id')) {
@@ -89,17 +111,17 @@ class StockOutCreate extends Component
 
                 // Auto-select basic unit, fallback to first
                 $basicUnit = collect($units)->firstWhere('basic', true);
-                $this->rawMaterials[$index]['item_unit_id'] = $basicUnit['id'] ?? ($units[0]['id'] ?? null);
+                $this->stockOutItems[$index]['item_unit_id'] = $basicUnit['id'] ?? ($units[0]['id'] ?? null);
             } else {
-                $this->rowUnits[$index]                     = [];
-                $this->rawMaterials[$index]['item_unit_id'] = null;
+                $this->rowUnits[$index]                      = [];
+                $this->stockOutItems[$index]['item_unit_id'] = null;
             }
         }
     }
 
     public function addRow(): void
     {
-        $this->rawMaterials[] = [
+        $this->stockOutItems[] = [
             'id'           => null,
             'item_id'      => null,
             'item_unit_id' => null,
@@ -110,7 +132,7 @@ class StockOutCreate extends Component
 
     public function removeItem(int $index): void
     {
-        if (count($this->rawMaterials) <= 1) {
+        if (count($this->stockOutItems) <= 1) {
             $this->dispatch('swal:error', [
                 'title' => 'Warning',
                 'text'  => 'At least one item is required!',
@@ -118,27 +140,27 @@ class StockOutCreate extends Component
             return;
         }
 
-        unset($this->rawMaterials[$index], $this->rowUnits[$index]);
-        $this->rawMaterials = array_values($this->rawMaterials);
-        $this->rowUnits     = array_values($this->rowUnits);
+        unset($this->stockOutItems[$index], $this->rowUnits[$index]);
+        $this->stockOutItems = array_values($this->stockOutItems);
+        $this->rowUnits      = array_values($this->rowUnits);
     }
 
     public function submit()
     {
         $this->validate([
-            'warehouse_id'                => 'required|integer',
-            'rawMaterials'                => 'required|array|min:1',
-            'rawMaterials.*.item_id'      => 'required|integer',
-            'rawMaterials.*.item_unit_id' => 'required|integer',
-            'rawMaterials.*.quantity'     => 'required|numeric|min:0.000001',
+            'warehouse_id'                 => 'required|integer',
+            'stockOutItems'                => 'required|array|min:1',
+            'stockOutItems.*.item_id'      => 'required|integer',
+            'stockOutItems.*.item_unit_id' => 'required|integer',
+            'stockOutItems.*.quantity'     => 'required|numeric|min:0.000001',
         ], [
-            'rawMaterials.required'                => 'Please add at least one item.',
-            'rawMaterials.min'                     => 'Please add at least one item.',
-            'rawMaterials.*.item_id.required'      => 'Item is required.',
-            'rawMaterials.*.item_unit_id.required' => 'Unit is required.',
-            'rawMaterials.*.quantity.required'     => 'Quantity is required.',
-            'rawMaterials.*.quantity.numeric'      => 'Quantity must be a number.',
-            'rawMaterials.*.quantity.min'          => 'Quantity must be greater than 0.',
+            'stockOutItems.required'                => 'Please add at least one item.',
+            'stockOutItems.min'                     => 'Please add at least one item.',
+            'stockOutItems.*.item_id.required'      => 'Item is required.',
+            'stockOutItems.*.item_unit_id.required' => 'Unit is required.',
+            'stockOutItems.*.quantity.required'     => 'Quantity is required.',
+            'stockOutItems.*.quantity.numeric'      => 'Quantity must be a number.',
+            'stockOutItems.*.quantity.min'          => 'Quantity must be greater than 0.',
         ]);
 
         DB::beginTransaction();
@@ -156,24 +178,22 @@ class StockOutCreate extends Component
                 ]);
             }
 
+            // When editing, unwind the previous pending reservation before re-applying below
+            $oldItems = $this->editing ? $stockOut->reportItems()->get() : collect();
+            foreach ($oldItems as $old) {
+                WarehouseInventory::releasePendingOut(
+                    $old->warehouse_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
+                );
+            }
+
             $syncedIds = [];
 
-            foreach ($this->rawMaterials as $index => $row) {
+            foreach ($this->stockOutItems as $index => $row) {
                 $item = collect($this->allItems)->firstWhere('id', (int) $row['item_id']);
                 abort_if(!$item, 422, 'Invalid item selected.');
 
                 $unit = collect($this->rowUnits[$index] ?? [])->firstWhere('id', (int) $row['item_unit_id']);
                 abort_if(!$unit, 422, 'Invalid unit selected.');
-
-                // Ensure inventory record exists (StockOut won't add qty, just ensure row present)
-                WarehouseInventory::firstOrCreate(
-                    [
-                        'warehouse_id' => $this->warehouse_id,
-                        'item_id'      => $item['id'],
-                        'item_unit_id' => $unit['id'],
-                    ],
-                    ['quantity' => 0]
-                );
 
                 $data = [
                     'warehouse_id'  => $this->warehouse_id,
@@ -188,6 +208,11 @@ class StockOutCreate extends Component
                 } else {
                     $input = $stockOut->reportItems()->create($data);
                 }
+
+                // Reserve the outgoing quantity as pending until the Stock Out is approved
+                WarehouseInventory::addPendingOut(
+                    $this->warehouse_id, $item['id'], $unit['id'], (float) $row['quantity']
+                );
 
                 $syncedIds[] = $input->id;
             }
@@ -212,10 +237,40 @@ class StockOutCreate extends Component
         }
     }
 
+    protected function warehouseName($warehouseId): string
+    {
+        return collect($this->warehouses)->firstWhere('id', (int) $warehouseId)['name'] ?? '—';
+    }
+
+    /**
+     * Resolve each row's item/unit into display names using the data already
+     * loaded from the API (the parent DB holds items, units and warehouses).
+     */
+    protected function resolvedRows(): array
+    {
+        $rows = [];
+
+        foreach ($this->stockOutItems as $index => $row) {
+            $item = collect($this->allItems)->firstWhere('id', (int) $row['item_id']);
+            $unit = collect($this->rowUnits[$index] ?? [])->firstWhere('id', (int) $row['item_unit_id']);
+
+            $rows[] = [
+                'item'     => $item ? trim(($item['name'] ?? '') . ' (' . ($item['code'] ?? '') . ')') : '—',
+                'unit'     => $unit ? trim(($unit['name'] ?? '') . ' (' . ($unit['symbol'] ?? '') . ')') : '—',
+                'quantity' => $row['quantity'],
+            ];
+        }
+
+        return $rows;
+    }
+
     public function render()
     {
         if ($this->viewStatus == 1) {
-            return view('livewire.stock-out.stock-out-view');
+            return view('livewire.stock-out.stock-out-view', [
+                'warehouseName' => $this->warehouseName($this->warehouse_id),
+                'rows'          => $this->resolvedRows(),
+            ]);
         }
 
         return view('livewire.stock-out.stock-out-create', [

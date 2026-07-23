@@ -7,6 +7,7 @@ use App\Models\WarehouseInventory;
 use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class TransferCreate extends Component
@@ -17,13 +18,14 @@ class TransferCreate extends Component
     public $id;
     public $viewStatus;
     public $confirmStatus      = 0;
+    public $transfer;
 
     public $warehouse_from_id;
     public $warehouse_to_id;
     public $warehouses         = [];
 
-    public $allItems           = [];   // raw material items from API
-    public $rawMaterials       = [];   // row data
+    public $allItems           = [];   // items common to both warehouses' item types
+    public $transferItems      = [];   // row data
     public $rowUnits           = [];   // units per row keyed by index
 
     protected ApiService $api;
@@ -43,6 +45,9 @@ class TransferCreate extends Component
         } elseif ($routeName === 'item-transfers.approve-receive') {
             $this->confirmStatus = 2;
             authorizeRequest('production.itemTransfer-approve');
+        } elseif ($viewStatus == 1) {
+            $this->confirmStatus = 0;
+            authorizeRequest('production.itemTransfer-view');
         } else {
             $this->confirmStatus = 0;
             authorizeRequest('production.itemTransfer-create');
@@ -54,16 +59,12 @@ class TransferCreate extends Component
             'related_to_production' => true,
         ])['data'] ?? [];
 
-        $this->allItems = $api->get('/v1/items', [
-            'item_type' => 'Raw Material',
-            'is_active'  => true,
-        ])['data'] ?? [];
-
         if ($id) {
             $this->id      = $id;
             $this->editing = true;
 
             $transfer = Transfer::with('reportItems')->findOrFail($id);
+            $this->transfer = $transfer;
 
             if ($this->confirmStatus == 1 && $transfer->status !== 'pending') {
                 session()->flash('error', 'This transfer has already been processed!');
@@ -78,7 +79,9 @@ class TransferCreate extends Component
             $this->warehouse_from_id = $transfer->warehouse_from_id;
             $this->warehouse_to_id   = $transfer->warehouse_to_id;
 
-            $this->rawMaterials = $transfer->reportItems->map(fn($reportItem) => [
+            $this->getTransferItems(dispatch: false);
+
+            $this->transferItems = $transfer->reportItems->map(fn($reportItem) => [
                 'id'                => $reportItem->id,
                 'item_id'           => $reportItem->item_id,
                 'item_unit_id'      => $reportItem->item_unit_id,
@@ -89,7 +92,7 @@ class TransferCreate extends Component
             ])->toArray();
 
             // Pre-load units for each existing row
-            foreach ($this->rawMaterials as $index => $row) {
+            foreach ($this->transferItems as $index => $row) {
                 $this->rowUnits[$index] = $row['item_id']
                     ? $this->fetchUnitsForItem($row['item_id'])
                     : [];
@@ -105,6 +108,55 @@ class TransferCreate extends Component
         return $response['data']['units'] ?? [];
     }
 
+    /**
+     * Fetch the items that may be transferred between the two selected
+     * warehouses. Items are limited to the item types held in common by both
+     * the source and destination warehouses.
+     */
+    #[On('getTransferItems')]
+    public function getTransferItems($warehouseFromId = null, $warehouseToId = null, $dispatch = true): void
+    {
+        $fromId = $warehouseFromId ?: $this->warehouse_from_id;
+        $toId   = $warehouseToId ?: $this->warehouse_to_id;
+
+        // Items can only be resolved once both warehouses are chosen
+        if (!$fromId || !$toId) {
+            $this->allItems = [];
+
+            if ($dispatch) {
+                $this->dispatch('setWarehouseItems', $this->allItems);
+            }
+            return;
+        }
+
+        // Item type IDs configured for the destination warehouse
+        $toTypeIds = collect($this->api->get("/v1/warehouses/{$toId}/item-types")['data'] ?? [])
+            ->pluck('id')
+            ->all();
+
+        // Items available in the source warehouse (already scoped to its own item
+        // types), narrowed to the item types the destination warehouse also holds.
+        $this->allItems = collect($this->api->get("/v1/warehouses/{$fromId}/items")['data'] ?? [])
+            ->filter(fn($item) => in_array($item['item_type_id'] ?? null, $toTypeIds))
+            ->values()
+            ->all();
+
+        if ($dispatch) {
+            $this->dispatch('setWarehouseItems', $this->allItems);
+        }
+    }
+
+    #[On('getItemUnits')]
+    public function getItemUnits($itemId, $index, $dispatch = true): void
+    {
+        $units = $this->fetchUnitsForItem((int) $itemId);
+        $this->rowUnits[$index] = $units;
+
+        if ($dispatch) {
+            $this->dispatch('setItemUnits', $index, $units);
+        }
+    }
+
     public function updatedRawMaterials($value, $key): void
     {
         if (str_ends_with($key, '.item_id')) {
@@ -116,17 +168,17 @@ class TransferCreate extends Component
 
                 // Auto-select basic unit, fallback to first
                 $basicUnit = collect($units)->firstWhere('basic', true);
-                $this->rawMaterials[$index]['item_unit_id'] = $basicUnit['id'] ?? ($units[0]['id'] ?? null);
+                $this->transferItems[$index]['item_unit_id'] = $basicUnit['id'] ?? ($units[0]['id'] ?? null);
             } else {
-                $this->rowUnits[$index]                     = [];
-                $this->rawMaterials[$index]['item_unit_id'] = null;
+                $this->rowUnits[$index]                      = [];
+                $this->transferItems[$index]['item_unit_id'] = null;
             }
         }
     }
 
     public function addRow(): void
     {
-        $this->rawMaterials[] = [
+        $this->transferItems[] = [
             'id'                => null,
             'item_id'           => null,
             'item_unit_id'      => null,
@@ -138,7 +190,7 @@ class TransferCreate extends Component
 
     public function removeItem(int $index): void
     {
-        if (count($this->rawMaterials) <= 1) {
+        if (count($this->transferItems) <= 1) {
             $this->dispatch('swal:error', [
                 'title' => 'Warning',
                 'text'  => 'At least one item is required!',
@@ -146,26 +198,26 @@ class TransferCreate extends Component
             return;
         }
 
-        unset($this->rawMaterials[$index], $this->rowUnits[$index]);
-        $this->rawMaterials = array_values($this->rawMaterials);
-        $this->rowUnits     = array_values($this->rowUnits);
+        unset($this->transferItems[$index], $this->rowUnits[$index]);
+        $this->transferItems = array_values($this->transferItems);
+        $this->rowUnits      = array_values($this->rowUnits);
     }
 
     protected function rules(): array
     {
         if ($this->confirmStatus == 2) {
             return [
-                'rawMaterials.*.received_quantity' => 'required|numeric|min:0',
+                'transferItems.*.received_quantity' => 'required|numeric|min:0',
             ];
         }
 
         return [
-            'warehouse_from_id'           => 'required|integer',
+            'warehouse_from_id'            => 'required|integer',
             'warehouse_to_id'             => 'required|integer|different:warehouse_from_id',
-            'rawMaterials'                => 'required|array|min:1',
-            'rawMaterials.*.item_id'      => 'required|integer',
-            'rawMaterials.*.item_unit_id' => 'required|integer',
-            'rawMaterials.*.quantity'     => 'required|numeric|min:0.000001',
+            'transferItems'                => 'required|array|min:1',
+            'transferItems.*.item_id'      => 'required|integer',
+            'transferItems.*.item_unit_id' => 'required|integer',
+            'transferItems.*.quantity'     => 'required|numeric|min:0.000001',
         ];
     }
 
@@ -173,16 +225,16 @@ class TransferCreate extends Component
     {
         return [
             'warehouse_to_id.different'                  => 'Warehouse To must be different from Warehouse From.',
-            'rawMaterials.required'                      => 'Please add at least one item.',
-            'rawMaterials.min'                           => 'Please add at least one item.',
-            'rawMaterials.*.item_id.required'            => 'Item is required.',
-            'rawMaterials.*.item_unit_id.required'       => 'Unit is required.',
-            'rawMaterials.*.quantity.required'           => 'Loaded quantity is required.',
-            'rawMaterials.*.quantity.numeric'            => 'Loaded quantity must be a number.',
-            'rawMaterials.*.quantity.min'                => 'Loaded quantity must be greater than 0.',
-            'rawMaterials.*.received_quantity.required'  => 'Received quantity is required.',
-            'rawMaterials.*.received_quantity.numeric'   => 'Received quantity must be a number.',
-            'rawMaterials.*.received_quantity.min'       => 'Received quantity must be 0 or greater.',
+            'transferItems.required'                     => 'Please add at least one item.',
+            'transferItems.min'                          => 'Please add at least one item.',
+            'transferItems.*.item_id.required'           => 'Item is required.',
+            'transferItems.*.item_unit_id.required'      => 'Unit is required.',
+            'transferItems.*.quantity.required'          => 'Loaded quantity is required.',
+            'transferItems.*.quantity.numeric'           => 'Loaded quantity must be a number.',
+            'transferItems.*.quantity.min'               => 'Loaded quantity must be greater than 0.',
+            'transferItems.*.received_quantity.required' => 'Received quantity is required.',
+            'transferItems.*.received_quantity.numeric'  => 'Received quantity must be a number.',
+            'transferItems.*.received_quantity.min'      => 'Received quantity must be 0 or greater.',
         ];
     }
 
@@ -200,6 +252,16 @@ class TransferCreate extends Component
                     return to_route('item-transfers')->with('error', 'Cannot edit a transfer that has already been processed!');
                 }
 
+                // Unwind the previous reservation using the transfer's current (old) warehouses
+                foreach ($transfer->reportItems as $old) {
+                    WarehouseInventory::releasePendingOut(
+                        $transfer->warehouse_from_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
+                    );
+                    WarehouseInventory::releasePendingIn(
+                        $transfer->warehouse_to_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
+                    );
+                }
+
                 $transfer->update([
                     'warehouse_from_id' => $this->warehouse_from_id,
                     'warehouse_to_id'   => $this->warehouse_to_id,
@@ -214,7 +276,7 @@ class TransferCreate extends Component
 
             $syncedIds = [];
 
-            foreach ($this->rawMaterials as $index => $row) {
+            foreach ($this->transferItems as $index => $row) {
                 $item = collect($this->allItems)->firstWhere('id', (int) $row['item_id']);
                 abort_if(!$item, 422, 'Invalid item selected.');
 
@@ -234,6 +296,14 @@ class TransferCreate extends Component
                 } else {
                     $input = $transfer->reportItems()->create($data);
                 }
+
+                // Reserve out of the source and into the destination until confirmed
+                WarehouseInventory::addPendingOut(
+                    $this->warehouse_from_id, $item['id'], $unit['id'], (float) $row['quantity']
+                );
+                WarehouseInventory::addPendingIn(
+                    $this->warehouse_to_id, $item['id'], $unit['id'], (float) $row['quantity']
+                );
 
                 $syncedIds[] = $input->id;
             }
@@ -264,9 +334,23 @@ class TransferCreate extends Component
 
         $transfer = Transfer::with('reportItems')->findOrFail($this->id);
 
+        // Validate the source warehouse holds enough actual stock for every item first
+        foreach ($this->transferItems as $row) {
+            $available = WarehouseInventory::availableQuantity(
+                $this->warehouse_from_id, (int) $row['item_id'], (int) $row['item_unit_id']
+            );
+
+            if ($available < (float) $row['quantity']) {
+                return $this->dispatch('swal:error', [
+                    'title' => 'Error!',
+                    'text'  => "Not enough stock for item ID {$row['item_id']}. Available: {$available}, Required: {$row['quantity']}",
+                ]);
+            }
+        }
+
         DB::beginTransaction();
         try {
-            foreach ($this->rawMaterials as $index => $row) {
+            foreach ($this->transferItems as $index => $row) {
                 $item = collect($this->allItems)->firstWhere('id', (int) $row['item_id']);
                 abort_if(!$item, 422, 'Invalid item selected.');
 
@@ -280,18 +364,10 @@ class TransferCreate extends Component
                     'quantity'      => (float) $row['quantity'],
                 ]);
 
-                // Ensure inventory rows exist on both sides
-                WarehouseInventory::firstOrCreate([
-                    'warehouse_id' => $this->warehouse_from_id,
-                    'item_id'      => $item['id'],
-                    'item_unit_id' => $unit['id'],
-                ], ['quantity' => 0]);
-
-                WarehouseInventory::firstOrCreate([
-                    'warehouse_id' => $this->warehouse_to_id,
-                    'item_id'      => $item['id'],
-                    'item_unit_id' => $unit['id'],
-                ], ['quantity' => 0]);
+                // Release the source reservation into an actual deduction
+                WarehouseInventory::confirmOut(
+                    $this->warehouse_from_id, $item['id'], $unit['id'], (float) $row['quantity']
+                );
             }
 
             $transfer->update(['status' => 'loaded']);
@@ -317,28 +393,16 @@ class TransferCreate extends Component
 
         DB::beginTransaction();
         try {
-            foreach ($this->rawMaterials as $row) {
+            foreach ($this->transferItems as $row) {
                 $receivedQty = (float) $row['received_quantity'];
+                $loadedQty   = (float) $row['quantity'];
 
-                // Add to destination warehouse
-                $inventoryTo = WarehouseInventory::where('warehouse_id', $this->warehouse_to_id)
-                    ->where('item_id', $row['item_id'])
-                    ->where('item_unit_id', $row['item_unit_id'])
-                    ->first();
-
-                if ($inventoryTo) {
-                    $inventoryTo->increment('quantity', $receivedQty);
-                }
-
-                // Deduct from source warehouse
-                $inventoryFrom = WarehouseInventory::where('warehouse_id', $this->warehouse_from_id)
-                    ->where('item_id', $row['item_id'])
-                    ->where('item_unit_id', $row['item_unit_id'])
-                    ->first();
-
-                if ($inventoryFrom) {
-                    $inventoryFrom->decrement('quantity', $receivedQty);
-                }
+                // Move the destination reservation into actual stock.
+                // The source was already deducted at load, so only the destination changes here;
+                // the received quantity may differ from the loaded (reserved) quantity.
+                WarehouseInventory::confirmIn(
+                    $this->warehouse_to_id, (int) $row['item_id'], (int) $row['item_unit_id'], $loadedQty, $receivedQty
+                );
 
                 // Save received_quantity on the report item
                 $transfer->reportItems()
@@ -361,10 +425,47 @@ class TransferCreate extends Component
         }
     }
 
+    protected function warehouseName($warehouseId): string
+    {
+        return collect($this->warehouses)->firstWhere('id', (int) $warehouseId)['name'] ?? '—';
+    }
+
+    /**
+     * Resolve each row's item/unit into display names using the data already
+     * loaded from the API (the parent DB holds items, units and warehouses).
+     */
+    protected function resolvedRows(): array
+    {
+        // Received quantities live on the persisted report items (not the form rows)
+        $received = $this->transfer
+            ? $this->transfer->reportItems->pluck('received_quantity', 'id')
+            : collect();
+
+        $rows = [];
+
+        foreach ($this->transferItems as $index => $row) {
+            $item = collect($this->allItems)->firstWhere('id', (int) $row['item_id']);
+            $unit = collect($this->rowUnits[$index] ?? [])->firstWhere('id', (int) $row['item_unit_id']);
+
+            $rows[] = [
+                'item'     => $item ? trim(($item['name'] ?? '') . ' (' . ($item['code'] ?? '') . ')') : '—',
+                'unit'     => $unit ? trim(($unit['name'] ?? '') . ' (' . ($unit['symbol'] ?? '') . ')') : '—',
+                'quantity' => $row['quantity'],
+                'received' => $received[$row['id']] ?? null,
+            ];
+        }
+
+        return $rows;
+    }
+
     public function render()
     {
         if ($this->viewStatus == 1) {
-            return view('livewire.transfer.transfer-view');
+            return view('livewire.transfer.transfer-view', [
+                'warehouseFromName' => $this->warehouseName($this->warehouse_from_id),
+                'warehouseToName'   => $this->warehouseName($this->warehouse_to_id),
+                'rows'              => $this->resolvedRows(),
+            ]);
         }
 
         return view('livewire.transfer.transfer-create', [
