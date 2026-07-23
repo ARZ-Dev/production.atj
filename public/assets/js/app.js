@@ -80,8 +80,12 @@ function setOptions(selector, options) {
             }
         }
 
-        if(selector.hasClass('raw-item-select') || selector.hasClass('packaging-item-select')) {
+        if(selector.hasClass('raw-item-select') || selector.hasClass('packaging-item-select') || selector.hasClass('item-select')) {
             text = `${value.name} (${value.code})`;
+        }
+
+        if(selector.hasClass('unit-select')) {
+            text = `${value.name} (${value.symbol})`;
         }
 
         if (selector.attr('id') == 'role') {

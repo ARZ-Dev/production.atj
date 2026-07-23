@@ -6,6 +6,7 @@ use App\Models\Waste;
 use App\Models\WarehouseInventory;
 use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -36,8 +37,20 @@ class WasteIndex extends Component
         authorizeRequest('production.itemWaste-delete');
 
         $waste = Waste::findOrFail($id);
-        $waste->reportItems()->delete();
-        $waste->delete();
+
+        DB::transaction(function () use ($waste) {
+            // Release the reservation if it was never approved
+            if ($waste->status === 'pending') {
+                foreach ($waste->reportItems as $item) {
+                    WarehouseInventory::releasePendingOut(
+                        $item->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                    );
+                }
+            }
+
+            $waste->reportItems()->delete();
+            $waste->delete();
+        });
 
         return to_route('item-wastes')->with('success', 'Waste deleted successfully.');
     }
@@ -55,12 +68,11 @@ class WasteIndex extends Component
 
         $warehouseId = $waste->warehouse_id;
 
-        // Full pre-check pass — validate all items before deducting any
+        // Full pre-check pass — validate all items against actual stock before deducting any
         foreach ($waste->reportItems as $item) {
-            $available = WarehouseInventory::where('warehouse_id', $warehouseId)
-                ->where('item_id', $item->item_id)
-                ->where('item_unit_id', $item->item_unit_id)
-                ->value('quantity') ?? 0;
+            $available = WarehouseInventory::availableQuantity(
+                $warehouseId, $item->item_id, $item->item_unit_id
+            );
 
             if ($available < $item->quantity) {
                 return $this->dispatch('swal:error', [
@@ -70,21 +82,16 @@ class WasteIndex extends Component
             }
         }
 
-        // All checks passed — deduct inventory
-        foreach ($waste->reportItems as $item) {
-            $inventory = WarehouseInventory::where('warehouse_id', $warehouseId)
-                ->where('item_id', $item->item_id)
-                ->where('item_unit_id', $item->item_unit_id)
-                ->first();
-
-            if ($inventory) {
-                $inventory->quantity -= $item->quantity;
-                $inventory->save();
+        DB::transaction(function () use ($waste, $warehouseId) {
+            foreach ($waste->reportItems as $item) {
+                // Release the reservation and deduct actual stock
+                WarehouseInventory::confirmOut(
+                    $warehouseId, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                );
             }
-        }
 
-        $waste->status = 'approved';
-        $waste->save();
+            $waste->update(['status' => 'approved']);
+        });
 
         return to_route('item-wastes')->with('success', 'Waste approved successfully.');
     }

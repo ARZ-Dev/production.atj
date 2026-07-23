@@ -1,64 +1,92 @@
 <div>
-  <div class="row">
-    <div class="col-md-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Stock In Details</h6>
-          <a href="{{ route('stock-ins') }}" class="btn btn-light-light text-muted">
-            <i class="bi bi-arrow-left me-1"></i>Back
-          </a>
+    @php
+        $statusMap = [
+            'pending'  => ['amber', 'bi-hourglass-split'],
+            'approved' => ['green', 'bi-check-circle'],
+        ];
+        [$statusClass, $statusIcon] = $statusMap[$stockIn->status] ?? ['muted', 'bi-circle'];
+    @endphp
+
+    {{-- Header --}}
+    <div class="pv-header">
+        <div>
+            <div class="pv-title">Stock In #{{ $stockIn->id }}</div>
+            <div class="pv-chips">
+                <span class="pv-chip {{ $statusClass }}">
+                    <i class="bi {{ $statusIcon }} chip-icon"></i>
+                    {{ ucfirst($stockIn->status) }}
+                </span>
+                <span class="pv-chip muted">
+                    <i class="bi bi-calendar3 chip-icon"></i>
+                    {{ $stockIn->created_at?->format('d M Y, H:i') }}
+                </span>
+            </div>
         </div>
-        <div class="card-body">
-          <div class="row justify-content-between mb-10">
-            <div class="col-12 text-start">
-              @if ($stockIn->status =='pending')
-              <span class="badge bg-warning mb-4">{{ $stockIn->status }}</span>
-              @else
-              <span class="badge bg-success mb-4">{{ $stockIn->status }}</span>
-              @endif
-              <h5 class="mb-0"># {{ $stockIn->id }}</h5>
-            </div>
-          </div>
-          <div class="row g-5 border-bottom border-dashed py-4">
-            <div class="col-md-4">
-              <h5 class="mb-4">Stock In Related To:</h5>
-              <p><span class="fw-semibold">Company:</span> {{ $stockIn->company->name }}</p>
-              <p><span class="fw-semibold">Warehouse:</span> {{ $stockIn->warehouse->name }}</p>
-              <p><span class="fw-semibold">Created At:</span> {{ $stockIn->created_at }}</p>
-            </div>
-          </div>
-          @if ($stockIn->reportItems->isNotEmpty())
-          <div class="py-4">
-            <div class="mt-4">
-              <h5>Stock In Details</h5>
-              <div class="table-responsive">
-                <table class="table table-hover align-middle table-sm">
-                  <thead class="table-light">
+        <a href="{{ route('item-stock-ins') }}" class="btn btn-light btn-sm flex-shrink-0">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    {{-- Summary --}}
+    <div class="pv-stats">
+        <div class="pv-stat pv-stat--primary">
+            <div class="s-label">Warehouse</div>
+            <div class="s-val s-val--sm">{{ $warehouseName }}</div>
+        </div>
+        <div class="pv-stat pv-stat--success">
+            <div class="s-label">Line Items</div>
+            <div class="s-val">{{ count($rows) }}</div>
+        </div>
+        <div class="pv-stat pv-stat--warning">
+            <div class="s-label">Status</div>
+            <div class="s-val s-val--sm">{{ ucfirst($stockIn->status) }}</div>
+        </div>
+    </div>
+
+    {{-- Notes --}}
+    @if(!empty($stockIn->notes))
+    <div class="sv-notes">
+        <div class="sv-notes-label"><i class="bi bi-sticky me-1"></i> Notes</div>
+        <div class="sv-notes-body">{{ $stockIn->notes }}</div>
+    </div>
+    @endif
+
+    {{-- Items --}}
+    <div class="pv-board">
+        <div class="pv-board-head">
+            <i class="bi bi-box-seam text-primary"></i>
+            <div class="pv-board-title">Stock In Items</div>
+            <span class="sv-board-count">{{ count($rows) }}</span>
+        </div>
+
+        @if(count($rows) > 0)
+        <div class="table-responsive">
+            <table class="table sv-table align-middle">
+                <thead>
                     <tr>
-                      <th style="width: 60px;" class="text-center">#</th>
-                      <th style="width: 200px;">Item</th>
-                      <th style="width: 200px;">Unit</th>
-                      <th>Quantity</th>
+                        <th style="width:56px;">#</th>
+                        <th>Item</th>
+                        <th>Unit</th>
+                        <th class="text-end">Quantity</th>
                     </tr>
-                  </thead>
-                  <tbody>
-                    @foreach ($stockIn->reportItems as $index => $reportItem)
+                </thead>
+                <tbody>
+                    @foreach($rows as $index => $row)
                     <tr>
-                      <td class="text-center text-muted">{{ $index + 1 }}</td>
-                      <td class="fw-semibold">{{ $reportItem->item->name }}</td>
-                      <td>{{ $reportItem->itemUnit?->unit }}</td>
-                      <td>{{ $reportItem->quantity }}</td>
+                        <td><span class="sv-seq">{{ $index + 1 }}</span></td>
+                        <td class="fw-semibold">{{ $row['item'] }}</td>
+                        <td><span class="sv-unit">{{ $row['unit'] }}</span></td>
+                        <td class="text-end"><span class="sv-qty">{{ $row['quantity'] }}</span></td>
                     </tr>
                     @endforeach
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          @endif
+                </tbody>
+            </table>
         </div>
-      </div>
+        @else
+        <div class="pv-empty">
+            <i class="bi bi-inbox"></i>
+            <p class="mb-0 text-muted">No items on this stock in.</p>
+        </div>
+        @endif
     </div>
-  </div>
-</div>
 </div>

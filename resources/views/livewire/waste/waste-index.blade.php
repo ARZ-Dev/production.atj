@@ -32,6 +32,14 @@
                                     <td><span class="badge bg-success">Approved</span></td>
                                 @endif
                                 <td>
+                                    @hasPermission('production.itemWaste-view')
+                                    <a href="{{ route('item-wastes.view', [$waste->id, 1]) }}"
+                                        class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
+                                        data-bs-custom-class="tooltip-white" data-bs-placement="top"
+                                        data-bs-title="View">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    @endhasPermission
                                     @if ($waste->status === 'pending')
                                         @hasPermission('production.itemWaste-approve')
                                         <button type="button" class="btn btn-light-success icon-btn-sm approve-button"

@@ -174,29 +174,24 @@
                                 'production.Transfer-list'
                                 ])
                                 <li class="pe-slide pe-has-sub">
-                                    <a href="#collapseProduction" class="pe-nav-link {{ request()->is('admin/item-requests*')
-                                    || request()->is('admin/item-stock-ins*') 
-                                    || request()->is('admin/item-stock-outs*') 
-                                    || request()->is('admin/item-wastes*')
-                                    || request()->is('admin/item-warehouse-inventory*') 
-                                    || request()->is('admin/item-transfers*')    
-                                    ? 'active' : '' }}" data-bs-toggle="collapse" aria-expanded="{{ request()->is('admin/item-requests*')
-                                    || request()->is('admin/item-stock-ins*') 
-                                    || request()->is('admin/item-stock-outs*') 
-                                    || request()->is('admin/item-wastes*')
-                                    || request()->is('admin/item-warehouse-inventory*') 
-                                    || request()->is('admin/item-transfers*')
-                                    ? 'true' : 'false' }}" aria-controls="collapseProduction">
+                                    @php
+                                        $stockTabActive = request()->is('admin/item-requests*')
+                                            || request()->is('admin/item-stock-ins*')
+                                            || request()->is('admin/item-stock-outs*')
+                                            || request()->is('admin/item-wastes*')
+                                            || request()->is('admin/item-warehouse-inventory*')
+                                            || request()->is('admin/item-transfers*');
+                                    @endphp
+                                    <a href="#collapseProduction" class="pe-nav-link {{ $stockTabActive ? 'active' : '' }}"
+                                       data-bs-toggle="collapse" aria-expanded="{{ $stockTabActive ? 'true' : 'false' }}"
+                                       aria-controls="collapseProduction">
 
                                         <i class="bi bi-rulers pe-nav-icon"></i>
                                         <span class="pe-nav-content">Stock Management</span>
                                         <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
                                     </a>
 
-                                    <ul class="pe-slide-menu collapse" id="collapseProduction">
-
-
-
+                                    <ul class="pe-slide-menu collapse {{ $stockTabActive ? "show" : "" }}" id="collapseProduction">
                                         {{-- Requests --}}
                                         @hasPermission('production.itemRequest-list')
                                         <li class="pe-slide-item">

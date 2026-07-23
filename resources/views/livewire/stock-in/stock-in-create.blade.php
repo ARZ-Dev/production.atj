@@ -15,12 +15,12 @@
                         <div class="row g-3">
 
                             {{-- Warehouse --}}
-                            <div class="col-12">
+                            <div class="col-lg-6 col-sm-12">
                                 <div wire:ignore>
                                     <label for="warehouse" class="form-label">
                                         Warehouse <span class="text-danger">*</span>
                                     </label>
-                                    <select id="warehouse"
+                                    <select id="warehouse_id"
                                             class="selectpicker w-100"
                                             title="Select Warehouse"
                                             data-style="btn-default"
@@ -62,23 +62,23 @@
                 {{-- Items Card --}}
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Raw Materials</h5>
+                        <h5 class="mb-0">Stock In Items</h5>
                         <button type="button" class="btn btn-success btn-sm" wire:click="addRow">
-                            <i class="ti ti-plus me-1"></i> Add Raw Material
+                            <i class="ti ti-plus me-1"></i> Add Stock In Item
                         </button>
                     </div>
                     <div class="card-body">
-                        @if(count($rawMaterials) > 0)
+                        @if(count($stockInItems) > 0)
                             <div class="row g-3">
-                                @foreach($rawMaterials as $index => $row)
+                                @foreach($stockInItems as $index => $row)
                                     <div class="col-12" wire:key="stock-in-row-{{ $index }}">
                                         <div class="border rounded p-3">
 
                                             <div class="d-flex justify-content-between align-items-center mb-3">
                                                 <label class="form-label mb-0">
-                                                    Raw Material #{{ $index + 1 }}
+                                                    Stock In #{{ $index + 1 }}
                                                 </label>
-                                                @if(count($rawMaterials) > 1)
+                                                @if(count($stockInItems) > 1)
                                                     <button type="button"
                                                             class="btn btn-danger btn-sm"
                                                             wire:click="removeItem({{ $index }})">
@@ -95,9 +95,9 @@
                                                         Item <span class="text-danger">*</span>
                                                     </label>
                                                     <div wire:ignore>
-                                                        <select wire:model="rawMaterials.{{ $index }}.item_id"
+                                                        <select wire:model="stockInItems.{{ $index }}.item_id"
                                                                 id="item_{{ $index }}"
-                                                                class="selectpicker w-100"
+                                                                class="selectpicker w-100 item-select"
                                                                 title="Select Item"
                                                                 data-style="btn-default"
                                                                 data-live-search="true"
@@ -114,7 +114,37 @@
                                                             @endforeach
                                                         </select>
                                                     </div>
-                                                    @error('rawMaterials.' . $index . '.item_id')
+                                                    @error('stockInItems.' . $index . '.item_id')
+                                                        <div class="text-danger small mt-1">{{ $message }}</div>
+                                                    @enderror
+                                                </div>
+
+                                                {{-- Unit — no wire:ignore so Livewire can update options --}}
+                                                <div class="col-12 col-md-4">
+                                                    <label class="form-label" for="unit_{{ $index }}">
+                                                        Unit <span class="text-danger">*</span>
+                                                    </label>
+                                                    <div wire:ignore>
+                                                        <select wire:model="stockInItems.{{ $index }}.item_unit_id"
+                                                                id="unit_{{ $index }}"
+                                                                class="selectpicker w-100 unit-select"
+                                                                title="Select Unit"
+                                                                data-style="btn-default"
+                                                                data-live-search="true"
+                                                                data-icon-base="ti"
+                                                                data-size="5"
+                                                                data-tick-icon="ti-check text-white"
+                                                                data-index="{{ $index }}">
+                                                            @foreach($rowUnits[$index] ?? [] as $unit)
+                                                                <option value="{{ $unit['id'] }}"
+                                                                    @selected($row['item_unit_id'] == $unit['id'])>
+                                                                    {{ $unit['name'] }}
+                                                                    ({{ $unit['symbol'] ?? '' }})
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    @error('stockInItems.' . $index . '.item_unit_id')
                                                         <div class="text-danger small mt-1">{{ $message }}</div>
                                                     @enderror
                                                 </div>
@@ -125,40 +155,12 @@
                                                         Quantity <span class="text-danger">*</span>
                                                     </label>
                                                     <input type="text"
-                                                           wire:model="rawMaterials.{{ $index }}.quantity"
+                                                           wire:model="stockInItems.{{ $index }}.quantity"
                                                            id="quantity_{{ $index }}"
                                                            class="form-control cleave-input"
                                                            placeholder="Enter Quantity">
-                                                    @error('rawMaterials.' . $index . '.quantity')
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </div>
-
-                                                {{-- Unit — no wire:ignore so Livewire can update options --}}
-                                                <div class="col-12 col-md-4">
-                                                    <label class="form-label" for="unit_{{ $index }}">
-                                                        Unit <span class="text-danger">*</span>
-                                                    </label>
-                                                    <select wire:model="rawMaterials.{{ $index }}.item_unit_id"
-                                                            id="unit_{{ $index }}"
-                                                            class="selectpicker w-100 unit-selectpicker"
-                                                            title="Select Unit"
-                                                            data-style="btn-default"
-                                                            data-live-search="true"
-                                                            data-icon-base="ti"
-                                                            data-size="5"
-                                                            data-tick-icon="ti-check text-white"
-                                                            data-index="{{ $index }}">
-                                                        @foreach($rowUnits[$index] ?? [] as $unit)
-                                                            <option value="{{ $unit['id'] }}"
-                                                                @selected($row['item_unit_id'] == $unit['id'])>
-                                                                {{ $unit['name'] }}
-                                                                ({{ $unit['symbol'] ?? '' }})
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                    @error('rawMaterials.' . $index . '.item_unit_id')
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
+                                                    @error('stockInItems.' . $index . '.quantity')
+                                                    <div class="text-danger small mt-1">{{ $message }}</div>
                                                     @enderror
                                                 </div>
 
@@ -198,24 +200,49 @@
             triggerCleave();
         });
 
-        // After every Livewire round-trip, refresh unit selectpickers
-        // (item selects have wire:ignore so they're unaffected)
-        Livewire.hook('commit', ({ succeed }) => {
-            succeed(() => {
-                $nextTick(() => {
-                    $('.unit-selectpicker').each(function () {
-                        $(this).selectpicker('destroy').selectpicker();
-                    });
-                });
-            });
-        });
-
         // Sync all selectpicker changes back to Livewire
         $(document).on('change', '.selectpicker', function () {
             const model = $(this).attr('wire:model');
             if (model) {
                 $wire.set(model, $(this).val());
             }
+        });
+
+        $(document).on('change', '#warehouse_id', function () {
+            if ($(this).val() === '') {
+                return;
+            }
+
+            $wire.dispatch('getWarehouseItems', {
+                warehouseId: $(this).val()
+            });
+        })
+
+        $wire.on('setWarehouseItems', function (params) {
+            let items = params[0];
+
+            setOptions($('.item-select'), items);
+        });
+
+        $(document).on('change', '.item-select', function () {
+            const index = $(this).data('index');
+            const itemId = $(this).val();
+
+            if (itemId === '') {
+                return;
+            }
+
+            $wire.dispatch('getItemUnits', {
+                itemId: itemId,
+                index: index
+            });
+        });
+
+        $wire.on('setItemUnits', function (params) {
+            let index = params[0];
+            let units = params[1];
+
+            setOptions($('#unit_' + index), units);
         });
     </script>
     @endscript

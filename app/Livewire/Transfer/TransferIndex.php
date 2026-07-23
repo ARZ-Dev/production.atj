@@ -3,8 +3,10 @@
 namespace App\Livewire\Transfer;
 
 use App\Models\Transfer;
+use App\Models\WarehouseInventory;
 use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -42,8 +44,20 @@ class TransferIndex extends Component
             ]);
         }
 
-        $transfer->reportItems()->delete();
-        $transfer->delete();
+        DB::transaction(function () use ($transfer) {
+            // Release the reservation on both warehouses (transfer is still pending)
+            foreach ($transfer->reportItems as $item) {
+                WarehouseInventory::releasePendingOut(
+                    $transfer->warehouse_from_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                );
+                WarehouseInventory::releasePendingIn(
+                    $transfer->warehouse_to_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                );
+            }
+
+            $transfer->reportItems()->delete();
+            $transfer->delete();
+        });
 
         return to_route('item-transfers')->with('success', 'Transfer deleted successfully.');
     }

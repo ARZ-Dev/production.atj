@@ -87,23 +87,23 @@
                 {{-- Items Card --}}
                 <div class="card mt-2">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">Transfer Raw Materials</h6>
+                        <h6 class="mb-0">Transfer Items</h6>
                         @if(!$confirmStatus)
                             <button type="button" class="btn btn-success btn-sm" wire:click="addRow">
-                                <i class="ti ti-plus me-1"></i> Add Raw Material
+                                <i class="ti ti-plus me-1"></i> Add Transfer Item
                             </button>
                         @endif
                     </div>
                     <div class="card-body">
-                        @if(count($rawMaterials) > 0)
+                        @if(count($transferItems) > 0)
                             <div class="row g-3">
-                                @foreach($rawMaterials as $index => $row)
+                                @foreach($transferItems as $index => $row)
                                     <div class="col-12" wire:key="transfer-row-{{ $index }}">
                                         <div class="border rounded p-3">
 
                                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <label class="form-label mb-0">Raw Material #{{ $index + 1 }}</label>
-                                                @if(!$confirmStatus && count($rawMaterials) > 1)
+                                                <label class="form-label mb-0">Transfer Item #{{ $index + 1 }}</label>
+                                                @if(!$confirmStatus && count($transferItems) > 1)
                                                     <button type="button"
                                                             class="btn btn-danger btn-sm"
                                                             wire:click="removeItem({{ $index }})">
@@ -120,9 +120,9 @@
                                                         Item <span class="text-danger">*</span>
                                                     </label>
                                                     <div wire:ignore>
-                                                        <select wire:model="rawMaterials.{{ $index }}.item_id"
+                                                        <select wire:model="transferItems.{{ $index }}.item_id"
                                                                 id="item_{{ $index }}"
-                                                                class="selectpicker w-100"
+                                                                class="selectpicker w-100 item-select"
                                                                 title="Select Item"
                                                                 data-style="btn-default"
                                                                 data-live-search="true"
@@ -140,7 +140,7 @@
                                                             @endforeach
                                                         </select>
                                                     </div>
-                                                    @error('rawMaterials.' . $index . '.item_id')
+                                                    @error('transferItems.' . $index . '.item_id')
                                                         <div class="text-danger small mt-1">{{ $message }}</div>
                                                     @enderror
                                                 </div>
@@ -150,26 +150,28 @@
                                                     <label class="form-label" for="unit_{{ $index }}">
                                                         Unit <span class="text-danger">*</span>
                                                     </label>
-                                                    <select wire:model="rawMaterials.{{ $index }}.item_unit_id"
-                                                            id="unit_{{ $index }}"
-                                                            class="selectpicker w-100 unit-selectpicker"
-                                                            title="Select Unit"
-                                                            data-style="btn-default"
-                                                            data-live-search="true"
-                                                            data-icon-base="ti"
-                                                            data-size="5"
-                                                            data-tick-icon="ti-check text-white"
-                                                            data-index="{{ $index }}"
-                                                            {{ $confirmStatus ? 'disabled' : '' }}>
-                                                        @foreach($rowUnits[$index] ?? [] as $unit)
-                                                            <option value="{{ $unit['id'] }}"
-                                                                @selected($row['item_unit_id'] == $unit['id'])>
-                                                                {{ $unit['name'] }}
-                                                                ({{ $unit['symbol'] ?? '' }})
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                    @error('rawMaterials.' . $index . '.item_unit_id')
+                                                    <div wire:ignore>
+                                                        <select wire:model="transferItems.{{ $index }}.item_unit_id"
+                                                                id="unit_{{ $index }}"
+                                                                class="selectpicker w-100 unit-select"
+                                                                title="Select Unit"
+                                                                data-style="btn-default"
+                                                                data-live-search="true"
+                                                                data-icon-base="ti"
+                                                                data-size="5"
+                                                                data-tick-icon="ti-check text-white"
+                                                                data-index="{{ $index }}"
+                                                                {{ $confirmStatus ? 'disabled' : '' }}>
+                                                            @foreach($rowUnits[$index] ?? [] as $unit)
+                                                                <option value="{{ $unit['id'] }}"
+                                                                    @selected($row['item_unit_id'] == $unit['id'])>
+                                                                    {{ $unit['name'] }}
+                                                                    ({{ $unit['symbol'] ?? '' }})
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    @error('transferItems.' . $index . '.item_unit_id')
                                                         <div class="text-danger small mt-1">{{ $message }}</div>
                                                     @enderror
                                                 </div>
@@ -180,12 +182,12 @@
                                                         Loaded Quantity <span class="text-danger">*</span>
                                                     </label>
                                                     <input type="text"
-                                                           wire:model.live="rawMaterials.{{ $index }}.quantity"
+                                                           wire:model.live="transferItems.{{ $index }}.quantity"
                                                            id="quantity_{{ $index }}"
                                                            class="form-control cleave-input"
                                                            placeholder="Enter Quantity"
                                                            {{ $confirmStatus == 2 ? 'readonly' : '' }}>
-                                                    @error('rawMaterials.' . $index . '.quantity')
+                                                    @error('transferItems.' . $index . '.quantity')
                                                         <div class="text-danger small mt-1">{{ $message }}</div>
                                                     @enderror
                                                 </div>
@@ -197,11 +199,11 @@
                                                             Received Quantity <span class="text-danger">*</span>
                                                         </label>
                                                         <input type="text"
-                                                               wire:model.live="rawMaterials.{{ $index }}.received_quantity"
+                                                               wire:model.live="transferItems.{{ $index }}.received_quantity"
                                                                id="received_quantity_{{ $index }}"
                                                                class="form-control cleave-input"
                                                                placeholder="Enter Received Quantity">
-                                                        @error('rawMaterials.' . $index . '.received_quantity')
+                                                        @error('transferItems.' . $index . '.received_quantity')
                                                             <div class="text-danger small mt-1">{{ $message }}</div>
                                                         @enderror
                                                     </div>
@@ -214,7 +216,7 @@
                             </div>
                         @else
                             <div class="text-center py-4">
-                                <p class="text-muted mb-0">No items added yet. Click "Add Raw Material" to start.</p>
+                                <p class="text-muted mb-0">No items added yet. Click "Add Transfer Item" to start.</p>
                             </div>
                         @endif
                     </div>
@@ -253,24 +255,58 @@
             triggerCleave();
         });
 
-        // After every Livewire round-trip, refresh unit selectpickers
-        // (item selects have wire:ignore so they're unaffected)
-        Livewire.hook('commit', ({ succeed }) => {
-            succeed(() => {
-                $nextTick(() => {
-                    $('.unit-selectpicker').each(function () {
-                        $(this).selectpicker('destroy').selectpicker();
-                    });
-                });
-            });
-        });
-
         // Sync all selectpicker changes back to Livewire
         $(document).on('change', '.selectpicker', function () {
             const model = $(this).attr('wire:model');
             if (model) {
                 $wire.set(model, $(this).val());
             }
+        });
+
+        // Fetch items common to both warehouses whenever either warehouse changes
+        function dispatchTransferItems() {
+            const fromId = $('#warehouse_from_id').val();
+            const toId   = $('#warehouse_to_id').val();
+
+            if (!fromId || !toId) {
+                return;
+            }
+
+            $wire.dispatch('getTransferItems', {
+                warehouseFromId: fromId,
+                warehouseToId: toId
+            });
+        }
+
+        $(document).on('change', '#warehouse_from_id, #warehouse_to_id', function () {
+            dispatchTransferItems();
+        });
+
+        $wire.on('setWarehouseItems', function (params) {
+            let items = params[0];
+
+            setOptions($('.item-select'), items);
+        });
+
+        $(document).on('change', '.item-select', function () {
+            const index = $(this).data('index');
+            const itemId = $(this).val();
+
+            if (itemId === '') {
+                return;
+            }
+
+            $wire.dispatch('getItemUnits', {
+                itemId: itemId,
+                index: index
+            });
+        });
+
+        $wire.on('setItemUnits', function (params) {
+            let index = params[0];
+            let units = params[1];
+
+            setOptions($('#unit_' + index), units);
         });
     </script>
     @endscript
