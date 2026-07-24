@@ -59,6 +59,7 @@
                                     @endhasPermission
                                     @endif
 
+                                    @if ($stockIn->status === 'pending')
                                      @hasPermission('production.itemStockIn-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $stockIn->id }}" data-bs-toggle="tooltip"
@@ -67,6 +68,7 @@
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     @endhasPermission
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach

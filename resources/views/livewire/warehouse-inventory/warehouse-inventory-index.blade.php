@@ -53,7 +53,9 @@
                             <th>#</th>
                             <th>Item</th>
                             <th>Unit</th>
-                            <th>Total Quantity</th>
+                            <th>On Hand</th>
+                            <th>Pending In</th>
+                            <th>Pending Out</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -63,7 +65,21 @@
                             <td>{{ $index + 1 }}</td>
                             <td>{{ $unit->item ?? 'N/A' }}</td>
                             <td>{{ $unit->unit ?? 'N/A' }}</td>
-                            <td>{{ $this->totalQuantity($unit->warehouse_id, $unit->item_id, $unit->item_unit_id) }}</td>
+                            <td class="fw-semibold">{{ $unit->quantity }}</td>
+                            <td>
+                                @if($unit->quantity_pending_in > 0)
+                                    <span class="badge bg-success">{{ $unit->quantity_pending_in }}</span>
+                                @else
+                                    <span class="text-muted">{{ $unit->quantity_pending_in }}</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($unit->quantity_pending_out > 0)
+                                    <span class="badge bg-warning text-dark">{{ $unit->quantity_pending_out }}</span>
+                                @else
+                                    <span class="text-muted">{{ $unit->quantity_pending_out }}</span>
+                                @endif
+                            </td>
                             <td>
                                 <button class="btn btn-sm btn-info"
                                     wire:click="viewUnitActivity({{ $unit->warehouse_id }}, {{ $unit->item_id }}, {{ $unit->item_unit_id }})">
@@ -73,7 +89,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="text-center">No items found for this warehouse</td>
+                            <td colspan="7" class="text-center">No items found for this warehouse</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -103,6 +119,35 @@
                     </div>
 
                     <div wire:loading.remove wire:target="viewUnitActivity">
+                        @if($selectedInventory)
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                {{ $selectedInventory->item }}
+                                <span class="text-muted">— {{ $selectedInventory->unit }}</span>
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3 text-center h-100">
+                                        <div class="text-muted text-uppercase small mb-1">On Hand</div>
+                                        <div class="fs-4 fw-bold">{{ $selectedInventory->quantity }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border border-success rounded p-3 text-center h-100">
+                                        <div class="text-success text-uppercase small mb-1">Pending In</div>
+                                        <div class="fs-4 fw-bold text-success">{{ $selectedInventory->quantity_pending_in }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border border-warning rounded p-3 text-center h-100">
+                                        <div class="text-warning text-uppercase small mb-1">Pending Out</div>
+                                        <div class="fs-4 fw-bold text-warning">{{ $selectedInventory->quantity_pending_out }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped">
                                 <thead class="bg-light">
