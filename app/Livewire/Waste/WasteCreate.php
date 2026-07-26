@@ -3,8 +3,8 @@
 namespace App\Livewire\Waste;
 
 use App\Models\Waste;
-use App\Models\WarehouseInventory;
 use App\Services\ApiService;
+use App\Services\InventoryService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
@@ -28,10 +28,12 @@ class WasteCreate extends Component
     public $rowUnits   = [];   // units per row keyed by index
 
     protected ApiService $api;
+    protected InventoryService $inventory;
 
-    public function boot(ApiService $api): void
+    public function boot(ApiService $api, InventoryService $inventory): void
     {
-        $this->api = $api;
+        $this->api       = $api;
+        $this->inventory = $inventory;
     }
 
     public function mount(ApiService $api, $id = null, $viewStatus = null): void
@@ -178,12 +180,15 @@ class WasteCreate extends Component
                 ]);
             }
 
-            // When editing, unwind the previous pending reservation before re-applying below
-            $oldItems = $this->editing ? $waste->reportItems()->get() : collect();
-            foreach ($oldItems as $old) {
-                WarehouseInventory::releasePendingOut(
-                    $old->warehouse_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
-                );
+            $ops = [];
+
+            // When editing, unwind the previous reservation before re-applying below
+            if ($this->editing) {
+                foreach ($waste->reportItems()->get() as $old) {
+                    $ops[] = InventoryService::releaseOut(
+                        $old->warehouse_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
+                    );
+                }
             }
 
             $syncedIds = [];
@@ -210,7 +215,7 @@ class WasteCreate extends Component
                 }
 
                 // Reserve the outgoing quantity as pending until the Waste is approved
-                WarehouseInventory::addPendingOut(
+                $ops[] = InventoryService::reserveOut(
                     $this->warehouse_id, $item['id'], $unit['id'], (float) $row['quantity']
                 );
 
@@ -220,6 +225,9 @@ class WasteCreate extends Component
             if ($this->editing) {
                 $waste->reportItems()->whereNotIn('id', $syncedIds)->delete();
             }
+
+            // Push the reservation changes to the parent inventory (throws on failure)
+            $this->inventory->applyOrFail($ops);
 
             DB::commit();
 

@@ -4,8 +4,8 @@ namespace App\Livewire\StockIn;
 
 
 use App\Models\StockIn;
-use App\Models\WarehouseInventory;
 use App\Services\ApiService;
+use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -20,6 +20,13 @@ class StockInIndex extends Component
 
     public $status;
     public $warehouseMap = [];
+
+    protected InventoryService $inventory;
+
+    public function boot(InventoryService $inventory): void
+    {
+        $this->inventory = $inventory;
+    }
 
     public function mount(ApiService $api)
     {
@@ -41,11 +48,14 @@ class StockInIndex extends Component
 
         $stockIn = StockIn::findOrFail($id);
 
-        DB::transaction(function () use ($stockIn) {
+        DB::beginTransaction();
+        try {
+            $ops = [];
+
             // Release the reservation if it was never approved
             if ($stockIn->status === 'pending') {
                 foreach ($stockIn->reportItems as $item) {
-                    WarehouseInventory::releasePendingIn(
+                    $ops[] = InventoryService::releaseIn(
                         $item->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
                     );
                 }
@@ -53,7 +63,17 @@ class StockInIndex extends Component
 
             $stockIn->reportItems()->delete();
             $stockIn->delete();
-        });
+
+            $this->inventory->applyOrFail($ops);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->dispatch('swal:error', [
+                'title' => 'Error',
+                'text'  => 'An error occurred: ' . $e->getMessage(),
+            ]);
+        }
 
         return to_route('item-stock-ins')->with('success', 'Stock In deleted successfully.');
     }
@@ -69,16 +89,29 @@ class StockInIndex extends Component
             return to_route('item-stock-ins')->with('error', 'Stock In is already approved.');
         }
 
-        DB::transaction(function () use ($stockIn) {
+        DB::beginTransaction();
+        try {
+            $ops = [];
+
+            // Move the reserved incoming quantity into actual stock
             foreach ($stockIn->reportItems as $item) {
-                // Move the reserved incoming quantity into actual stock
-                WarehouseInventory::confirmIn(
-                    $stockIn->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                $ops[] = InventoryService::confirmIn(
+                    $stockIn->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity, (float) $item->quantity
                 );
             }
 
+            $this->inventory->applyOrFail($ops);
+
             $stockIn->update(['status' => 'approved']);
-        });
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->dispatch('swal:error', [
+                'title' => 'Error',
+                'text'  => 'An error occurred: ' . $e->getMessage(),
+            ]);
+        }
 
         return to_route('item-stock-ins')->with('success', 'Stock In approved successfully.');
     }

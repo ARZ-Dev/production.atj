@@ -3,8 +3,8 @@
 namespace App\Livewire\StockOut;
 
 use App\Models\StockOut;
-use App\Models\WarehouseInventory;
 use App\Services\ApiService;
+use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -17,6 +17,13 @@ class StockOutIndex extends Component
     public $stockOuts;
     public $status;
     public $warehouseMap = [];
+
+    protected InventoryService $inventory;
+
+    public function boot(InventoryService $inventory): void
+    {
+        $this->inventory = $inventory;
+    }
 
     public function mount(ApiService $api)
     {
@@ -38,11 +45,14 @@ class StockOutIndex extends Component
 
         $stockOut = StockOut::findOrFail($id);
 
-        DB::transaction(function () use ($stockOut) {
+        DB::beginTransaction();
+        try {
+            $ops = [];
+
             // Release the reservation if it was never approved
             if ($stockOut->status === 'pending') {
                 foreach ($stockOut->reportItems as $item) {
-                    WarehouseInventory::releasePendingOut(
+                    $ops[] = InventoryService::releaseOut(
                         $item->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity
                     );
                 }
@@ -50,7 +60,17 @@ class StockOutIndex extends Component
 
             $stockOut->reportItems()->delete();
             $stockOut->delete();
-        });
+
+            $this->inventory->applyOrFail($ops);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->dispatch('swal:error', [
+                'title' => 'Error',
+                'text'  => 'An error occurred: ' . $e->getMessage(),
+            ]);
+        }
 
         return to_route('item-stock-outs')->with('success', 'Stock Out deleted successfully.');
     }
@@ -66,32 +86,30 @@ class StockOutIndex extends Component
             return to_route('item-stock-outs')->with('error', 'Stock Out is already approved.');
         }
 
-        $warehouseId = $stockOut->warehouse_id;
+        DB::beginTransaction();
+        try {
+            $ops = [];
 
-        // Full pre-check pass — validate all items against actual stock before deducting any
-        foreach ($stockOut->reportItems as $item) {
-            $available = WarehouseInventory::availableQuantity(
-                $warehouseId, $item->item_id, $item->item_unit_id
-            );
-
-            if ($available < $item->quantity) {
-                return $this->dispatch('swal:error', [
-                    'title' => 'Error!',
-                    'text'  => "Not enough stock for item ID {$item->item_id}. Available: {$available}, Required: {$item->quantity}",
-                ]);
-            }
-        }
-
-        DB::transaction(function () use ($stockOut, $warehouseId) {
+            // Release the reservation and deduct actual stock. The parent validates
+            // availability for every line and rejects the whole batch if any is short.
             foreach ($stockOut->reportItems as $item) {
-                // Release the reservation and deduct actual stock
-                WarehouseInventory::confirmOut(
-                    $warehouseId, $item->item_id, $item->item_unit_id, (float) $item->quantity
+                $ops[] = InventoryService::confirmOut(
+                    $stockOut->warehouse_id, $item->item_id, $item->item_unit_id, (float) $item->quantity, (float) $item->quantity
                 );
             }
 
+            $this->inventory->applyOrFail($ops);
+
             $stockOut->update(['status' => 'approved']);
-        });
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->dispatch('swal:error', [
+                'title' => 'Error!',
+                'text'  => $e->getMessage(),
+            ]);
+        }
 
         return to_route('item-stock-outs')->with('success', 'Stock Out approved successfully.');
     }
