@@ -15,6 +15,7 @@ use App\Models\ProductionLine;
 use App\Models\RecipeInput;
 use App\Models\RecipeSideProduct;
 use App\Services\ApiService;
+use App\Services\InventoryService;
 use App\Services\PlanCarryOverService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
@@ -79,12 +80,14 @@ class PlanBoard extends Component
     protected ApiService $api;
     protected RecipeDurationService $durationService;
     protected PlanCarryOverService $carryOverService;
+    protected InventoryService $inventory;
 
-    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService): void
+    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService, InventoryService $inventory): void
     {
         $this->api              = $api;
         $this->durationService  = $durationService;
         $this->carryOverService = $carryOverService;
+        $this->inventory        = $inventory;
     }
 
     public function mount($id): void
@@ -721,8 +724,29 @@ class PlanBoard extends Component
             return;
         }
 
-        // Nothing extra to record — apply and log immediately.
-        DB::transaction(fn() => $this->applyStatusChange($event, $action));
+        // Nothing extra to record in a modal — apply and log immediately.
+        // A non-recipe event ended here still confirms out any items it
+        // reserved when it was started.
+        $warehouseId = $this->warehouseId();
+
+        DB::beginTransaction();
+        try {
+            $this->applyStatusChange($event, $action);
+
+            if ($action === 'terminate' && $warehouseId) {
+                $this->inventory->applyOrFail(
+                    $this->confirmOutOps($warehouseId, $this->reservedInputQuantities($event))
+                );
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $this->dispatch('swal:error', [
+                'title' => 'Action failed',
+                'text'  => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function assertTransitionAllowed(Event $event, string $action): bool
@@ -1295,14 +1319,36 @@ class PlanBoard extends Component
             ['endingActivity.time.required' => 'Please enter the end time.', 'endingActivity.time.date' => 'Please enter a valid end time.']
         );
 
-        $activity = EventPauseActivity::whereHas('event', fn($q) => $q->where('plan_id', $this->plan->id))
+        $activity = EventPauseActivity::with('quantities')
+            ->whereHas('event', fn($q) => $q->where('plan_id', $this->plan->id))
             ->whereNull('ended_at')
             ->findOrFail($this->endingActivity['id']);
 
-        $activity->update([
-            'ended_at' => Carbon::parse($this->endingActivity['time'])->format('Y-m-d H:i:s'),
-            'end_note' => $this->endingActivity['note'] ?: null,
-        ]);
+        $warehouseId = $this->warehouseId();
+
+        DB::beginTransaction();
+        try {
+            $activity->update([
+                'ended_at' => Carbon::parse($this->endingActivity['time'])->format('Y-m-d H:i:s'),
+                'end_note' => $this->endingActivity['note'] ?: null,
+            ]);
+
+            // The items used were reserved out when the emergency was added —
+            // confirm them out of stock now that it has ended.
+            if ($warehouseId) {
+                $this->inventory->applyOrFail($this->confirmOutOps($warehouseId, $activity->quantities));
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $this->dispatch('swal:error', [
+                'title' => 'Cannot end emergency event',
+                'text'  => $e->getMessage(),
+            ]);
+
+            return;
+        }
 
         $this->endingActivity = null;
 
@@ -1341,9 +1387,34 @@ class PlanBoard extends Component
             ]
         );
 
-        $pauseLog = $this->latestPauseLog($event->id);
+        $pauseLog    = $this->latestPauseLog($event->id);
+        $warehouseId = $this->warehouseId();
 
-        DB::transaction(function () use ($event, $pauseLog) {
+        // Items to reserve out (every entered quantity across all rows).
+        $reserve = [];
+        foreach ($this->pauseActivityRows as $row) {
+            foreach ($row['items'] ?? [] as $item) {
+                $qty = (float) ($item['quantity'] ?? 0);
+
+                if ($qty > 0 && !empty($item['item_id']) && !empty($item['item_unit_id'])) {
+                    $reserve[] = [
+                        'item_id'      => $item['item_id'],
+                        'item_unit_id' => $item['item_unit_id'],
+                        'quantity'     => $qty,
+                        'item_name'    => $item['item_name'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        // Block the emergency if any used item is not available in stock,
+        // before touching the DB or the pending-out reservation.
+        if ($warehouseId && !$this->stockAvailable($warehouseId, $reserve, 'Cannot record emergency events')) {
+            return;
+        }
+
+        DB::beginTransaction();
+        try {
             foreach ($this->pauseActivityRows as $row) {
                 $type = collect($this->pauseEventTypes)->firstWhere('id', (int) $row['event_type_id']);
 
@@ -1361,7 +1432,23 @@ class PlanBoard extends Component
 
                 $this->storeEmergencyQuantities($event, $pauseLog, $activity, $row['items'] ?? []);
             }
-        });
+
+            // Reserve the used items as pending out. The pre-check above guards
+            // availability; this still throws on a race and rolls back.
+            if ($warehouseId) {
+                $this->inventory->applyOrFail($this->reserveOutOps($warehouseId, $reserve));
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $this->dispatch('swal:error', [
+                'title' => 'Cannot record emergency events',
+                'text'  => $e->getMessage(),
+            ]);
+
+            return;
+        }
 
         $this->closeActionModal();
     }
@@ -1445,6 +1532,121 @@ class PlanBoard extends Component
         };
     }
 
+    // ─── Warehouse inventory ──────────────────────────────────────────────────
+    //
+    // The plan's factory is the production warehouse. Consumed items are held
+    // as "pending out" from when an event/emergency starts until it ends, then
+    // confirmed out; produced items and side products are added in when the
+    // event ends. All operations go through the parent inventory API and throw
+    // on insufficient stock so the surrounding transaction rolls back.
+
+    protected function warehouseId(): ?int
+    {
+        return $this->plan->factory_id ? (int) $this->plan->factory_id : null;
+    }
+
+    /** reserve_out ops for [item_id, item_unit_id, quantity] rows. */
+    protected function reserveOutOps(int $warehouseId, iterable $rows): array
+    {
+        $ops = [];
+
+        foreach ($rows as $row) {
+            $qty = (float) ($row['quantity'] ?? 0);
+
+            if (!empty($row['item_id']) && !empty($row['item_unit_id']) && $qty > 0) {
+                $ops[] = InventoryService::reserveOut($warehouseId, $row['item_id'], $row['item_unit_id'], $qty);
+            }
+        }
+
+        return $ops;
+    }
+
+    /** confirm_out ops (pending out → out) for a set of recorded quantities. */
+    protected function confirmOutOps(int $warehouseId, iterable $quantities): array
+    {
+        $ops = [];
+
+        foreach ($quantities as $qty) {
+            $amount = (float) $qty->actual_quantity;
+
+            if ($qty->item_id && $qty->item_unit_id && $amount > 0) {
+                $ops[] = InventoryService::confirmOut($warehouseId, $qty->item_id, $qty->item_unit_id, $amount, $amount);
+            }
+        }
+
+        return $ops;
+    }
+
+    /** reserve_in + confirm_in ops (add straight to stock) for recorded quantities. */
+    protected function stockInOps(int $warehouseId, iterable $quantities): array
+    {
+        $ops = [];
+
+        foreach ($quantities as $qty) {
+            $amount = (float) $qty->actual_quantity;
+
+            if ($qty->item_id && $qty->item_unit_id && $amount > 0) {
+                $ops[] = InventoryService::reserveIn($warehouseId, $qty->item_id, $qty->item_unit_id, $amount);
+                $ops[] = InventoryService::confirmIn($warehouseId, $qty->item_id, $qty->item_unit_id, $amount, $amount);
+            }
+        }
+
+        return $ops;
+    }
+
+    /**
+     * Explicitly verify the requested quantities are available in stock before
+     * reserving them out. Available = on-hand − already pending out. Requests
+     * for the same item/unit are summed. On a shortfall, shows an error naming
+     * the item and returns false; otherwise true.
+     */
+    protected function stockAvailable(int $warehouseId, array $rows, string $errorTitle): bool
+    {
+        $needed = [];
+
+        foreach ($rows as $row) {
+            $itemId = (int) ($row['item_id'] ?? 0);
+            $unitId = (int) ($row['item_unit_id'] ?? 0);
+            $qty    = (float) ($row['quantity'] ?? 0);
+
+            if (!$itemId || !$unitId || $qty <= 0) {
+                continue;
+            }
+
+            $key = "{$itemId}:{$unitId}";
+            $needed[$key] ??= [
+                'item_id'      => $itemId,
+                'item_unit_id' => $unitId,
+                'item_name'    => $row['item_name'] ?? "Item #{$itemId}",
+                'quantity'     => 0.0,
+            ];
+            $needed[$key]['quantity'] += $qty;
+        }
+
+        foreach ($needed as $entry) {
+            $inv       = $this->inventory->find($warehouseId, $entry['item_id'], $entry['item_unit_id']);
+            $available = (float) ($inv['quantity'] ?? 0) - (float) ($inv['quantity_pending_out'] ?? 0);
+
+            if ($entry['quantity'] > $available + 1e-6) {
+                $this->dispatch('swal:error', [
+                    'title' => $errorTitle,
+                    'text'  => "Not enough stock for \"{$entry['item_name']}\": you need "
+                        . $this->trimNumber($entry['quantity']) . ' but only '
+                        . $this->trimNumber(max($available, 0)) . ' is available.',
+                ]);
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function trimNumber(float $number): string
+    {
+        return rtrim(rtrim(number_format($number, 4, '.', ''), '0'), '.') ?: '0';
+    }
+
     protected function submitStart(Event $event): void
     {
         $hasRecipe = (bool) ($this->eventAction['has_recipe'] ?? false);
@@ -1457,7 +1659,29 @@ class PlanBoard extends Component
             ['actionInputs.*.actual_quantity' => 'used quantity']
         );
 
-        DB::transaction(function () use ($event, $hasRecipe) {
+        $warehouseId = $this->warehouseId();
+
+        // Items to reserve out of stock (every row with a quantity).
+        $reserve = [];
+        foreach ($this->actionInputs as $row) {
+            if ((float) ($row['actual_quantity'] ?? 0) > 0) {
+                $reserve[] = [
+                    'item_id'      => $row['item_id'],
+                    'item_unit_id' => $row['item_unit_id'],
+                    'quantity'     => (float) $row['actual_quantity'],
+                    'item_name'    => $row['item_name'] ?? null,
+                ];
+            }
+        }
+
+        // Block the start if any consumed item is not available in stock,
+        // before touching the event or the pending-out reservation.
+        if ($warehouseId && !$this->stockAvailable($warehouseId, $reserve, 'Cannot start event')) {
+            return;
+        }
+
+        DB::beginTransaction();
+        try {
             $log = $this->applyStatusChange($event, 'start', [
                 'notes'       => $this->actionNotes,
                 'happened_at' => $this->parsedActionTime(),
@@ -1473,7 +1697,23 @@ class PlanBoard extends Component
 
                 $this->storeQuantity($event, $log, 'input', $row);
             }
-        });
+
+            // Reserve the consumed items as pending out. The pre-check above
+            // guards availability; this still throws on a race and rolls back.
+            if ($warehouseId) {
+                $this->inventory->applyOrFail($this->reserveOutOps($warehouseId, $reserve));
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $this->dispatch('swal:error', [
+                'title' => 'Cannot start event',
+                'text'  => $e->getMessage(),
+            ]);
+
+            return;
+        }
 
         $this->closeActionModal();
     }
@@ -1492,22 +1732,59 @@ class PlanBoard extends Component
             ]
         );
 
-        DB::transaction(function () use ($event) {
+        $warehouseId = $this->warehouseId();
+
+        DB::beginTransaction();
+        try {
             $log = $this->applyStatusChange($event, 'terminate', [
                 'notes'       => $this->actionNotes,
                 'happened_at' => $this->parsedActionTime(),
             ]);
 
+            $produced = collect();
+
             foreach ($this->actionOutputs as $row) {
-                $this->storeQuantity($event, $log, 'output', $row);
+                $produced->push($this->storeQuantity($event, $log, 'output', $row));
             }
 
             foreach ($this->actionSideProducts as $row) {
-                $this->storeQuantity($event, $log, 'side_product', $row);
+                $produced->push($this->storeQuantity($event, $log, 'side_product', $row));
             }
-        });
+
+            if ($warehouseId) {
+                // Consumed inputs (reserved at start): pending out → out.
+                // Produced item + side products: added in.
+                $ops = array_merge(
+                    $this->confirmOutOps($warehouseId, $this->reservedInputQuantities($event)),
+                    $this->stockInOps($warehouseId, $produced),
+                );
+
+                $this->inventory->applyOrFail($ops);
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $this->dispatch('swal:error', [
+                'title' => 'Cannot end event',
+                'text'  => $e->getMessage(),
+            ]);
+
+            return;
+        }
 
         $this->closeActionModal();
+    }
+
+    /**
+     * Input quantities that were reserved as pending out when the event
+     * started (source = input), to be confirmed out when it ends.
+     */
+    protected function reservedInputQuantities(Event $event)
+    {
+        return EventQuantity::where('event_id', $event->id)
+            ->where('source', 'input')
+            ->get();
     }
 
     protected function submitPause(Event $event): void
@@ -1566,9 +1843,9 @@ class PlanBoard extends Component
         ], $logData));
     }
 
-    protected function storeQuantity(Event $event, EventStatusLog $log, string $source, array $row): void
+    protected function storeQuantity(Event $event, EventStatusLog $log, string $source, array $row): EventQuantity
     {
-        EventQuantity::create([
+        return EventQuantity::create([
             'event_id'               => $event->id,
             'event_status_log_id'    => $log->id,
             'source'                 => $source,
