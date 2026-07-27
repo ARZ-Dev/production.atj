@@ -35,9 +35,7 @@ class ItemRequestCreate extends Component
     {
         authorizeRequest($id ? 'production.item-request-edit' : 'production.item-request-create');
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         $this->rawMaterials = $api->get('/v1/items', [
             'item_type' => 'Raw Material',

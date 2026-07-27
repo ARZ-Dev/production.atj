@@ -42,9 +42,7 @@ class StockInCreate extends Component
 
         authorizeRequest($viewStatus == 1 ? 'production.itemStockIn-view' : 'production.stockIn-create');
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         if ($id) {
             $this->id      = $id;

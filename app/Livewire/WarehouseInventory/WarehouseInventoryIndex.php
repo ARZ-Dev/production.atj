@@ -38,9 +38,7 @@ class WarehouseInventoryIndex extends Component
     {
         authorizeRequest('production.rawMaterialWarehouseInventory-list');
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         $this->warehouseMap = collect($this->warehouses)->pluck('name', 'id')->toArray();
 

@@ -57,9 +57,7 @@ class TransferCreate extends Component
 
         $this->viewStatus = $viewStatus;
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         if ($id) {
             $this->id      = $id;

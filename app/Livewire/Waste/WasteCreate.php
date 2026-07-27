@@ -42,9 +42,7 @@ class WasteCreate extends Component
 
         authorizeRequest($viewStatus == 1 ? 'production.itemWaste-view' : 'production.rawMaterialWaste-create');
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         if ($id) {
             $this->id      = $id;
