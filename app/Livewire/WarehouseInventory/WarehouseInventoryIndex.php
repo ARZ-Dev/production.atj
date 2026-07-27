@@ -3,8 +3,8 @@
 namespace App\Livewire\WarehouseInventory;
 
 use App\Models\ReportItem;
-use App\Models\WarehouseInventory;
 use App\Services\ApiService;
+use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -26,19 +26,19 @@ class WarehouseInventoryIndex extends Component
     public $unitMap         = [];
 
     protected ApiService $api;
+    protected InventoryService $inventory;
 
-    public function boot(ApiService $api): void
+    public function boot(ApiService $api, InventoryService $inventory): void
     {
-        $this->api = $api;
+        $this->api       = $api;
+        $this->inventory = $inventory;
     }
 
     public function mount(ApiService $api): void
     {
         authorizeRequest('production.rawMaterialWarehouseInventory-list');
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         $this->warehouseMap = collect($this->warehouses)->pluck('name', 'id')->toArray();
 
@@ -76,20 +76,18 @@ class WarehouseInventoryIndex extends Component
             return;
         }
 
-        // Read the live inventory rows for the selected warehouse
-        $this->warehouseUnits = WarehouseInventory::where('warehouse_id', $this->warehouse_id)
-            ->orderBy('item_id')
-            ->get()
+        // Read the live inventory rows for the selected warehouse from the parent API
+        $this->warehouseUnits = collect($this->inventory->forWarehouse($this->warehouse_id))
             ->map(function ($row) {
                 return (object) [
-                    'warehouse_id'         => $row->warehouse_id,
-                    'item_id'              => $row->item_id,
-                    'item_unit_id'         => $row->item_unit_id,
-                    'item'                 => $this->itemName($row->item_id),
-                    'unit'                 => $this->unitName($row->item_id, $row->item_unit_id),
-                    'quantity'             => $row->quantity,
-                    'quantity_pending_in'  => $row->quantity_pending_in,
-                    'quantity_pending_out' => $row->quantity_pending_out,
+                    'warehouse_id'         => $row['warehouse_id'],
+                    'item_id'              => $row['item_id'],
+                    'item_unit_id'         => $row['item_unit_id'],
+                    'item'                 => $this->itemName($row['item_id']),
+                    'unit'                 => $this->unitName($row['item_id'], $row['item_unit_id']),
+                    'quantity'             => $row['quantity'],
+                    'quantity_pending_in'  => $row['quantity_pending_in'],
+                    'quantity_pending_out' => $row['quantity_pending_out'],
                 ];
             })
             ->values();
@@ -104,17 +102,14 @@ class WarehouseInventoryIndex extends Component
         ];
 
         // Live on-hand / pending figures for this item-unit in this warehouse
-        $inventory = WarehouseInventory::where('warehouse_id', $warehouseId)
-            ->where('item_id', $itemId)
-            ->where('item_unit_id', $itemUnitId)
-            ->first();
+        $inventory = $this->inventory->find($warehouseId, $itemId, $itemUnitId);
 
         $this->selectedInventory = (object) [
             'item'                 => $this->itemName($itemId),
             'unit'                 => $this->unitName($itemId, $itemUnitId),
-            'quantity'             => $inventory->quantity ?? 0,
-            'quantity_pending_in'  => $inventory->quantity_pending_in ?? 0,
-            'quantity_pending_out' => $inventory->quantity_pending_out ?? 0,
+            'quantity'             => $inventory['quantity'] ?? 0,
+            'quantity_pending_in'  => $inventory['quantity_pending_in'] ?? 0,
+            'quantity_pending_out' => $inventory['quantity_pending_out'] ?? 0,
         ];
 
         $items = ReportItem::where('item_id', $itemId)

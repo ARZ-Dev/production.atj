@@ -3,8 +3,8 @@
 namespace App\Livewire\Transfer;
 
 use App\Models\Transfer;
-use App\Models\WarehouseInventory;
 use App\Services\ApiService;
+use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -29,10 +29,12 @@ class TransferCreate extends Component
     public $rowUnits           = [];   // units per row keyed by index
 
     protected ApiService $api;
+    protected InventoryService $inventory;
 
-    public function boot(ApiService $api): void
+    public function boot(ApiService $api, InventoryService $inventory): void
     {
-        $this->api = $api;
+        $this->api       = $api;
+        $this->inventory = $inventory;
     }
 
     public function mount(ApiService $api, $id = null, $viewStatus = null)
@@ -55,9 +57,7 @@ class TransferCreate extends Component
 
         $this->viewStatus = $viewStatus;
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         if ($id) {
             $this->id      = $id;
@@ -244,6 +244,8 @@ class TransferCreate extends Component
 
         DB::beginTransaction();
         try {
+            $ops = [];
+
             if ($this->editing) {
                 $transfer = Transfer::findOrFail($this->id);
 
@@ -254,10 +256,10 @@ class TransferCreate extends Component
 
                 // Unwind the previous reservation using the transfer's current (old) warehouses
                 foreach ($transfer->reportItems as $old) {
-                    WarehouseInventory::releasePendingOut(
+                    $ops[] = InventoryService::releaseOut(
                         $transfer->warehouse_from_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
                     );
-                    WarehouseInventory::releasePendingIn(
+                    $ops[] = InventoryService::releaseIn(
                         $transfer->warehouse_to_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
                     );
                 }
@@ -298,10 +300,10 @@ class TransferCreate extends Component
                 }
 
                 // Reserve out of the source and into the destination until confirmed
-                WarehouseInventory::addPendingOut(
+                $ops[] = InventoryService::reserveOut(
                     $this->warehouse_from_id, $item['id'], $unit['id'], (float) $row['quantity']
                 );
-                WarehouseInventory::addPendingIn(
+                $ops[] = InventoryService::reserveIn(
                     $this->warehouse_to_id, $item['id'], $unit['id'], (float) $row['quantity']
                 );
 
@@ -311,6 +313,9 @@ class TransferCreate extends Component
             if ($this->editing) {
                 $transfer->reportItems()->whereNotIn('id', $syncedIds)->delete();
             }
+
+            // Push the reservation changes to the parent inventory (throws on failure)
+            $this->inventory->applyOrFail($ops);
 
             DB::commit();
 
@@ -334,22 +339,10 @@ class TransferCreate extends Component
 
         $transfer = Transfer::with('reportItems')->findOrFail($this->id);
 
-        // Validate the source warehouse holds enough actual stock for every item first
-        foreach ($this->transferItems as $row) {
-            $available = WarehouseInventory::availableQuantity(
-                $this->warehouse_from_id, (int) $row['item_id'], (int) $row['item_unit_id']
-            );
-
-            if ($available < (float) $row['quantity']) {
-                return $this->dispatch('swal:error', [
-                    'title' => 'Error!',
-                    'text'  => "Not enough stock for item ID {$row['item_id']}. Available: {$available}, Required: {$row['quantity']}",
-                ]);
-            }
-        }
-
         DB::beginTransaction();
         try {
+            $ops = [];
+
             foreach ($this->transferItems as $index => $row) {
                 $item = collect($this->allItems)->firstWhere('id', (int) $row['item_id']);
                 abort_if(!$item, 422, 'Invalid item selected.');
@@ -364,11 +357,14 @@ class TransferCreate extends Component
                     'quantity'      => (float) $row['quantity'],
                 ]);
 
-                // Release the source reservation into an actual deduction
-                WarehouseInventory::confirmOut(
-                    $this->warehouse_from_id, $item['id'], $unit['id'], (float) $row['quantity']
+                // Release the source reservation into an actual deduction. The parent
+                // validates availability and rejects the batch if the source is short.
+                $ops[] = InventoryService::confirmOut(
+                    $this->warehouse_from_id, $item['id'], $unit['id'], (float) $row['quantity'], (float) $row['quantity']
                 );
             }
+
+            $this->inventory->applyOrFail($ops);
 
             $transfer->update(['status' => 'loaded']);
 
@@ -393,6 +389,8 @@ class TransferCreate extends Component
 
         DB::beginTransaction();
         try {
+            $ops = [];
+
             foreach ($this->transferItems as $row) {
                 $receivedQty = (float) $row['received_quantity'];
                 $loadedQty   = (float) $row['quantity'];
@@ -400,7 +398,7 @@ class TransferCreate extends Component
                 // Move the destination reservation into actual stock.
                 // The source was already deducted at load, so only the destination changes here;
                 // the received quantity may differ from the loaded (reserved) quantity.
-                WarehouseInventory::confirmIn(
+                $ops[] = InventoryService::confirmIn(
                     $this->warehouse_to_id, (int) $row['item_id'], (int) $row['item_unit_id'], $loadedQty, $receivedQty
                 );
 
@@ -409,6 +407,8 @@ class TransferCreate extends Component
                     ->where('id', $row['id'])
                     ->update(['received_quantity' => $receivedQty]);
             }
+
+            $this->inventory->applyOrFail($ops);
 
             $transfer->update(['status' => 'approved']);
 

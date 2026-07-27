@@ -344,8 +344,13 @@
                 <div class="modal-body">
                     @if($eventAction['action'] === 'start')
 
+                    @php $startHasRecipe = (bool) ($eventAction['has_recipe'] ?? false); @endphp
                     <p class="text-muted mb-2" style="font-size: 12px;">
+                        @if($startHasRecipe)
                         Record the actual quantity used for each recipe item, then start the event.
+                        @else
+                        Enter the quantity used for any item consumed — leave the rest empty — then start the event.
+                        @endif
                     </p>
                     @if(count($actionInputs))
                     @include('livewire.plans.partials._action-quantity-table', [
@@ -353,10 +358,15 @@
                         'model'        => 'actionInputs',
                         'actualLabel'  => 'Used Qty',
                         'percentLabel' => '% Difference',
+                        'showOriginal' => $startHasRecipe,
                     ])
-                    @else
+                    @elseif($startHasRecipe)
                     <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
                         This recipe has no input items defined.
+                    </div>
+                    @else
+                    <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
+                        No items are available for this event type.
                     </div>
                     @endif
                     <div class="row g-3 mt-0">

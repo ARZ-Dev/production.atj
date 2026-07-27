@@ -699,11 +699,16 @@ class PlanBoard extends Component
 
         $this->resetActionForm();
 
-        $needsRecipeModal = (bool) $event->eventType?->has_recipe && $event->recipe;
+        $hasRecipe = (bool) $event->eventType?->has_recipe && $event->recipe;
 
-        // Pause/resume always collect a reason; start/terminate only when the
-        // event type has a recipe whose quantities must be recorded.
-        if ($action === 'pause' || $action === 'resume' || $needsRecipeModal) {
+        // Start shows the used-items table for recipe events (recipe inputs)
+        // and for non-recipe events that have item types configured (e.g.
+        // cleaning consuming detergent). Terminate stays recipe-only.
+        $needsStartModal     = $action === 'start' && ($hasRecipe || !empty($event->eventType?->item_type_ids));
+        $needsTerminateModal = $action === 'terminate' && $hasRecipe;
+
+        // Pause/resume always collect a reason.
+        if ($action === 'pause' || $action === 'resume' || $needsStartModal || $needsTerminateModal) {
             match ($action) {
                 'start'     => $this->prepareStartModal($event),
                 'terminate' => $this->prepareTerminateModal($event),
@@ -800,18 +805,67 @@ class PlanBoard extends Component
 
     protected function prepareStartModal(Event $event): void
     {
-        $this->actionInputs = $event->recipe->inputs
-            ->map(fn(RecipeInput $input) => $this->quantityRow(
-                $input->item_type_id,
-                $input->item_id,
-                $input->item_unit_id,
-                (float) $input->quantity,
-                recipeInputId: $input->id,
-            ))
-            ->values()
-            ->all();
+        $hasRecipe = (bool) $event->eventType?->has_recipe && $event->recipe;
 
-        $this->eventAction = $this->baseActionPayload($event, 'start');
+        if ($hasRecipe) {
+            // Recipe events: the recipe's inputs, with their planned quantity.
+            $this->actionInputs = $event->recipe->inputs
+                ->map(fn(RecipeInput $input) => $this->quantityRow(
+                    $input->item_type_id,
+                    $input->item_id,
+                    $input->item_unit_id,
+                    (float) $input->quantity,
+                    recipeInputId: $input->id,
+                ))
+                ->values()
+                ->all();
+        } else {
+            // Non-recipe events: every item of the event type's item types —
+            // no planned quantity, so the Original Qty column is hidden.
+            $this->actionInputs = $this->itemTypeQuantityRows($event->eventType);
+        }
+
+        $this->eventAction = array_merge($this->baseActionPayload($event, 'start'), [
+            'has_recipe' => $hasRecipe,
+        ]);
+    }
+
+    /**
+     * Quantity rows for every item belonging to an event type's item types,
+     * defaulting each to its basic unit. Used for non-recipe start events.
+     */
+    protected function itemTypeQuantityRows(?EventType $eventType): array
+    {
+        $rows = [];
+
+        foreach ($eventType?->item_type_ids ?? [] as $itemTypeId) {
+            $typeName = $this->itemTypeName((int) $itemTypeId);
+
+            foreach ($this->itemsForItemType((int) $itemTypeId) as $item) {
+                $units = $this->unitsForItem($item);
+                $basic = collect($units)->firstWhere('basic', true) ?: ($units[0] ?? null);
+
+                $unitLabel = $basic
+                    ? ($basic['name'] ?? '') . (!empty($basic['symbol']) ? " ({$basic['symbol']})" : '')
+                    : null;
+
+                $rows[] = [
+                    'recipe_input_id'        => null,
+                    'recipe_side_product_id' => null,
+                    'item_type_id'           => (int) $itemTypeId,
+                    'item_type_name'         => $typeName ?: 'Other',
+                    'item_id'                => $item['id'] ?? null,
+                    'item_unit_id'           => $basic['id'] ?? null,
+                    'item_name'              => $item['name'] ?? null,
+                    'unit_name'              => $unitLabel,
+                    'planned_quantity'       => null,
+                    'actual_quantity'        => null,
+                    'percentage'             => null,
+                ];
+            }
+        }
+
+        return $rows;
     }
 
     protected function prepareTerminateModal(Event $event): void
@@ -1393,19 +1447,30 @@ class PlanBoard extends Component
 
     protected function submitStart(Event $event): void
     {
+        $hasRecipe = (bool) ($this->eventAction['has_recipe'] ?? false);
+
+        // Recipe inputs are all consumed, so each quantity is required;
+        // non-recipe items are candidates — only the ones used are recorded.
         $this->validate(
-            ['actionInputs.*.actual_quantity' => 'required|numeric|min:0'],
+            ['actionInputs.*.actual_quantity' => ($hasRecipe ? 'required' : 'nullable') . '|numeric|min:0'],
             [],
             ['actionInputs.*.actual_quantity' => 'used quantity']
         );
 
-        DB::transaction(function () use ($event) {
+        DB::transaction(function () use ($event, $hasRecipe) {
             $log = $this->applyStatusChange($event, 'start', [
                 'notes'       => $this->actionNotes,
                 'happened_at' => $this->parsedActionTime(),
             ]);
 
             foreach ($this->actionInputs as $row) {
+                $quantity = $row['actual_quantity'] ?? null;
+
+                // For non-recipe events, skip items with no entered quantity.
+                if (!$hasRecipe && ($quantity === null || $quantity === '' || (float) $quantity <= 0)) {
+                    continue;
+                }
+
                 $this->storeQuantity($event, $log, 'input', $row);
             }
         });
@@ -1514,9 +1579,9 @@ class PlanBoard extends Component
             'item_unit_id'           => $row['item_unit_id'],
             'item_name'              => $row['item_name'],
             'unit_name'              => $row['unit_name'],
-            'planned_quantity'       => (float) $row['planned_quantity'],
-            'actual_quantity'        => (float) $row['actual_quantity'],
-            'percentage'             => $this->percentageOf($row['planned_quantity'], $row['actual_quantity']),
+            'planned_quantity'       => ($row['planned_quantity'] ?? null) !== null ? (float) $row['planned_quantity'] : null,
+            'actual_quantity'        => (float) ($row['actual_quantity'] ?? 0),
+            'percentage'             => $this->percentageOf($row['planned_quantity'] ?? null, $row['actual_quantity'] ?? null),
         ]);
     }
 

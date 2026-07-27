@@ -3,8 +3,8 @@
 namespace App\Livewire\StockIn;
 
 use App\Models\StockIn;
-use App\Models\WarehouseInventory;
 use App\Services\ApiService;
+use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -28,10 +28,12 @@ class StockInCreate extends Component
     public $rowUnits     = [];   // units per row keyed by index
 
     protected ApiService $api;
+    protected InventoryService $inventory;
 
-    public function boot(ApiService $api): void
+    public function boot(ApiService $api, InventoryService $inventory): void
     {
-        $this->api = $api;
+        $this->api       = $api;
+        $this->inventory = $inventory;
     }
 
     public function mount(ApiService $api, $id = null, $viewStatus = null): void
@@ -40,9 +42,7 @@ class StockInCreate extends Component
 
         authorizeRequest($viewStatus == 1 ? 'production.itemStockIn-view' : 'production.stockIn-create');
 
-        $this->warehouses = $api->get('/v1/warehouses', [
-            'related_to_production' => true,
-        ])['data'] ?? [];
+        $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
         if ($id) {
             $this->id      = $id;
@@ -178,12 +178,15 @@ class StockInCreate extends Component
                 ]);
             }
 
-            // When editing, unwind the previous pending reservation before re-applying below
-            $oldItems = $this->editing ? $stockIn->reportItems()->get() : collect();
-            foreach ($oldItems as $old) {
-                WarehouseInventory::releasePendingIn(
-                    $old->warehouse_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
-                );
+            $ops = [];
+
+            // When editing, unwind the previous reservation before re-applying below
+            if ($this->editing) {
+                foreach ($stockIn->reportItems()->get() as $old) {
+                    $ops[] = InventoryService::releaseIn(
+                        $old->warehouse_id, $old->item_id, $old->item_unit_id, (float) $old->quantity
+                    );
+                }
             }
 
             $syncedIds = [];
@@ -210,7 +213,7 @@ class StockInCreate extends Component
                 }
 
                 // Reserve the incoming quantity as pending until the Stock In is approved
-                WarehouseInventory::addPendingIn(
+                $ops[] = InventoryService::reserveIn(
                     $this->warehouse_id, $item['id'], $unit['id'], (float) $row['quantity']
                 );
 
@@ -220,6 +223,9 @@ class StockInCreate extends Component
             if ($this->editing) {
                 $stockIn->reportItems()->whereNotIn('id', $syncedIds)->delete();
             }
+
+            // Push the reservation changes to the parent inventory (throws on failure)
+            $this->inventory->applyOrFail($ops);
 
             DB::commit();
 
