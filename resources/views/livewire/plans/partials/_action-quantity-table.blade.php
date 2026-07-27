@@ -55,7 +55,7 @@
                 <td>
                     <input type="number" step="any" min="0"
                         class="form-control form-control-sm @error("{$model}.{$i}.actual_quantity") is-invalid @enderror"
-                        wire:model.live="{{ $model }}.{{ $i }}.actual_quantity" placeholder="0">
+                        wire:model.live.debounce.600ms="{{ $model }}.{{ $i }}.actual_quantity" placeholder="0">
                     @error("{$model}.{$i}.actual_quantity")
                     <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
