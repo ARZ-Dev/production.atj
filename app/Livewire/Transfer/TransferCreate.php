@@ -330,6 +330,10 @@ class TransferCreate extends Component
                 'title' => 'Error',
                 'text'  => 'An error occurred: ' . $e->getMessage(),
             ]);
+
+            // Stay on the page so the error shows; the ": mixed" return type
+            // requires an explicit return on this path.
+            return null;
         }
     }
 
@@ -378,6 +382,10 @@ class TransferCreate extends Component
                 'title' => 'Error',
                 'text'  => 'An error occurred: ' . $e->getMessage(),
             ]);
+
+            // Stay on the page so the error shows; the ": mixed" return type
+            // requires an explicit return on this path.
+            return null;
         }
     }
 
@@ -422,6 +430,10 @@ class TransferCreate extends Component
                 'title' => 'Error',
                 'text'  => 'An error occurred: ' . $e->getMessage(),
             ]);
+
+            // Stay on the page so the error shows; the ": mixed" return type
+            // requires an explicit return on this path.
+            return null;
         }
     }
 

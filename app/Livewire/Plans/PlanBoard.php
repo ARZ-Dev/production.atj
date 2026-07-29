@@ -619,16 +619,25 @@ class PlanBoard extends Component
             return;
         }
 
+        $laneChanged = (int) $event->production_line_id !== $productionLineId
+            || $event->placeable_type !== $placeableClass
+            || (int) $event->placeable_id !== $placeableId;
+
+        // A started event is locked to its lane — its warehouse (and reserved
+        // stock) is tied to that placement, so it can't be moved elsewhere.
+        if ($laneChanged && $event->status) {
+            $label = self::EVENT_STATUS_LABELS[$event->status] ?? $event->status;
+            $this->dispatch('dropRejected', message: "\"{$event->eventType?->name}\" can't be moved to another lane while it is \"{$label}\".");
+
+            return;
+        }
+
         // The board is divided into 15-minute slots (96 per day); the drop
         // reports which slot the card landed on.
         $slot    = max(0, min(95, $slot));
         $newFrom = Carbon::parse($this->plan->date)->startOfDay()
             ->addMinutes($slot * 15)
             ->format('Y-m-d H:i:s');
-
-        $laneChanged = (int) $event->production_line_id !== $productionLineId
-            || $event->placeable_type !== $placeableClass
-            || (int) $event->placeable_id !== $placeableId;
 
         $event->production_line_id = $productionLineId;
         $event->placeable_type     = $placeableClass;
@@ -665,7 +674,16 @@ class PlanBoard extends Component
 
     public function unplaceEvent(int $eventId): void
     {
-        $event = Event::where('plan_id', $this->plan->id)->findOrFail($eventId);
+        $event = Event::with('eventType')->where('plan_id', $this->plan->id)->findOrFail($eventId);
+
+        // A started event can't be unplaced — its warehouse and reserved stock
+        // are tied to its placement.
+        if ($event->status) {
+            $label = self::EVENT_STATUS_LABELS[$event->status] ?? $event->status;
+            $this->dispatch('dropRejected', message: "\"{$event->eventType?->name}\" can't be unplaced while it is \"{$label}\".");
+
+            return;
+        }
 
         $event->production_line_id  = null;
         $event->placeable_type      = null;
@@ -692,6 +710,17 @@ class PlanBoard extends Component
             ->findOrFail($eventId);
 
         if (!$this->assertTransitionAllowed($event, $action)) {
+            return;
+        }
+
+        // An event must be placed on a line or preparation before it can be
+        // started — that placement determines which warehouse stock moves from.
+        if ($action === 'start' && !$event->placeable_id) {
+            $this->dispatch('swal:error', [
+                'title' => 'Event not placed',
+                'text'  => 'Place this event on a line or preparation before starting it.',
+            ]);
+
             return;
         }
 
@@ -727,7 +756,7 @@ class PlanBoard extends Component
         // Nothing extra to record in a modal — apply and log immediately.
         // A non-recipe event ended here still confirms out any items it
         // reserved when it was started.
-        $warehouseId = $this->warehouseId();
+        $warehouseId = $this->outWarehouseId($event);
 
         DB::beginTransaction();
         try {
@@ -1319,12 +1348,12 @@ class PlanBoard extends Component
             ['endingActivity.time.required' => 'Please enter the end time.', 'endingActivity.time.date' => 'Please enter a valid end time.']
         );
 
-        $activity = EventPauseActivity::with('quantities')
+        $activity = EventPauseActivity::with('quantities', 'event')
             ->whereHas('event', fn($q) => $q->where('plan_id', $this->plan->id))
             ->whereNull('ended_at')
             ->findOrFail($this->endingActivity['id']);
 
-        $warehouseId = $this->warehouseId();
+        $warehouseId = $activity->event ? $this->outWarehouseId($activity->event) : null;
 
         DB::beginTransaction();
         try {
@@ -1388,7 +1417,7 @@ class PlanBoard extends Component
         );
 
         $pauseLog    = $this->latestPauseLog($event->id);
-        $warehouseId = $this->warehouseId();
+        $warehouseId = $this->outWarehouseId($event);
 
         // Items to reserve out (every entered quantity across all rows).
         $reserve = [];
@@ -1540,9 +1569,44 @@ class PlanBoard extends Component
     // event ends. All operations go through the parent inventory API and throw
     // on insufficient stock so the surrounding transaction rolls back.
 
-    protected function warehouseId(): ?int
+    /**
+     * The placeable (preparation or line) the event runs on.
+     */
+    protected function placeableFor(Event $event)
     {
-        return $this->plan->factory_id ? (int) $this->plan->factory_id : null;
+        if (!$event->placeable_type || !$event->placeable_id) {
+            return null;
+        }
+
+        return $event->placeable_type::find($event->placeable_id);
+    }
+
+    /**
+     * Warehouse items are consumed from: a preparation's raw-material store
+     * (rm_warehouse_id) or a line's semi-finished-goods store (sfg_warehouse_id).
+     */
+    protected function outWarehouseId(Event $event): ?int
+    {
+        $placeable = $this->placeableFor($event);
+
+        if (!$placeable) {
+            return null;
+        }
+
+        $column = $event->placeable_type === Preparation::class ? 'rm_warehouse_id' : 'sfg_warehouse_id';
+
+        return $placeable->{$column} ? (int) $placeable->{$column} : null;
+    }
+
+    /**
+     * Warehouse produced items and side products are added into: the
+     * finished-goods store (fg_warehouse_id) for both preparations and lines.
+     */
+    protected function inWarehouseId(Event $event): ?int
+    {
+        $placeable = $this->placeableFor($event);
+
+        return $placeable && $placeable->fg_warehouse_id ? (int) $placeable->fg_warehouse_id : null;
     }
 
     /** reserve_out ops for [item_id, item_unit_id, quantity] rows. */
@@ -1659,7 +1723,7 @@ class PlanBoard extends Component
             ['actionInputs.*.actual_quantity' => 'used quantity']
         );
 
-        $warehouseId = $this->warehouseId();
+        $warehouseId = $this->outWarehouseId($event);
 
         // Items to reserve out of stock (every row with a quantity).
         $reserve = [];
@@ -1732,7 +1796,8 @@ class PlanBoard extends Component
             ]
         );
 
-        $warehouseId = $this->warehouseId();
+        $outWarehouseId = $this->outWarehouseId($event);
+        $inWarehouseId  = $this->inWarehouseId($event);
 
         DB::beginTransaction();
         try {
@@ -1751,16 +1816,20 @@ class PlanBoard extends Component
                 $produced->push($this->storeQuantity($event, $log, 'side_product', $row));
             }
 
-            if ($warehouseId) {
-                // Consumed inputs (reserved at start): pending out → out.
-                // Produced item + side products: added in.
-                $ops = array_merge(
-                    $this->confirmOutOps($warehouseId, $this->reservedInputQuantities($event)),
-                    $this->stockInOps($warehouseId, $produced),
-                );
+            // Consumed inputs (reserved at start): pending out → out of the
+            // raw-material/semi-finished store. Produced item + side products:
+            // added into the finished-goods store.
+            $ops = [];
 
-                $this->inventory->applyOrFail($ops);
+            if ($outWarehouseId) {
+                $ops = array_merge($ops, $this->confirmOutOps($outWarehouseId, $this->reservedInputQuantities($event)));
             }
+
+            if ($inWarehouseId) {
+                $ops = array_merge($ops, $this->stockInOps($inWarehouseId, $produced));
+            }
+
+            $this->inventory->applyOrFail($ops);
 
             DB::commit();
         } catch (\Throwable $e) {
