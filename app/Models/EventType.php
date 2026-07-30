@@ -22,6 +22,11 @@ class EventType extends Model
         return $this->hasMany(Event::class);
     }
 
+    public function eventTypeItems()
+    {
+        return $this->hasMany(EventTypeItem::class);
+    }
+
     public function lines()
     {
         return $this->belongsToMany(Line::class, 'event_type_line');

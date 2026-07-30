@@ -345,28 +345,30 @@
                     @if($eventAction['action'] === 'start')
 
                     @php $startHasRecipe = (bool) ($eventAction['has_recipe'] ?? false); @endphp
+                    @if(count($actionInputs))
                     <p class="text-muted mb-2" style="font-size: 12px;">
                         @if($startHasRecipe)
                         Record the actual quantity used for each recipe item, then start the event.
                         @else
-                        Enter the quantity used for any item consumed — leave the rest empty — then start the event.
+                        Record the actual quantity used for each item — leave unused items empty — then start the event.
                         @endif
                     </p>
-                    @if(count($actionInputs))
                     @include('livewire.plans.partials._action-quantity-table', [
                         'rows'         => $actionInputs,
                         'model'        => 'actionInputs',
                         'actualLabel'  => 'Used Qty',
                         'percentLabel' => '% Difference',
-                        'showOriginal' => $startHasRecipe,
+                        'showOriginal' => true,
                     ])
-                    @elseif($startHasRecipe)
-                    <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
-                        This recipe has no input items defined.
-                    </div>
                     @else
                     <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
-                        No items are available for this event type.
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        @if($startHasRecipe)
+                        This recipe has no input items defined — no quantities will be recorded.
+                        @else
+                        No items are defined for this event type — no quantities will be recorded.
+                        Add items to this event type if you want to track usage. You can still start the event below.
+                        @endif
                     </div>
                     @endif
                     <div class="row g-3 mt-0">
@@ -387,6 +389,7 @@
 
                     @elseif($eventAction['action'] === 'terminate')
 
+                    @if($eventAction['has_recipe'])
                     <div class="fw-bold mb-1" style="font-size: 13px;">
                         <i class="bi bi-box-seam me-1 text-primary"></i> Produced Item
                     </div>
@@ -408,6 +411,7 @@
                         'percentLabel' => '% Produced',
                     ])
                     @endif
+                    @endif
 
                     <div class="row g-3 mt-0">
                         <div class="col-md-6">
@@ -421,7 +425,7 @@
                         <div class="col-12">
                             <label class="form-label">Notes</label>
                             <textarea class="form-control" rows="3" wire:model="actionNotes"
-                                placeholder="Optional notes about the produced quantities…"></textarea>
+                                placeholder="Optional notes about ending this event…"></textarea>
                         </div>
                     </div>
 
@@ -685,14 +689,16 @@
                                 <thead>
                                     <tr>
                                         <th>Item</th>
-                                        <th style="width: 180px;">Unit</th>
-                                        <th style="width: 130px;">Qty Used</th>
+                                        <th style="width: 150px;">Unit</th>
+                                        <th style="width: 110px;">Original Qty</th>
+                                        <th style="width: 120px;">Used Qty</th>
+                                        <th style="width: 110px;">% Difference</th>
                                     </tr>
                                 </thead>
                                 @foreach($itemGroups as $groupName => $groupItems)
                                 <tbody wire:key="pa-{{ $i }}-group-{{ $loop->index }}">
                                     <tr class="aqt-group-row">
-                                        <td colspan="3" class="aqt-group-title">
+                                        <td colspan="5" class="aqt-group-title">
                                             <i class="bi bi-tag-fill me-1"></i>{{ $groupName }}
                                             <span class="aqt-group-count">{{ count($groupItems) }}</span>
                                         </td>
@@ -700,21 +706,25 @@
                                     @foreach($groupItems as $j => $emItem)
                                     <tr wire:key="pa-{{ $i }}-item-{{ $j }}">
                                         <td>{{ $emItem['item_name'] ?? '—' }}</td>
+                                        <td>{{ $emItem['unit_name'] ?? '—' }}</td>
                                         <td>
-                                            <select class="form-select form-select-sm"
-                                                wire:model="pauseActivityRows.{{ $i }}.items.{{ $j }}.item_unit_id">
-                                                @foreach($emItem['units'] ?? [] as $unit)
-                                                <option value="{{ $unit['id'] }}">{{ $unit['label'] }}</option>
-                                                @endforeach
-                                            </select>
+                                            <input type="number" class="form-control form-control-sm"
+                                                value="{{ ($emItem['planned_quantity'] ?? 0) + 0 }}" disabled>
                                         </td>
                                         <td>
                                             <input type="number" step="any" min="0" placeholder="0"
                                                 class="form-control form-control-sm @error("pauseActivityRows.{$i}.items.{$j}.quantity") is-invalid @enderror"
-                                                wire:model="pauseActivityRows.{{ $i }}.items.{{ $j }}.quantity">
+                                                wire:model.live.debounce.600ms="pauseActivityRows.{{ $i }}.items.{{ $j }}.quantity">
                                             @error("pauseActivityRows.{$i}.items.{$j}.quantity")
                                             <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="text" class="form-control"
+                                                    value="{{ ($emItem['percentage'] ?? null) !== null ? $emItem['percentage'] + 0 : '' }}" disabled>
+                                                <span class="input-group-text">%</span>
+                                            </div>
                                         </td>
                                     </tr>
                                     @endforeach
@@ -724,7 +734,7 @@
                         </div>
                         @elseif(!empty($row['event_type_id']))
                         <div class="text-muted mt-2" style="font-size: 11px;">
-                            <i class="bi bi-info-circle me-1"></i>No item types are configured for this event type.
+                            <i class="bi bi-info-circle me-1"></i>No items are defined for this event type.
                         </div>
                         @endif
                     </div>

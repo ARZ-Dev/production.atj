@@ -86,7 +86,7 @@
     <!-- Create / Edit Modal -->
     <div class="modal fade" id="eventTypeModal" tabindex="-1" aria-labelledby="eventTypeModalLabel" aria-hidden="true"
         wire:ignore.self data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="eventTypeModalLabel">
@@ -163,6 +163,66 @@
                         <div class="form-text">Restricts which item types can be selected for events of this type.</div>
                         @error('item_type_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                     </div>
+
+                    @if(!$has_recipe)
+                        @if(count($eventTypeItems))
+                        @php
+                            $etGroups = [];
+                            foreach ($eventTypeItems as $i => $r) {
+                                $etGroups[$r['item_type_name']][$i] = $r;
+                            }
+                        @endphp
+                        <div class="mb-3">
+                            <label class="form-label mb-1">
+                                Items <span class="text-muted" style="font-size: 11px;">— set a unit &amp; quantity for the items this event uses</span>
+                            </label>
+                            <div class="table-responsive border rounded">
+                                <table class="table table-sm align-middle mb-0 aqt-table" style="font-size: 12px;">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th style="width: 190px;">Unit</th>
+                                            <th style="width: 130px;">Quantity</th>
+                                        </tr>
+                                    </thead>
+                                    @foreach($etGroups as $groupName => $groupRows)
+                                    <tbody wire:key="et-item-group-{{ $loop->index }}">
+                                        <tr class="aqt-group-row">
+                                            <td colspan="3" class="aqt-group-title">
+                                                <i class="bi bi-tag-fill me-1"></i>{{ $groupName }}
+                                                <span class="aqt-group-count">{{ count($groupRows) }}</span>
+                                            </td>
+                                        </tr>
+                                        @foreach($groupRows as $i => $row)
+                                        <tr wire:key="et-item-{{ $row['item_id'] }}">
+                                            <td>{{ $row['item_name'] }}</td>
+                                            <td>
+                                                <select class="form-select form-select-sm"
+                                                    wire:model="eventTypeItems.{{ $i }}.item_unit_id">
+                                                    @foreach($row['units'] as $unit)
+                                                    <option value="{{ $unit['id'] }}">{{ $unit['label'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number" step="any" min="0" placeholder="0"
+                                                    class="form-control form-control-sm"
+                                                    wire:model="eventTypeItems.{{ $i }}.quantity">
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                    @endforeach
+                                </table>
+                            </div>
+                            <div class="form-text">Only items with a quantity are saved — leave the rest empty.</div>
+                        </div>
+                        @elseif(count($item_type_ids))
+                        <div class="mb-3 text-muted" style="font-size: 12px;">
+                            <i class="bi bi-info-circle me-1"></i>No active items found for the selected item types.
+                        </div>
+                        @endif
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal"
@@ -209,7 +269,10 @@
         // directly off the DOM at the moment Save is clicked and push it in
         // right before submitting.
         $(document).on('click', '#et_submit_btn', function () {
-            const selected = ($('#et_item_type_ids').val() || []).map(v => parseInt(v));
+            // Keep the same string representation the live `changed.bs.select`
+            // sync uses, so re-setting here doesn't look "dirty" and rebuild
+            // the items table (which would drop unsaved quantities).
+            const selected = ($('#et_item_type_ids').val() || []).map(String);
             $wire.set('item_type_ids', selected, false);
             $wire.call('submit');
         });
