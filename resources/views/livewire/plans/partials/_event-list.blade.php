@@ -50,10 +50,6 @@
                         $continuesNextDay = !$isCarryOver && $event->placeable_id && $event->from_time && $event->to_time
                             && \Carbon\Carbon::parse($event->to_time)->gt(\Carbon\Carbon::parse($event->from_time)->startOfDay()->addDay());
 
-                        // Recipe events confirm terminate through the quantities
-                        // modal instead of a plain confirm dialog.
-                        $needsQtyModal = $hasRecipe && $event->recipe_id;
-
                         $statusKey = $event->status ?: '';
                         $status    = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'badge' => 'bg-secondary'];
 
@@ -149,11 +145,17 @@
                             </button>
                             @endif
                             @if($statusKey === '')
-                            <button type="button" class="btn btn-light-success btn-sm"
-                                wire:click.stop="updateEventStatus({{ $event->id }}, 'start')"
-                                wire:loading.attr="disabled" wire:target="updateEventStatus">
-                                <i class="bi bi-play-fill"></i> Start
-                            </button>
+                                @if($event->placeable_id)
+                                <button type="button" class="btn btn-light-success btn-sm"
+                                    wire:click.stop="updateEventStatus({{ $event->id }}, 'start')"
+                                    wire:loading.attr="disabled" wire:target="updateEventStatus">
+                                    <i class="bi bi-play-fill"></i> Start
+                                </button>
+                                @else
+                                <span class="text-muted" style="font-size: 11px;" title="Place this event on a preparation or line to start it">
+                                    <i class="bi bi-geo-alt"></i> Place to start
+                                </span>
+                                @endif
                             @elseif($statusKey === 'in_progress')
                             <button type="button" class="btn btn-light-warning btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'pause')"
@@ -162,7 +164,6 @@
                             </button>
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
-                                @unless($needsQtyModal) wire:confirm="End this event? It cannot be resumed afterwards." @endunless
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-stop-fill"></i> End
                             </button>
@@ -174,7 +175,6 @@
                             </button>
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
-                                @unless($needsQtyModal) wire:confirm="End this event? It cannot be resumed afterwards." @endunless
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-stop-fill"></i> End
                             </button>
