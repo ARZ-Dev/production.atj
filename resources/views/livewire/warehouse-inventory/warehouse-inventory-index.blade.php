@@ -56,6 +56,7 @@
                             <th>On Hand</th>
                             <th>Pending In</th>
                             <th>Pending Out</th>
+                            <th>In Process</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -81,6 +82,13 @@
                                 @endif
                             </td>
                             <td>
+                                @if($unit->quantity_in_process > 0)
+                                    <span class="badge bg-info text-dark">{{ $unit->quantity_in_process }}</span>
+                                @else
+                                    <span class="text-muted">{{ $unit->quantity_in_process }}</span>
+                                @endif
+                            </td>
+                            <td>
                                 <button class="btn btn-sm btn-info"
                                     wire:click="viewUnitActivity({{ $unit->warehouse_id }}, {{ $unit->item_id }}, {{ $unit->item_unit_id }})">
                                     Check Activity
@@ -89,7 +97,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="7" class="text-center">No items found for this warehouse</td>
+                            <td colspan="8" class="text-center">No items found for this warehouse</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -126,22 +134,28 @@
                                 <span class="text-muted">— {{ $selectedInventory->unit }}</span>
                             </h6>
                             <div class="row g-3">
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <div class="border rounded p-3 text-center h-100">
                                         <div class="text-muted text-uppercase small mb-1">On Hand</div>
                                         <div class="fs-4 fw-bold">{{ $selectedInventory->quantity }}</div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <div class="border border-success rounded p-3 text-center h-100">
                                         <div class="text-success text-uppercase small mb-1">Pending In</div>
                                         <div class="fs-4 fw-bold text-success">{{ $selectedInventory->quantity_pending_in }}</div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <div class="border border-warning rounded p-3 text-center h-100">
                                         <div class="text-warning text-uppercase small mb-1">Pending Out</div>
                                         <div class="fs-4 fw-bold text-warning">{{ $selectedInventory->quantity_pending_out }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border border-info rounded p-3 text-center h-100">
+                                        <div class="text-info text-uppercase small mb-1">In Process</div>
+                                        <div class="fs-4 fw-bold text-info">{{ $selectedInventory->quantity_in_process }}</div>
                                     </div>
                                 </div>
                             </div>

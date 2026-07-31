@@ -1540,7 +1540,7 @@ class PlanBoard extends Component
         return $placeable && $placeable->fg_warehouse_id ? (int) $placeable->fg_warehouse_id : null;
     }
 
-    /** reserve_out ops for [item_id, item_unit_id, quantity] rows. */
+    /** reserve_process ops (hold in process) for [item_id, item_unit_id, quantity] rows. */
     protected function reserveOutOps(int $warehouseId, iterable $rows): array
     {
         $ops = [];
@@ -1549,14 +1549,14 @@ class PlanBoard extends Component
             $qty = (float) ($row['quantity'] ?? 0);
 
             if (!empty($row['item_id']) && !empty($row['item_unit_id']) && $qty > 0) {
-                $ops[] = InventoryService::reserveOut($warehouseId, $row['item_id'], $row['item_unit_id'], $qty);
+                $ops[] = InventoryService::reserveProcess($warehouseId, $row['item_id'], $row['item_unit_id'], $qty);
             }
         }
 
         return $ops;
     }
 
-    /** confirm_out ops (pending out → out) for a set of recorded quantities. */
+    /** confirm_process_out ops (in process → out) for a set of recorded quantities. */
     protected function confirmOutOps(int $warehouseId, iterable $quantities): array
     {
         $ops = [];
@@ -1565,14 +1565,14 @@ class PlanBoard extends Component
             $amount = (float) $qty->actual_quantity;
 
             if ($qty->item_id && $qty->item_unit_id && $amount > 0) {
-                $ops[] = InventoryService::confirmOut($warehouseId, $qty->item_id, $qty->item_unit_id, $amount, $amount);
+                $ops[] = InventoryService::confirmProcessOut($warehouseId, $qty->item_id, $qty->item_unit_id, $amount, $amount);
             }
         }
 
         return $ops;
     }
 
-    /** reserve_in + confirm_in ops (add straight to stock) for recorded quantities. */
+    /** reserve_process + confirm_process_in ops (add straight to stock) for recorded quantities. */
     protected function stockInOps(int $warehouseId, iterable $quantities): array
     {
         $ops = [];
@@ -1581,8 +1581,8 @@ class PlanBoard extends Component
             $amount = (float) $qty->actual_quantity;
 
             if ($qty->item_id && $qty->item_unit_id && $amount > 0) {
-                $ops[] = InventoryService::reserveIn($warehouseId, $qty->item_id, $qty->item_unit_id, $amount);
-                $ops[] = InventoryService::confirmIn($warehouseId, $qty->item_id, $qty->item_unit_id, $amount, $amount);
+                $ops[] = InventoryService::reserveProcess($warehouseId, $qty->item_id, $qty->item_unit_id, $amount);
+                $ops[] = InventoryService::confirmProcessIn($warehouseId, $qty->item_id, $qty->item_unit_id, $amount, $amount);
             }
         }
 
@@ -1591,9 +1591,9 @@ class PlanBoard extends Component
 
     /**
      * Explicitly verify the requested quantities are available in stock before
-     * reserving them out. Available = on-hand − already pending out. Requests
-     * for the same item/unit are summed. On a shortfall, shows an error naming
-     * the item and returns false; otherwise true.
+     * holding them in process. Available = on-hand − pending out − in process.
+     * Requests for the same item/unit are summed. On a shortfall, shows an
+     * error naming the item and returns false; otherwise true.
      */
     protected function stockAvailable(int $warehouseId, array $rows, string $errorTitle): bool
     {
@@ -1620,7 +1620,9 @@ class PlanBoard extends Component
 
         foreach ($needed as $entry) {
             $inv       = $this->inventory->find($warehouseId, $entry['item_id'], $entry['item_unit_id']);
-            $available = (float) ($inv['quantity'] ?? 0) - (float) ($inv['quantity_pending_out'] ?? 0);
+            $available = (float) ($inv['quantity'] ?? 0)
+                - (float) ($inv['quantity_pending_out'] ?? 0)
+                - (float) ($inv['quantity_in_process'] ?? 0);
 
             if ($entry['quantity'] > $available + 1e-6) {
                 $this->dispatch('swal:error', [

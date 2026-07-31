@@ -88,6 +88,7 @@ class WarehouseInventoryIndex extends Component
                     'quantity'             => $row['quantity'],
                     'quantity_pending_in'  => $row['quantity_pending_in'],
                     'quantity_pending_out' => $row['quantity_pending_out'],
+                    'quantity_in_process'  => $row['quantity_in_process'] ?? 0,
                 ];
             })
             ->values();
@@ -110,6 +111,7 @@ class WarehouseInventoryIndex extends Component
             'quantity'             => $inventory['quantity'] ?? 0,
             'quantity_pending_in'  => $inventory['quantity_pending_in'] ?? 0,
             'quantity_pending_out' => $inventory['quantity_pending_out'] ?? 0,
+            'quantity_in_process'  => $inventory['quantity_in_process'] ?? 0,
         ];
 
         $items = ReportItem::where('item_id', $itemId)

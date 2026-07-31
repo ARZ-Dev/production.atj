@@ -145,8 +145,18 @@ class WasteCreate extends Component
         $this->rowUnits   = array_values($this->rowUnits);
     }
 
+    /** Strip Cleave.js thousands separators (e.g. "1,000") from quantities before use. */
+    protected function sanitizeQuantities(): void
+    {
+        foreach ($this->wasteItems as $index => $row) {
+            $this->wasteItems[$index]['quantity'] = str_replace(',', '', (string) ($row['quantity'] ?? ''));
+        }
+    }
+
     public function submit()
     {
+        $this->sanitizeQuantities();
+
         $this->validate([
             'warehouse_id'              => 'required|integer',
             'wasteItems'                => 'required|array|min:1',

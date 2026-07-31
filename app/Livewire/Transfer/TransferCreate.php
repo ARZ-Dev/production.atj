@@ -238,8 +238,23 @@ class TransferCreate extends Component
         ];
     }
 
+    /** Strip Cleave.js thousands separators (e.g. "1,000") from quantities before use. */
+    protected function sanitizeQuantities(): void
+    {
+        foreach ($this->transferItems as $index => $row) {
+            $this->transferItems[$index]['quantity'] = str_replace(',', '', (string) ($row['quantity'] ?? ''));
+
+            if (isset($this->transferItems[$index]['received_quantity'])) {
+                $this->transferItems[$index]['received_quantity'] =
+                    str_replace(',', '', (string) $this->transferItems[$index]['received_quantity']);
+            }
+        }
+    }
+
     public function submit(): mixed
     {
+        $this->sanitizeQuantities();
+
         $this->validate();
 
         DB::beginTransaction();
@@ -339,6 +354,8 @@ class TransferCreate extends Component
 
     public function confirmLoad(): mixed
     {
+        $this->sanitizeQuantities();
+
         $this->validate();
 
         $transfer = Transfer::with('reportItems')->findOrFail($this->id);
@@ -391,6 +408,8 @@ class TransferCreate extends Component
 
     public function confirmReceive(): mixed
     {
+        $this->sanitizeQuantities();
+
         $this->validate();
 
         $transfer = Transfer::with('reportItems')->findOrFail($this->id);

@@ -145,8 +145,18 @@ class StockInCreate extends Component
         $this->rowUnits     = array_values($this->rowUnits);
     }
 
+    /** Strip Cleave.js thousands separators (e.g. "1,000") from quantities before use. */
+    protected function sanitizeQuantities(): void
+    {
+        foreach ($this->stockInItems as $index => $row) {
+            $this->stockInItems[$index]['quantity'] = str_replace(',', '', (string) ($row['quantity'] ?? ''));
+        }
+    }
+
     public function submit()
     {
+        $this->sanitizeQuantities();
+
         $this->validate([
             'warehouse_id'                => 'required|integer',
             'stockInItems'                => 'required|array|min:1',
