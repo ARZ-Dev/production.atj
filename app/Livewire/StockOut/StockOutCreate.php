@@ -145,8 +145,18 @@ class StockOutCreate extends Component
         $this->rowUnits      = array_values($this->rowUnits);
     }
 
+    /** Strip Cleave.js thousands separators (e.g. "1,000") from quantities before use. */
+    protected function sanitizeQuantities(): void
+    {
+        foreach ($this->stockOutItems as $index => $row) {
+            $this->stockOutItems[$index]['quantity'] = str_replace(',', '', (string) ($row['quantity'] ?? ''));
+        }
+    }
+
     public function submit()
     {
+        $this->sanitizeQuantities();
+
         $this->validate([
             'warehouse_id'                 => 'required|integer',
             'stockOutItems'                => 'required|array|min:1',

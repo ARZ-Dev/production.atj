@@ -97,6 +97,37 @@ class InventoryService
         ]);
     }
 
+    // ─── "In process" holds (production events) ──────────────
+    //
+    // Events tie stock up in quantity_in_process rather than the pending
+    // columns, which stay reserved for stock-outs and wastes only.
+
+    public static function reserveProcess($warehouseId, $itemId, $itemUnitId, $quantity): array
+    {
+        return self::line('reserve_process', $warehouseId, $itemId, $itemUnitId, ['quantity' => (float) $quantity]);
+    }
+
+    public static function releaseProcess($warehouseId, $itemId, $itemUnitId, $quantity): array
+    {
+        return self::line('release_process', $warehouseId, $itemId, $itemUnitId, ['quantity' => (float) $quantity]);
+    }
+
+    public static function confirmProcessIn($warehouseId, $itemId, $itemUnitId, $pendingQuantity, $actualQuantity): array
+    {
+        return self::line('confirm_process_in', $warehouseId, $itemId, $itemUnitId, [
+            'pending_quantity' => (float) $pendingQuantity,
+            'actual_quantity'  => (float) $actualQuantity,
+        ]);
+    }
+
+    public static function confirmProcessOut($warehouseId, $itemId, $itemUnitId, $pendingQuantity, $actualQuantity): array
+    {
+        return self::line('confirm_process_out', $warehouseId, $itemId, $itemUnitId, [
+            'pending_quantity' => (float) $pendingQuantity,
+            'actual_quantity'  => (float) $actualQuantity,
+        ]);
+    }
+
     protected static function line(string $op, $warehouseId, $itemId, $itemUnitId, array $extra): array
     {
         return array_merge([
