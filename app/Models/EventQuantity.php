@@ -12,6 +12,10 @@ class EventQuantity extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'confirmed_at' => 'datetime',
+    ];
+
     public function event()
     {
         return $this->belongsTo(Event::class);
