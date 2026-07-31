@@ -1285,11 +1285,12 @@ class PlanBoard extends Component
             ->findOrFail($this->endingActivity['id']);
 
         $warehouseId = $activity->event ? $this->outWarehouseId($activity->event) : null;
+        $endedAt     = Carbon::parse($this->endingActivity['time']);
 
         DB::beginTransaction();
         try {
             $activity->update([
-                'ended_at' => Carbon::parse($this->endingActivity['time'])->format('Y-m-d H:i:s'),
+                'ended_at' => $endedAt->format('Y-m-d H:i:s'),
                 'end_note' => $this->endingActivity['note'] ?: null,
             ]);
 
@@ -1298,6 +1299,9 @@ class PlanBoard extends Component
             if ($warehouseId) {
                 $this->inventory->applyOrFail($this->confirmOutOps($warehouseId, $activity->quantities));
             }
+
+            // Mark them confirmed out for the activity report.
+            $activity->quantities()->whereNull('confirmed_at')->update(['confirmed_at' => $endedAt]);
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -1390,7 +1394,7 @@ class PlanBoard extends Component
                     'created_by_name'     => authUser()?->name,
                 ]);
 
-                $this->storeEmergencyQuantities($event, $pauseLog, $activity, $row['items'] ?? []);
+                $this->storeEmergencyQuantities($event, $pauseLog, $activity, $row['items'] ?? [], $warehouseId);
             }
 
             // Reserve the used items as pending out. The pre-check above guards
@@ -1417,7 +1421,7 @@ class PlanBoard extends Component
      * Persist only the emergency items the user actually entered a quantity
      * for — the table lists every candidate item, most stay empty.
      */
-    protected function storeEmergencyQuantities(Event $event, ?EventStatusLog $pauseLog, EventPauseActivity $activity, array $items): void
+    protected function storeEmergencyQuantities(Event $event, ?EventStatusLog $pauseLog, EventPauseActivity $activity, array $items, ?int $warehouseId = null): void
     {
         foreach ($items as $item) {
             $quantity = $item['quantity'] ?? null;
@@ -1432,6 +1436,7 @@ class PlanBoard extends Component
                 'event_id'                => $event->id,
                 'event_status_log_id'     => $pauseLog?->id,
                 'event_pause_activity_id' => $activity->id,
+                'warehouse_id'            => $warehouseId,
                 'source'                  => 'emergency',
                 'item_type_id'            => $item['item_type_id'] ?? null,
                 'item_id'                 => $item['item_id'] ?? null,
@@ -1692,7 +1697,7 @@ class PlanBoard extends Component
                     continue;
                 }
 
-                $this->storeQuantity($event, $log, 'input', $row);
+                $this->storeQuantity($event, $log, 'input', $row, $warehouseId);
             }
 
             // Reserve the consumed items as pending out. The pre-check above
@@ -1731,25 +1736,27 @@ class PlanBoard extends Component
 
         $outWarehouseId = $this->outWarehouseId($event);
         $inWarehouseId  = $this->inWarehouseId($event);
+        $endedAt        = $this->parsedActionTime();
 
         DB::beginTransaction();
         try {
             $log = $this->applyStatusChange($event, 'terminate', [
                 'notes'       => $this->actionNotes,
-                'happened_at' => $this->parsedActionTime(),
+                'happened_at' => $endedAt,
             ]);
 
             $produced = collect();
 
+            // Produced items are added straight in, so they're confirmed now.
             foreach ($this->actionOutputs as $row) {
-                $produced->push($this->storeQuantity($event, $log, 'output', $row));
+                $produced->push($this->storeQuantity($event, $log, 'output', $row, $inWarehouseId, $endedAt));
             }
 
             foreach ($this->actionSideProducts as $row) {
-                $produced->push($this->storeQuantity($event, $log, 'side_product', $row));
+                $produced->push($this->storeQuantity($event, $log, 'side_product', $row, $inWarehouseId, $endedAt));
             }
 
-            // Consumed inputs (reserved at start): pending out → out of the
+            // Consumed inputs (held in process at start): in process → out of the
             // raw-material/semi-finished store. Produced item + side products:
             // added into the finished-goods store.
             $ops = [];
@@ -1763,6 +1770,12 @@ class PlanBoard extends Component
             }
 
             $this->inventory->applyOrFail($ops);
+
+            // Mark the consumed inputs as confirmed out for the activity report.
+            EventQuantity::where('event_id', $event->id)
+                ->where('source', 'input')
+                ->whereNull('confirmed_at')
+                ->update(['confirmed_at' => $endedAt]);
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -1845,11 +1858,12 @@ class PlanBoard extends Component
         ], $logData));
     }
 
-    protected function storeQuantity(Event $event, EventStatusLog $log, string $source, array $row): EventQuantity
+    protected function storeQuantity(Event $event, EventStatusLog $log, string $source, array $row, ?int $warehouseId = null, $confirmedAt = null): EventQuantity
     {
         return EventQuantity::create([
             'event_id'               => $event->id,
             'event_status_log_id'    => $log->id,
+            'warehouse_id'           => $warehouseId,
             'source'                 => $source,
             'recipe_input_id'        => $row['recipe_input_id'] ?? null,
             'recipe_side_product_id' => $row['recipe_side_product_id'] ?? null,
@@ -1861,6 +1875,7 @@ class PlanBoard extends Component
             'planned_quantity'       => ($row['planned_quantity'] ?? null) !== null ? (float) $row['planned_quantity'] : null,
             'actual_quantity'        => (float) ($row['actual_quantity'] ?? 0),
             'percentage'             => $this->percentageOf($row['planned_quantity'] ?? null, $row['actual_quantity'] ?? null),
+            'confirmed_at'           => $confirmedAt,
         ]);
     }
 
