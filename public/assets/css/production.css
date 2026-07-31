@@ -497,13 +497,13 @@
 
 /* Status-action modal: item-type grouped quantity table */
 .aqt-table > tbody + tbody { border-top: 0; }
-.aqt-group-row td { padding: 0 !important; border: 0; }
-.aqt-group-title {
+.aqt-group-row td { border-bottom: 0; }
+.aqt-table td.aqt-group-title {
     background: rgba(129,140,248,.10);
     color: #4f46e5;
     font-size: 13px; font-weight: 800;
     text-transform: uppercase; letter-spacing: .6px;
-    padding: 8px 10px !important;
+    padding: 8px 12px;
     border-left: 3px solid #818cf8;
     border-radius: 4px;
 }
