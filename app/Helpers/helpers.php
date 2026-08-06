@@ -40,6 +40,32 @@ if (!function_exists('authorizeRequest')) {
     }
 }
 
+if (!function_exists('format_quantity')) {
+    /**
+     * Format a stored quantity for display inside a Cleave.js input:
+     * thousands separators with trailing zeros trimmed
+     * (e.g. "1250.000000" → "1,250", 1250.5 → "1,250.5").
+     *
+     * Precision is kept up to 6 decimals so an unedited value round-trips
+     * unchanged through sanitizeQuantities() (which only strips the commas)
+     * when the form is submitted.
+     */
+    function format_quantity($value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        $formatted = number_format((float) $value, 6, '.', ',');
+
+        if (str_contains($formatted, '.')) {
+            $formatted = rtrim(rtrim($formatted, '0'), '.');
+        }
+
+        return $formatted;
+    }
+}
+
 if (!function_exists('getRelationName')) {
     function getRelationName($relation)
     {

@@ -59,7 +59,7 @@ class WasteCreate extends Component
                 'id'           => $input->id,
                 'item_id'      => $input->item_id,
                 'item_unit_id' => $input->item_unit_id,
-                'quantity'     => $input->quantity,
+                'quantity'     => format_quantity($input->quantity),
             ])->toArray();
 
             // Pre-load units for each existing row
@@ -95,27 +95,15 @@ class WasteCreate extends Component
         $units = $this->fetchUnitsForItem((int) $itemId);
         $this->rowUnits[$index] = $units;
 
-        if ($dispatch) {
-            $this->dispatch('setItemUnits', $index, $units);
+        // When the item has exactly one unit, select it automatically so the
+        // user doesn't have to open a dropdown with a single choice.
+        $autoUnitId = count($units) === 1 ? ($units[0]['id'] ?? null) : null;
+        if ($autoUnitId !== null) {
+            $this->wasteItems[$index]['item_unit_id'] = $autoUnitId;
         }
-    }
 
-    public function updatedRawMaterials($value, $key): void
-    {
-        if (str_ends_with($key, '.item_id')) {
-            $index = (int) explode('.', $key)[0];
-
-            if ($value) {
-                $units                  = $this->fetchUnitsForItem((int) $value);
-                $this->rowUnits[$index] = $units;
-
-                // Auto-select basic unit, fallback to first
-                $basicUnit = collect($units)->firstWhere('basic', true);
-                $this->wasteItems[$index]['item_unit_id'] = $basicUnit['id'] ?? ($units[0]['id'] ?? null);
-            } else {
-                $this->rowUnits[$index]                   = [];
-                $this->wasteItems[$index]['item_unit_id'] = null;
-            }
+        if ($dispatch) {
+            $this->dispatch('setItemUnits', $index, $units, $autoUnitId);
         }
     }
 
