@@ -85,9 +85,9 @@ class TransferCreate extends Component
                 'id'                => $reportItem->id,
                 'item_id'           => $reportItem->item_id,
                 'item_unit_id'      => $reportItem->item_unit_id,
-                'quantity'          => $reportItem->quantity,
+                'quantity'          => format_quantity($reportItem->quantity),
                 'received_quantity' => $this->confirmStatus == 2
-                    ? ($reportItem->received_quantity ?? $reportItem->quantity)
+                    ? format_quantity($reportItem->received_quantity ?? $reportItem->quantity)
                     : null,
             ])->toArray();
 
@@ -152,27 +152,15 @@ class TransferCreate extends Component
         $units = $this->fetchUnitsForItem((int) $itemId);
         $this->rowUnits[$index] = $units;
 
-        if ($dispatch) {
-            $this->dispatch('setItemUnits', $index, $units);
+        // When the item has exactly one unit, select it automatically so the
+        // user doesn't have to open a dropdown with a single choice.
+        $autoUnitId = count($units) === 1 ? ($units[0]['id'] ?? null) : null;
+        if ($autoUnitId !== null) {
+            $this->transferItems[$index]['item_unit_id'] = $autoUnitId;
         }
-    }
 
-    public function updatedRawMaterials($value, $key): void
-    {
-        if (str_ends_with($key, '.item_id')) {
-            $index = (int) explode('.', $key)[0];
-
-            if ($value) {
-                $units                  = $this->fetchUnitsForItem((int) $value);
-                $this->rowUnits[$index] = $units;
-
-                // Auto-select basic unit, fallback to first
-                $basicUnit = collect($units)->firstWhere('basic', true);
-                $this->transferItems[$index]['item_unit_id'] = $basicUnit['id'] ?? ($units[0]['id'] ?? null);
-            } else {
-                $this->rowUnits[$index]                      = [];
-                $this->transferItems[$index]['item_unit_id'] = null;
-            }
+        if ($dispatch) {
+            $this->dispatch('setItemUnits', $index, $units, $autoUnitId);
         }
     }
 

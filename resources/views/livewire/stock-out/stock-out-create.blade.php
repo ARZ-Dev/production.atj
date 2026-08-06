@@ -62,125 +62,127 @@
                 {{-- Items Card --}}
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Stock Out Items</h5>
-                        <button type="button" class="btn btn-success btn-sm" wire:click="addRow">
-                            <i class="ti ti-plus me-1"></i> Add Stock Out Item
-                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="mb-0">Stock Out Items</h5>
+                            <span class="ir-count">{{ count($stockOutItems) }}</span>
+                        </div>
                     </div>
                     <div class="card-body">
-                        @if(count($stockOutItems) > 0)
-                            <div class="row g-3">
-                                @foreach($stockOutItems as $index => $row)
-                                    <div class="col-12" wire:key="stock-out-row-{{ $index }}">
-                                        <div class="border rounded p-3">
+                        <div class="ir-editor">
 
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <label class="form-label mb-0">
-                                                    Stock Out #{{ $index + 1 }}
-                                                </label>
-                                                @if(count($stockOutItems) > 1)
-                                                    <button type="button"
-                                                            class="btn btn-danger btn-sm"
-                                                            wire:click="removeItem({{ $index }})">
-                                                        <i class="ti ti-trash me-1"></i> Remove
-                                                    </button>
-                                                @endif
-                                            </div>
+                            {{-- Column header (desktop) --}}
+                            <div class="ir-head ir-cols-basic">
+                                <div class="ir-idx-h">#</div>
+                                <div>Item</div>
+                                <div>Unit</div>
+                                <div>Quantity</div>
+                                <div></div>
+                            </div>
 
-                                            <div class="row g-3 align-items-end">
+                            @forelse($stockOutItems as $index => $row)
+                                <div class="ir-row ir-cols-basic" wire:key="stock-out-row-{{ $index }}">
 
-                                                {{-- Item --}}
-                                                <div class="col-12 col-md-4">
-                                                    <label class="form-label" for="item_{{ $index }}">
-                                                        Item <span class="text-danger">*</span>
-                                                    </label>
-                                                    <div wire:ignore>
-                                                        <select wire:model="stockOutItems.{{ $index }}.item_id"
-                                                                id="item_{{ $index }}"
-                                                                class="selectpicker w-100 item-select"
-                                                                title="Select Item"
-                                                                data-style="btn-default"
-                                                                data-live-search="true"
-                                                                data-icon-base="ti"
-                                                                data-size="5"
-                                                                data-tick-icon="ti-check text-white"
-                                                                data-index="{{ $index }}">
-                                                            @foreach($items as $item)
-                                                                <option value="{{ $item['id'] }}"
-                                                                    @selected($row['item_id'] == $item['id'])>
-                                                                    {{ $item['name'] }}
-                                                                    ({{ $item['code'] ?? '' }})
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                    @error('stockOutItems.' . $index . '.item_id')
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </div>
-
-                                                {{-- Unit — no wire:ignore so Livewire can update options --}}
-                                                <div class="col-12 col-md-4">
-                                                    <label class="form-label" for="unit_{{ $index }}">
-                                                        Unit <span class="text-danger">*</span>
-                                                    </label>
-                                                    <div wire:ignore>
-                                                        <select wire:model="stockOutItems.{{ $index }}.item_unit_id"
-                                                                id="unit_{{ $index }}"
-                                                                class="selectpicker w-100 unit-select"
-                                                                title="Select Unit"
-                                                                data-style="btn-default"
-                                                                data-live-search="true"
-                                                                data-icon-base="ti"
-                                                                data-size="5"
-                                                                data-tick-icon="ti-check text-white"
-                                                                data-index="{{ $index }}">
-                                                            @foreach($rowUnits[$index] ?? [] as $unit)
-                                                                <option value="{{ $unit['id'] }}"
-                                                                    @selected($row['item_unit_id'] == $unit['id'])>
-                                                                    {{ $unit['name'] }}
-                                                                    ({{ $unit['symbol'] ?? '' }})
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                    @error('stockOutItems.' . $index . '.item_unit_id')
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </div>
-
-                                                {{-- Quantity --}}
-                                                <div class="col-12 col-md-4">
-                                                    <label class="form-label" for="quantity_{{ $index }}">
-                                                        Quantity <span class="text-danger">*</span>
-                                                    </label>
-                                                    <input type="text"
-                                                           wire:model="stockOutItems.{{ $index }}.quantity"
-                                                           id="quantity_{{ $index }}"
-                                                           class="form-control cleave-input"
-                                                           placeholder="Enter Quantity">
-                                                    @error('stockOutItems.' . $index . '.quantity')
-                                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </div>
-
-                                            </div>
-                                        </div>
+                                    {{-- Index --}}
+                                    <div class="ir-idx-cell">
+                                        <span class="ir-idx">{{ $index + 1 }}</span>
                                     </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="text-center py-4">
-                                <p class="text-muted mb-0">No items added yet. Click "Add Stock Out Item" to start.</p>
-                            </div>
-                        @endif
+
+                                    {{-- Item --}}
+                                    <div class="ir-cell">
+                                        <span class="ir-cell-label">Item</span>
+                                        <div wire:ignore>
+                                            <select wire:model="stockOutItems.{{ $index }}.item_id"
+                                                    id="item_{{ $index }}"
+                                                    class="selectpicker w-100 item-select"
+                                                    title="Select Item"
+                                                    data-style="btn-default"
+                                                    data-live-search="true"
+                                                    data-icon-base="ti"
+                                                    data-size="5"
+                                                    data-tick-icon="ti-check text-white"
+                                                    data-index="{{ $index }}">
+                                                @foreach($items as $item)
+                                                    <option value="{{ $item['id'] }}"
+                                                        @selected($row['item_id'] == $item['id'])>
+                                                        {{ $item['name'] }}
+                                                        ({{ $item['code'] ?? '' }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @error('stockOutItems.' . $index . '.item_id')
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Unit — no wire:ignore so Livewire can update options --}}
+                                    <div class="ir-cell">
+                                        <span class="ir-cell-label">Unit</span>
+                                        <div wire:ignore>
+                                            <select wire:model="stockOutItems.{{ $index }}.item_unit_id"
+                                                    id="unit_{{ $index }}"
+                                                    class="selectpicker w-100 unit-select"
+                                                    title="Select Unit"
+                                                    data-style="btn-default"
+                                                    data-live-search="true"
+                                                    data-icon-base="ti"
+                                                    data-size="5"
+                                                    data-tick-icon="ti-check text-white"
+                                                    data-index="{{ $index }}">
+                                                @foreach($rowUnits[$index] ?? [] as $unit)
+                                                    <option value="{{ $unit['id'] }}"
+                                                        @selected($row['item_unit_id'] == $unit['id'])>
+                                                        {{ $unit['name'] }}
+                                                        ({{ $unit['symbol'] ?? '' }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @error('stockOutItems.' . $index . '.item_unit_id')
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Quantity --}}
+                                    <div class="ir-cell">
+                                        <span class="ir-cell-label">Quantity</span>
+                                        <input type="text"
+                                               wire:model="stockOutItems.{{ $index }}.quantity"
+                                               id="quantity_{{ $index }}"
+                                               class="form-control cleave-input"
+                                               placeholder="Enter Quantity">
+                                        @error('stockOutItems.' . $index . '.quantity')
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Remove --}}
+                                    <div class="ir-remove-cell">
+                                        <button type="button"
+                                                class="ir-remove"
+                                                title="Remove item"
+                                                wire:click="removeItem({{ $index }})"
+                                                @disabled(count($stockOutItems) <= 1)>
+                                            <i class="bi bi-trash"></i><span class="ir-remove-text">Remove</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="ir-empty">No items added yet.</div>
+                            @endforelse
+
+                            {{-- Add (bottom) --}}
+                            <button type="button" class="ir-add" wire:click="addRow">
+                                <i class="bi bi-plus-lg"></i> Add Stock Out Item
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {{-- Submit --}}
                 <div class="col-12 text-end mb-2">
                     <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-check me-1"></i> Submit
+                        <i class="bi bi-check-lg me-1"></i> Submit
                     </button>
                 </div>
 
@@ -241,8 +243,14 @@
         $wire.on('setItemUnits', function (params) {
             let index = params[0];
             let units = params[1];
+            let autoUnitId = params[2] ?? null;
 
             setOptions($('#unit_' + index), units);
+
+            // If the item has exactly one unit, select it automatically
+            if (autoUnitId) {
+                $('#unit_' + index).selectpicker('val', String(autoUnitId));
+            }
         });
     </script>
     @endscript

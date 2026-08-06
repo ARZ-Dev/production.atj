@@ -1,4 +1,11 @@
 <div>
+    @php
+        // Column layout differs per mode:
+        //   create/edit      → item · unit · loaded qty · remove
+        //   approve load     → item · unit · loaded qty
+        //   approve receive  → item · unit · loaded qty · received qty
+        $irCols = $confirmStatus == 2 ? 'ir-cols-txrecv' : ($confirmStatus == 1 ? 'ir-cols-txload' : 'ir-cols-basic');
+    @endphp
     <form>
         <div class="row">
             <div class="col-12">
@@ -87,138 +94,147 @@
                 {{-- Items Card --}}
                 <div class="card mt-2">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">Transfer Items</h6>
-                        @if(!$confirmStatus)
-                            <button type="button" class="btn btn-success btn-sm" wire:click="addRow">
-                                <i class="ti ti-plus me-1"></i> Add Transfer Item
-                            </button>
-                        @endif
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="mb-0">Transfer Items</h6>
+                            <span class="ir-count">{{ count($transferItems) }}</span>
+                        </div>
                     </div>
                     <div class="card-body">
-                        @if(count($transferItems) > 0)
-                            <div class="row g-3">
-                                @foreach($transferItems as $index => $row)
-                                    <div class="col-12" wire:key="transfer-row-{{ $index }}">
-                                        <div class="border rounded p-3">
+                        <div class="ir-editor">
 
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <label class="form-label mb-0">Transfer Item #{{ $index + 1 }}</label>
-                                                @if(!$confirmStatus && count($transferItems) > 1)
-                                                    <button type="button"
-                                                            class="btn btn-danger btn-sm"
-                                                            wire:click="removeItem({{ $index }})">
-                                                        <i class="ti ti-trash me-1"></i> Remove
-                                                    </button>
-                                                @endif
-                                            </div>
+                            {{-- Column header (desktop) --}}
+                            <div class="ir-head {{ $irCols }}">
+                                <div class="ir-idx-h">#</div>
+                                <div>Item</div>
+                                <div>Unit</div>
+                                <div>Loaded Qty</div>
+                                @if($confirmStatus == 2)
+                                    <div>Received Qty</div>
+                                @endif
+                                @if(!$confirmStatus)
+                                    <div></div>
+                                @endif
+                            </div>
 
-                                            <div class="row g-3 align-items-end">
+                            @forelse($transferItems as $index => $row)
+                                <div class="ir-row {{ $irCols }}" wire:key="transfer-row-{{ $index }}">
 
-                                                {{-- Item --}}
-                                                <div class="col-12 {{ $confirmStatus ? 'col-md-3' : 'col-md-4' }}">
-                                                    <label class="form-label" for="item_{{ $index }}">
-                                                        Item <span class="text-danger">*</span>
-                                                    </label>
-                                                    <div wire:ignore>
-                                                        <select wire:model="transferItems.{{ $index }}.item_id"
-                                                                id="item_{{ $index }}"
-                                                                class="selectpicker w-100 item-select"
-                                                                title="Select Item"
-                                                                data-style="btn-default"
-                                                                data-live-search="true"
-                                                                data-icon-base="ti"
-                                                                data-size="5"
-                                                                data-tick-icon="ti-check text-white"
-                                                                data-index="{{ $index }}"
-                                                                {{ $confirmStatus ? 'disabled' : '' }}>
-                                                            @foreach($items as $item)
-                                                                <option value="{{ $item['id'] }}"
-                                                                    @selected($row['item_id'] == $item['id'])>
-                                                                    {{ $item['name'] }}
-                                                                    ({{ $item['code'] ?? '' }})
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                    @error('transferItems.' . $index . '.item_id')
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </div>
-
-                                                {{-- Unit — no wire:ignore so Livewire can update options --}}
-                                                <div class="col-12 {{ $confirmStatus ? 'col-md-3' : 'col-md-4' }}">
-                                                    <label class="form-label" for="unit_{{ $index }}">
-                                                        Unit <span class="text-danger">*</span>
-                                                    </label>
-                                                    <div wire:ignore>
-                                                        <select wire:model="transferItems.{{ $index }}.item_unit_id"
-                                                                id="unit_{{ $index }}"
-                                                                class="selectpicker w-100 unit-select"
-                                                                title="Select Unit"
-                                                                data-style="btn-default"
-                                                                data-live-search="true"
-                                                                data-icon-base="ti"
-                                                                data-size="5"
-                                                                data-tick-icon="ti-check text-white"
-                                                                data-index="{{ $index }}"
-                                                                {{ $confirmStatus ? 'disabled' : '' }}>
-                                                            @foreach($rowUnits[$index] ?? [] as $unit)
-                                                                <option value="{{ $unit['id'] }}"
-                                                                    @selected($row['item_unit_id'] == $unit['id'])>
-                                                                    {{ $unit['name'] }}
-                                                                    ({{ $unit['symbol'] ?? '' }})
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                    @error('transferItems.' . $index . '.item_unit_id')
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </div>
-
-                                                {{-- Loaded Quantity --}}
-                                                <div class="col-12 {{ $confirmStatus ? 'col-md-3' : 'col-md-4' }}">
-                                                    <label class="form-label" for="quantity_{{ $index }}">
-                                                        Loaded Quantity <span class="text-danger">*</span>
-                                                    </label>
-                                                    <input type="text"
-                                                           wire:model.live="transferItems.{{ $index }}.quantity"
-                                                           id="quantity_{{ $index }}"
-                                                           class="form-control cleave-input"
-                                                           placeholder="Enter Quantity"
-                                                           {{ $confirmStatus == 2 ? 'readonly' : '' }}>
-                                                    @error('transferItems.' . $index . '.quantity')
-                                                        <div class="text-danger small mt-1">{{ $message }}</div>
-                                                    @enderror
-                                                </div>
-
-                                                {{-- Received Quantity (approve receive only) --}}
-                                                @if($confirmStatus == 2)
-                                                    <div class="col-12 col-md-3">
-                                                        <label class="form-label" for="received_quantity_{{ $index }}">
-                                                            Received Quantity <span class="text-danger">*</span>
-                                                        </label>
-                                                        <input type="text"
-                                                               wire:model.live="transferItems.{{ $index }}.received_quantity"
-                                                               id="received_quantity_{{ $index }}"
-                                                               class="form-control cleave-input"
-                                                               placeholder="Enter Received Quantity">
-                                                        @error('transferItems.' . $index . '.received_quantity')
-                                                            <div class="text-danger small mt-1">{{ $message }}</div>
-                                                        @enderror
-                                                    </div>
-                                                @endif
-
-                                            </div>
-                                        </div>
+                                    {{-- Index --}}
+                                    <div class="ir-idx-cell">
+                                        <span class="ir-idx">{{ $index + 1 }}</span>
                                     </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="text-center py-4">
-                                <p class="text-muted mb-0">No items added yet. Click "Add Transfer Item" to start.</p>
-                            </div>
-                        @endif
+
+                                    {{-- Item --}}
+                                    <div class="ir-cell">
+                                        <span class="ir-cell-label">Item</span>
+                                        <div wire:ignore>
+                                            <select wire:model="transferItems.{{ $index }}.item_id"
+                                                    id="item_{{ $index }}"
+                                                    class="selectpicker w-100 item-select"
+                                                    title="Select Item"
+                                                    data-style="btn-default"
+                                                    data-live-search="true"
+                                                    data-icon-base="ti"
+                                                    data-size="5"
+                                                    data-tick-icon="ti-check text-white"
+                                                    data-index="{{ $index }}"
+                                                    {{ $confirmStatus ? 'disabled' : '' }}>
+                                                @foreach($items as $item)
+                                                    <option value="{{ $item['id'] }}"
+                                                        @selected($row['item_id'] == $item['id'])>
+                                                        {{ $item['name'] }}
+                                                        ({{ $item['code'] ?? '' }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @error('transferItems.' . $index . '.item_id')
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Unit — no wire:ignore so Livewire can update options --}}
+                                    <div class="ir-cell">
+                                        <span class="ir-cell-label">Unit</span>
+                                        <div wire:ignore>
+                                            <select wire:model="transferItems.{{ $index }}.item_unit_id"
+                                                    id="unit_{{ $index }}"
+                                                    class="selectpicker w-100 unit-select"
+                                                    title="Select Unit"
+                                                    data-style="btn-default"
+                                                    data-live-search="true"
+                                                    data-icon-base="ti"
+                                                    data-size="5"
+                                                    data-tick-icon="ti-check text-white"
+                                                    data-index="{{ $index }}"
+                                                    {{ $confirmStatus ? 'disabled' : '' }}>
+                                                @foreach($rowUnits[$index] ?? [] as $unit)
+                                                    <option value="{{ $unit['id'] }}"
+                                                        @selected($row['item_unit_id'] == $unit['id'])>
+                                                        {{ $unit['name'] }}
+                                                        ({{ $unit['symbol'] ?? '' }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @error('transferItems.' . $index . '.item_unit_id')
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Loaded Quantity --}}
+                                    <div class="ir-cell">
+                                        <span class="ir-cell-label">Loaded Qty</span>
+                                        <input type="text"
+                                               wire:model.live="transferItems.{{ $index }}.quantity"
+                                               id="quantity_{{ $index }}"
+                                               class="form-control cleave-input"
+                                               placeholder="Enter Quantity"
+                                               {{ $confirmStatus == 2 ? 'readonly' : '' }}>
+                                        @error('transferItems.' . $index . '.quantity')
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Received Quantity (approve receive only) --}}
+                                    @if($confirmStatus == 2)
+                                        <div class="ir-cell">
+                                            <span class="ir-cell-label">Received Qty</span>
+                                            <input type="text"
+                                                   wire:model.live="transferItems.{{ $index }}.received_quantity"
+                                                   id="received_quantity_{{ $index }}"
+                                                   class="form-control cleave-input"
+                                                   placeholder="Enter Received Quantity">
+                                            @error('transferItems.' . $index . '.received_quantity')
+                                                <div class="text-danger small mt-1">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                    @endif
+
+                                    {{-- Remove (create / edit only) --}}
+                                    @if(!$confirmStatus)
+                                        <div class="ir-remove-cell">
+                                            <button type="button"
+                                                    class="ir-remove"
+                                                    title="Remove item"
+                                                    wire:click="removeItem({{ $index }})"
+                                                    @disabled(count($transferItems) <= 1)>
+                                                <i class="bi bi-trash"></i><span class="ir-remove-text">Remove</span>
+                                            </button>
+                                        </div>
+                                    @endif
+                                </div>
+                            @empty
+                                <div class="ir-empty">No items added yet.</div>
+                            @endforelse
+
+                            {{-- Add (bottom, create / edit only) --}}
+                            @if(!$confirmStatus)
+                                <button type="button" class="ir-add" wire:click="addRow">
+                                    <i class="bi bi-plus-lg"></i> Add Transfer Item
+                                </button>
+                            @endif
+                        </div>
                     </div>
                 </div>
 
@@ -226,15 +242,15 @@
                 <div class="col-12 text-end mt-2 mb-2">
                     @if($confirmStatus == 1)
                         <button type="button" class="btn btn-primary" wire:click="confirmLoad">
-                            <i class="ti ti-check me-1"></i> Approve Load
+                            <i class="bi bi-check-lg me-1"></i> Approve Load
                         </button>
                     @elseif($confirmStatus == 2)
                         <button type="button" class="btn btn-primary" wire:click="confirmReceive">
-                            <i class="ti ti-check me-1"></i> Approve Receive
+                            <i class="bi bi-check-lg me-1"></i> Approve Receive
                         </button>
                     @else
                         <button type="button" class="btn btn-primary" wire:click="submit">
-                            <i class="ti ti-check me-1"></i> Submit
+                            <i class="bi bi-check-lg me-1"></i> Submit
                         </button>
                     @endif
                 </div>
@@ -305,8 +321,14 @@
         $wire.on('setItemUnits', function (params) {
             let index = params[0];
             let units = params[1];
+            let autoUnitId = params[2] ?? null;
 
             setOptions($('#unit_' + index), units);
+
+            // If the item has exactly one unit, select it automatically
+            if (autoUnitId) {
+                $('#unit_' + index).selectpicker('val', String(autoUnitId));
+            }
         });
     </script>
     @endscript

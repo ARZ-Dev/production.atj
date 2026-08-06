@@ -85,9 +85,9 @@ class RecipeCreate extends Component
         $this->item_id           = $recipe->item_id;
         $this->item_unit_id      = $recipe->item_unit_id;
         $this->batch             = $recipe->batch ?? 1;
-        $this->quantity_per_batch = $recipe->quantity_per_batch;
-        $this->batch_weight      = $recipe->batch_weight;
-        $this->batch_volume      = $recipe->batch_volume;
+        $this->quantity_per_batch = format_quantity($recipe->quantity_per_batch);
+        $this->batch_weight      = $recipe->batch_weight !== null ? format_quantity($recipe->batch_weight) : null;
+        $this->batch_volume      = $recipe->batch_volume !== null ? format_quantity($recipe->batch_volume) : null;
         $this->status            = (bool) $recipe->status;
         $this->notes             = $recipe->notes;
 
@@ -168,7 +168,7 @@ class RecipeCreate extends Component
                     'id'           => is_object($record) ? $record->id : ($record['id'] ?? null),
                     'item_id'      => $itemId,
                     'item_unit_id' => is_object($record) ? $record->item_unit_id : $record['item_unit_id'],
-                    'quantity'     => is_object($record) ? $record->quantity : $record['quantity'],
+                    'quantity'     => format_quantity(is_object($record) ? $record->quantity : $record['quantity']),
                     'notes'        => is_object($record) ? $record->notes : ($record['notes'] ?? null),
                 ];
                 $rowUnits[] = $itemId ? $this->fetchUnitsForItem((int) $itemId) : [];
@@ -344,9 +344,44 @@ class RecipeCreate extends Component
         }
     }
 
+    /**
+     * Strip Cleave.js thousands separators (e.g. "1,000" → "1000") from every
+     * quantity field before validation/save. Null/empty values are preserved
+     * so an optional Batch Weight/Volume stays null rather than becoming "".
+     */
+    protected function sanitizeQuantities(): void
+    {
+        $this->quantity_per_batch = $this->stripThousands($this->quantity_per_batch);
+        $this->batch_weight       = $this->stripThousands($this->batch_weight);
+        $this->batch_volume       = $this->stripThousands($this->batch_volume);
+
+        foreach ($this->sections as $sIdx => $section) {
+            foreach ($section['rows'] as $rIdx => $row) {
+                $this->sections[$sIdx]['rows'][$rIdx]['quantity'] = $this->stripThousands($row['quantity'] ?? '');
+            }
+        }
+
+        foreach ($this->sideSections as $sIdx => $section) {
+            foreach ($section['rows'] as $rIdx => $row) {
+                $this->sideSections[$sIdx]['rows'][$rIdx]['quantity'] = $this->stripThousands($row['quantity'] ?? '');
+            }
+        }
+    }
+
+    protected function stripThousands($value)
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        return str_replace(',', '', (string) $value);
+    }
+
     // ─── Submit ───────────────────────────────────────────────────────────────
     public function submit(): void
     {
+        $this->sanitizeQuantities();
+
         $rules = [
             'name'              => 'required|string|max:255',
             'recipe_type_id'    => 'required|integer|exists:recipe_types,id',
@@ -367,11 +402,18 @@ class RecipeCreate extends Component
             $rules["sections.{$sIdx}.rows.*.quantity"]     = 'required|numeric|min:0.0001';
         }
 
+        // Side products are optional. Only validate the rows the user actually
+        // filled in (i.e. picked an item for); blank rows are simply skipped.
         foreach ($this->sideSections as $sIdx => $section) {
-            $rules["sideSections.{$sIdx}.rows"]                 = 'required|array|min:1';
-            $rules["sideSections.{$sIdx}.rows.*.item_id"]      = 'required|integer';
-            $rules["sideSections.{$sIdx}.rows.*.item_unit_id"] = 'required|integer';
-            $rules["sideSections.{$sIdx}.rows.*.quantity"]     = 'required|numeric|min:0.0001';
+            foreach ($section['rows'] as $rIdx => $row) {
+                if (empty($row['item_id'])) {
+                    continue;
+                }
+
+                $rules["sideSections.{$sIdx}.rows.{$rIdx}.item_id"]      = 'required|integer';
+                $rules["sideSections.{$sIdx}.rows.{$rIdx}.item_unit_id"] = 'required|integer';
+                $rules["sideSections.{$sIdx}.rows.{$rIdx}.quantity"]     = 'required|numeric|min:0.0001';
+            }
         }
 
         $this->validate($rules, [
@@ -386,6 +428,10 @@ class RecipeCreate extends Component
             'batch.min'                    => 'Batch must be at least 1.',
             'sections.required'            => 'Please select a recipe type first.',
             'sections.min'                 => 'Please select a recipe type first.',
+            'sideSections.*.rows.*.item_id.required'      => 'Side product item is required.',
+            'sideSections.*.rows.*.item_unit_id.required' => 'Side product unit is required.',
+            'sideSections.*.rows.*.quantity.required'     => 'Side product quantity is required.',
+            'sideSections.*.rows.*.quantity.min'          => 'Quantity must be greater than 0.',
         ]);
 
         DB::beginTransaction();
@@ -441,6 +487,11 @@ class RecipeCreate extends Component
 
             foreach ($this->sideSections as $sIdx => $section) {
                 foreach ($section['rows'] as $rIdx => $row) {
+                    // Side products are optional — skip blank rows entirely.
+                    if (empty($row['item_id'])) {
+                        continue;
+                    }
+
                     $unit = collect($this->sideSections[$sIdx]['rowUnits'][$rIdx] ?? [])->firstWhere('id', (int) $row['item_unit_id']);
                     abort_if(!$unit, 422, "Invalid unit for {$section['title']} row " . ($rIdx + 1));
 

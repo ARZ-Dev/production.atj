@@ -25,7 +25,7 @@
                                 <th>#</th>
                                 <th>Name</th>
                                 <th>Department</th>
-                                <th>SFG Warehouse</th>
+                                <th>RM Warehouse</th>
                                 <th>FG Warehouse</th>
                                 <th>Event Types</th>
                                 <th>Actions</th>
@@ -132,7 +132,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Semi Finished Good Warehouse <span class="text-danger">*</span></label>
+                            <label class="form-label">Raw Material Warehouse <span class="text-danger">*</span></label>
                             <div wire:ignore>
                                 <select id="line_sfg_warehouse_id"
                                     class="selectpicker w-100 @error('sfg_warehouse_id') is-invalid @enderror"
@@ -145,7 +145,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Finished Good Warehouse <span class="text-danger">*</span></label>
+                            <label class="form-label">Finished Goods Warehouse <span class="text-danger">*</span></label>
                             <div wire:ignore>
                                 <select id="line_fg_warehouse_id"
                                     class="selectpicker w-100 @error('fg_warehouse_id') is-invalid @enderror"

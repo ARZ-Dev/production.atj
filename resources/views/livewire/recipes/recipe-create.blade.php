@@ -129,7 +129,7 @@
                                 <label class="form-label" for="quantity_per_batch">
                                     Quantity Per Batch <span class="text-danger">*</span>
                                 </label>
-                                <input type="text" id="quantity_per_batch" class="form-control"
+                                <input type="text" id="quantity_per_batch" class="form-control cleave-input"
                                     wire:model="quantity_per_batch" placeholder="e.g. 100">
                                 @error('quantity_per_batch')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
@@ -139,7 +139,7 @@
                             {{-- Batch Weight --}}
                             <div class="col-12 col-md-4">
                                 <label class="form-label" for="batch_weight">Batch Weight (kg)</label>
-                                <input type="text" id="batch_weight" class="form-control" wire:model="batch_weight"
+                                <input type="text" id="batch_weight" class="form-control cleave-input" wire:model="batch_weight"
                                     placeholder="Optional">
                                 @error('batch_weight')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
@@ -149,7 +149,7 @@
                             {{-- Batch Volume --}}
                             <div class="col-12 col-md-4">
                                 <label class="form-label" for="batch_volume">Batch Volume (M³)</label>
-                                <input type="text" id="batch_volume" class="form-control" wire:model="batch_volume"
+                                <input type="text" id="batch_volume" class="form-control cleave-input" wire:model="batch_volume"
                                     placeholder="Optional">
                                 @error('batch_volume')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
@@ -183,112 +183,113 @@
                 @foreach($sections as $sectionIndex => $section)
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">{{ $section['title'] }}</h5>
-                        <button type="button" class="btn btn-success btn-sm"
-                            wire:click="addRowToSection({{ $sectionIndex }})">
-                            <i class="ti ti-plus me-1"></i> Add {{ $section['title'] }}
-                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="mb-0">{{ $section['title'] }}</h5>
+                            <span class="ir-count">{{ count($section['rows']) }}</span>
+                        </div>
                     </div>
                     <div class="card-body">
-                        @if(count($section['rows']) > 0)
-                        <div class="row g-3">
-                            @foreach($section['rows'] as $rowIndex => $row)
-                            <div class="col-12" wire:key="section-{{ $sectionIndex }}-row-{{ $rowIndex }}">
-                                <div class="border rounded p-3">
+                        <div class="ir-editor">
 
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <label class="form-label mb-0 fw-semibold">#{{ $rowIndex + 1 }}</label>
-                                        @if(count($section['rows']) > 1)
-                                        <button type="button" class="btn btn-danger btn-sm"
-                                            wire:click="removeRowFromSection({{ $sectionIndex }}, {{ $rowIndex }})">
-                                            <i class="ti ti-trash me-1"></i> Remove
-                                        </button>
-                                        @endif
+                            {{-- Column header (desktop) --}}
+                            <div class="ir-head ir-cols-notes">
+                                <div class="ir-idx-h">#</div>
+                                <div>Item</div>
+                                <div>Unit</div>
+                                <div>Quantity</div>
+                                <div>Notes</div>
+                                <div></div>
+                            </div>
+
+                            @forelse($section['rows'] as $rowIndex => $row)
+                            <div class="ir-row ir-cols-notes" wire:key="section-{{ $sectionIndex }}-row-{{ $rowIndex }}">
+
+                                {{-- Index --}}
+                                <div class="ir-idx-cell"><span class="ir-idx">{{ $rowIndex + 1 }}</span></div>
+
+                                {{-- Item --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Item</span>
+                                    <div wire:ignore>
+                                        <select id="section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                                wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_id"
+                                            class="selectpicker w-100 section-item-select section-items-{{ $sectionIndex }}" title="Select Item"
+                                            data-style="btn-default" data-live-search="true" data-icon-base="ti"
+                                            data-size="5" data-tick-icon="ti-check text-white"
+                                            data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
+                                            @foreach($sectionItems[$sectionIndex] ?? [] as $item)
+                                            <option value="{{ $item['id'] }}"
+                                                @selected($row['item_id']==$item['id'])>
+                                                {{ $item['name'] }} ({{ $item['code'] ?? '' }})
+                                            </option>
+                                            @endforeach
+                                        </select>
                                     </div>
+                                    @error("sections.{$sectionIndex}.rows.{$rowIndex}.item_id")
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                    @enderror
+                                </div>
 
-                                    <div class="row g-3 align-items-end">
+                                {{-- Unit --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Unit</span>
+                                    <select id="section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        class="selectpicker w-100" title="Select Unit" data-style="btn-default"
+                                        data-live-search="true" data-icon-base="ti" data-size="5"
+                                        data-tick-icon="ti-check text-white"
+                                        wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_unit_id"
+                                        data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
+                                        @foreach($section['rowUnits'][$rowIndex] ?? [] as $unit)
+                                        <option value="{{ $unit['id'] }}"
+                                            @selected($row['item_unit_id']==$unit['id'])>
+                                            {{ $unit['name'] }} ({{ $unit['symbol'] ?? '' }})
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                    @error("sections.{$sectionIndex}.rows.{$rowIndex}.item_unit_id")
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                    @enderror
+                                </div>
 
-                                        {{-- Item --}}
-                                        <div class="col-12 col-md-4">
-                                            <label class="form-label">
-                                                Item <span class="text-danger">*</span>
-                                            </label>
-                                            <div wire:ignore>
-                                                <select id="section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                        wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_id"
-                                                    class="selectpicker w-100 section-item-select section-items-{{ $sectionIndex }}" title="Select Item"
-                                                    data-style="btn-default" data-live-search="true" data-icon-base="ti"
-                                                    data-size="5" data-tick-icon="ti-check text-white"
-                                                    data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
-                                                    @foreach($sectionItems[$sectionIndex] ?? [] as $item)
-                                                    <option value="{{ $item['id'] }}"
-                                                        @selected($row['item_id']==$item['id'])>
-                                                        {{ $item['name'] }} ({{ $item['code'] ?? '' }})
-                                                    </option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                            @error("sections.{$sectionIndex}.rows.{$rowIndex}.item_id")
-                                            <div class="text-danger small mt-1">{{ $message }}</div>
-                                            @enderror
-                                        </div>
+                                {{-- Quantity --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Quantity</span>
+                                    <input type="text"
+                                        wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.quantity"
+                                        id="section_qty_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        class="form-control cleave-input" placeholder="Enter quantity">
+                                    @error("sections.{$sectionIndex}.rows.{$rowIndex}.quantity")
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                    @enderror
+                                </div>
 
-                                        {{-- Unit --}}
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">
-                                                Unit <span class="text-danger">*</span>
-                                            </label>
-                                            <select id="section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                class="selectpicker w-100" title="Select Unit" data-style="btn-default"
-                                                data-live-search="true" data-icon-base="ti" data-size="5"
-                                                data-tick-icon="ti-check text-white"
-                                                wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_unit_id"
-                                                data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
-                                                @foreach($section['rowUnits'][$rowIndex] ?? [] as $unit)
-                                                <option value="{{ $unit['id'] }}"
-                                                    @selected($row['item_unit_id']==$unit['id'])>
-                                                    {{ $unit['name'] }} ({{ $unit['symbol'] ?? '' }})
-                                                </option>
-                                                @endforeach
-                                            </select>
-                                            @error("sections.{$sectionIndex}.rows.{$rowIndex}.item_unit_id")
-                                            <div class="text-danger small mt-1">{{ $message }}</div>
-                                            @enderror
-                                        </div>
+                                {{-- Notes --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Notes</span>
+                                    <input type="text"
+                                        wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.notes"
+                                        id="section_notes_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        class="form-control" placeholder="Optional">
+                                </div>
 
-                                        {{-- Quantity --}}
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">
-                                                Quantity <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text"
-                                                wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.quantity"
-                                                id="section_qty_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                class="form-control" placeholder="Enter quantity">
-                                            @error("sections.{$sectionIndex}.rows.{$rowIndex}.quantity")
-                                            <div class="text-danger small mt-1">{{ $message }}</div>
-                                            @enderror
-                                        </div>
-
-                                        {{-- Notes --}}
-                                        <div class="col-12 col-md-2">
-                                            <label class="form-label">Notes</label>
-                                            <input type="text"
-                                                wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.notes"
-                                                id="section_notes_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                class="form-control" placeholder="Optional">
-                                        </div>
-
-                                    </div>
+                                {{-- Remove --}}
+                                <div class="ir-remove-cell">
+                                    <button type="button" class="ir-remove" title="Remove item"
+                                        wire:click="removeRowFromSection({{ $sectionIndex }}, {{ $rowIndex }})"
+                                        @disabled(count($section['rows']) <= 1)>
+                                        <i class="bi bi-trash"></i><span class="ir-remove-text">Remove</span>
+                                    </button>
                                 </div>
                             </div>
-                            @endforeach
+                            @empty
+                            <div class="ir-empty">No items added yet.</div>
+                            @endforelse
+
+                            {{-- Add (bottom) --}}
+                            <button type="button" class="ir-add" wire:click="addRowToSection({{ $sectionIndex }})">
+                                <i class="bi bi-plus-lg"></i> Add {{ $section['title'] }}
+                            </button>
                         </div>
-                        @else
-                        <div class="text-center py-4">
-                            <p class="text-muted mb-0">No items added yet.</p>
-                        </div>
-                        @endif
                     </div>
                 </div>
                 @endforeach
@@ -297,111 +298,118 @@
                 @foreach($sideSections as $sectionIndex => $section)
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">{{ $section['title'] }} <span class="badge bg-light-info text-info ms-1">Side Product</span></h5>
-                        <button type="button" class="btn btn-success btn-sm"
-                            wire:click="addRowToSideSection({{ $sectionIndex }})">
-                            <i class="ti ti-plus me-1"></i> Add {{ $section['title'] }}
-                        </button>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h5 class="mb-0">{{ $section['title'] }}</h5>
+                            <span class="badge bg-light-info text-info">Side Product</span>
+                            <span class="badge bg-light-secondary text-muted">Optional</span>
+                            <span class="ir-count">{{ count($section['rows']) }}</span>
+                        </div>
                     </div>
                     <div class="card-body">
-                        @if(count($section['rows']) > 0)
-                        <div class="row g-3">
-                            @foreach($section['rows'] as $rowIndex => $row)
-                            <div class="col-12" wire:key="side-section-{{ $sectionIndex }}-row-{{ $rowIndex }}">
-                                <div class="border rounded p-3">
+                        <p class="text-muted small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Side products are optional — leave a row empty to skip it.
+                        </p>
+                        <div class="ir-editor">
 
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <label class="form-label mb-0 fw-semibold">#{{ $rowIndex + 1 }}</label>
-                                        @if(count($section['rows']) > 1)
-                                        <button type="button" class="btn btn-danger btn-sm"
-                                            wire:click="removeRowFromSideSection({{ $sectionIndex }}, {{ $rowIndex }})">
-                                            <i class="ti ti-trash me-1"></i> Remove
-                                        </button>
-                                        @endif
+                            {{-- Column header (desktop) --}}
+                            <div class="ir-head ir-cols-notes">
+                                <div class="ir-idx-h">#</div>
+                                <div>Item</div>
+                                <div>Unit</div>
+                                <div>Quantity</div>
+                                <div>Notes</div>
+                                <div></div>
+                            </div>
+
+                            @forelse($section['rows'] as $rowIndex => $row)
+                            <div class="ir-row ir-cols-notes" wire:key="side-section-{{ $sectionIndex }}-row-{{ $rowIndex }}">
+
+                                {{-- Index --}}
+                                <div class="ir-idx-cell"><span class="ir-idx">{{ $rowIndex + 1 }}</span></div>
+
+                                {{-- Item --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Item</span>
+                                    <div wire:ignore>
+                                        <select id="side_section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                            class="selectpicker w-100 side-section-item-select" title="Select Item"
+                                            data-style="btn-default" data-live-search="true" data-icon-base="ti"
+                                            data-size="5" data-tick-icon="ti-check text-white"
+                                            data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
+                                            @foreach($sideSectionItems[$sectionIndex] ?? [] as $item)
+                                            <option value="{{ $item['id'] }}"
+                                                @selected($row['item_id']==$item['id'])>
+                                                {{ $item['name'] }} ({{ $item['code'] ?? '' }})
+                                            </option>
+                                            @endforeach
+                                        </select>
                                     </div>
+                                    @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.item_id")
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                    @enderror
+                                </div>
 
-                                    <div class="row g-3 align-items-end">
+                                {{-- Unit --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Unit</span>
+                                    <select id="side_section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        class="selectpicker w-100" title="Select Unit" data-style="btn-default"
+                                        data-live-search="true" data-icon-base="ti" data-size="5"
+                                        data-tick-icon="ti-check text-white"
+                                        wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_unit_id"
+                                        data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
+                                        @foreach($section['rowUnits'][$rowIndex] ?? [] as $unit)
+                                        <option value="{{ $unit['id'] }}"
+                                            @selected($row['item_unit_id']==$unit['id'])>
+                                            {{ $unit['name'] }} ({{ $unit['symbol'] ?? '' }})
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                    @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.item_unit_id")
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                    @enderror
+                                </div>
 
-                                        {{-- Item --}}
-                                        <div class="col-12 col-md-4">
-                                            <label class="form-label">
-                                                Item <span class="text-danger">*</span>
-                                            </label>
-                                            <div wire:ignore>
-                                                <select id="side_section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                    class="selectpicker w-100 side-section-item-select" title="Select Item"
-                                                    data-style="btn-default" data-live-search="true" data-icon-base="ti"
-                                                    data-size="5" data-tick-icon="ti-check text-white"
-                                                    data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
-                                                    @foreach($sideSectionItems[$sectionIndex] ?? [] as $item)
-                                                    <option value="{{ $item['id'] }}"
-                                                        @selected($row['item_id']==$item['id'])>
-                                                        {{ $item['name'] }} ({{ $item['code'] ?? '' }})
-                                                    </option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                            @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.item_id")
-                                            <div class="text-danger small mt-1">{{ $message }}</div>
-                                            @enderror
-                                        </div>
+                                {{-- Quantity --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Quantity</span>
+                                    <input type="text"
+                                        wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.quantity"
+                                        id="side_section_qty_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        class="form-control cleave-input" placeholder="Enter quantity">
+                                    @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.quantity")
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                    @enderror
+                                </div>
 
-                                        {{-- Unit --}}
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">
-                                                Unit <span class="text-danger">*</span>
-                                            </label>
-                                            <select id="side_section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                class="selectpicker w-100" title="Select Unit" data-style="btn-default"
-                                                data-live-search="true" data-icon-base="ti" data-size="5"
-                                                data-tick-icon="ti-check text-white"
-                                                wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_unit_id"
-                                                data-section="{{ $sectionIndex }}" data-row="{{ $rowIndex }}">
-                                                @foreach($section['rowUnits'][$rowIndex] ?? [] as $unit)
-                                                <option value="{{ $unit['id'] }}"
-                                                    @selected($row['item_unit_id']==$unit['id'])>
-                                                    {{ $unit['name'] }} ({{ $unit['symbol'] ?? '' }})
-                                                </option>
-                                                @endforeach
-                                            </select>
-                                            @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.item_unit_id")
-                                            <div class="text-danger small mt-1">{{ $message }}</div>
-                                            @enderror
-                                        </div>
+                                {{-- Notes --}}
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Notes</span>
+                                    <input type="text"
+                                        wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.notes"
+                                        id="side_section_notes_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        class="form-control" placeholder="Optional">
+                                </div>
 
-                                        {{-- Quantity --}}
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">
-                                                Quantity <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text"
-                                                wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.quantity"
-                                                id="side_section_qty_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                class="form-control" placeholder="Enter quantity">
-                                            @error("sideSections.{$sectionIndex}.rows.{$rowIndex}.quantity")
-                                            <div class="text-danger small mt-1">{{ $message }}</div>
-                                            @enderror
-                                        </div>
-
-                                        {{-- Notes --}}
-                                        <div class="col-12 col-md-2">
-                                            <label class="form-label">Notes</label>
-                                            <input type="text"
-                                                wire:model="sideSections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.notes"
-                                                id="side_section_notes_{{ $sectionIndex }}_{{ $rowIndex }}"
-                                                class="form-control" placeholder="Optional">
-                                        </div>
-
-                                    </div>
+                                {{-- Remove --}}
+                                <div class="ir-remove-cell">
+                                    <button type="button" class="ir-remove" title="Remove item"
+                                        wire:click="removeRowFromSideSection({{ $sectionIndex }}, {{ $rowIndex }})"
+                                        @disabled(count($section['rows']) <= 1)>
+                                        <i class="bi bi-trash"></i><span class="ir-remove-text">Remove</span>
+                                    </button>
                                 </div>
                             </div>
-                            @endforeach
+                            @empty
+                            <div class="ir-empty">No side products added.</div>
+                            @endforelse
+
+                            {{-- Add (bottom) --}}
+                            <button type="button" class="ir-add" wire:click="addRowToSideSection({{ $sectionIndex }})">
+                                <i class="bi bi-plus-lg"></i> Add {{ $section['title'] }}
+                            </button>
                         </div>
-                        @else
-                        <div class="text-center py-4">
-                            <p class="text-muted mb-0">No items added yet.</p>
-                        </div>
-                        @endif
                     </div>
                 </div>
                 @endforeach
@@ -410,7 +418,7 @@
                 @if($recipe_type_id)
                 <div class="col-12 text-end mb-2">
                     <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-check me-1"></i>
+                        <i class="bi bi-check-lg me-1"></i>
                         {{ $editing ? 'Update Recipe' : 'Save Recipe' }}
                     </button>
                 </div>
@@ -424,10 +432,12 @@
     <script>
         // ── Boot ─────────────────────────────────────────────────────────────
         $('.selectpicker').selectpicker();
+        triggerCleave();
 
         // ── New DOM nodes (new rows / cards added by Livewire) ───────────────
         Livewire.hook('morph.added', ({ el }) => {
             $(el).find('[id^="section_item_"], [id^="section_unit_"], [id^="side_section_item_"], [id^="side_section_unit_"], #header_item, #header_unit, #output_item_type').selectpicker();
+            triggerCleave();
         });
 
         // ── After Livewire round-trip: re-init non-wire:ignore unit pickers ───
@@ -440,17 +450,6 @@
                 });
             });
         });
-
-        // ── After Livewire round-trip: re-init non-wire:ignore unit pickers ───
-        // Livewire.hook('commit', ({ succeed }) => {
-        //     succeed(() => {
-        //         $nextTick(() => {
-        //             $('[id^="section_unit_"], #header_unit').each(function () {
-        //                 $(this).selectpicker('destroy').selectpicker();
-        //             });
-        //         });
-        //     });
-        // });
 
         // ── Recipe type changed: rebuild output item type picker options ──────
         $wire.on('output-item-types-changed', ({ itemTypes }) => {
@@ -469,17 +468,6 @@
                 }
             });
         });
-
-        // ── After row removed from a section: re-sync picker values ──────────
-        // $wire.on('section-rows-removed', ({ sectionIndex, rows }) => {
-        //     $nextTick(() => {
-        //         rows.forEach(function (itemId, i) {
-        //             $(`#section_item_${sectionIndex}_${i}`)
-        //                 .val(itemId ? String(itemId) : '')
-        //                 .selectpicker('refresh');
-        //         });
-        //     });
-        // });
 
         // ── Sync wire:ignore selectpickers to Livewire via wire:model attr ────
         $(document).on('change', '.selectpicker', function () {
@@ -536,8 +524,7 @@
             $nextTick(() => {
                 rows.forEach(function (itemId, i) {
                     $(`#side_section_item_${sectionIndex}_${i}`)
-                        .val(itemId ? String(itemId) : '')
-                        .selectpicker('refresh');
+                        .selectpicker('val', itemId ? String(itemId) : '');
                 });
             });
         });
