@@ -142,8 +142,10 @@
                     @endif
 
                     <div class="mb-3">
+                        <label for="et_item_type_ids" class="form-label">
+                            Item Types To Be {{ $has_recipe ? 'Produced' : 'Used' }} <span class="text-danger">*</span>
+                        </label>
                         <div wire:ignore>
-                            <label for="et_item_type_ids" class="form-label">Item Types</label>
                             <select id="et_item_type_ids" multiple
                                     class="selectpicker w-100"
                                     title="Select Item Types"
