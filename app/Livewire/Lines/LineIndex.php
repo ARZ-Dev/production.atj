@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lines;
 
+use App\Livewire\Concerns\BuildsItemTypeRouting;
 use App\Models\EventType;
 use App\Models\Line;
 use App\Services\ApiService;
@@ -10,19 +11,24 @@ use Livewire\Component;
 
 class LineIndex extends Component
 {
+    use BuildsItemTypeRouting;
+
     public $lines       = [];
     public $departments = [];
     public $warehouses  = [];
     public $eventTypes  = [];
 
     // Form fields
-    public ?int   $line_id         = null;
-    public string $name            = '';
-    public ?int   $department_id   = null;
-    public ?int   $sfg_warehouse_id = null;
-    public ?int   $fg_warehouse_id  = null;
+    public ?int   $line_id           = null;
+    public string $name              = '';
+    public ?int   $department_id     = null;
+    public array  $sfg_warehouse_ids = [];
+    public ?int   $fg_warehouse_id   = null;
     public array  $selectedEventTypes = [];
-    public bool   $editing          = false;
+    public bool   $editing           = false;
+
+    // Warehouses of the selected department, for the routing table's dropdowns.
+    public array  $departmentWarehouses = [];
 
     protected ApiService $api;
 
@@ -55,13 +61,16 @@ class LineIndex extends Component
 
     public function resetForm(): void
     {
-        $this->line_id          = null;
-        $this->name             = '';
-        $this->department_id    = null;
-        $this->sfg_warehouse_id = null;
-        $this->fg_warehouse_id  = null;
+        $this->line_id           = null;
+        $this->name              = '';
+        $this->department_id     = null;
+        $this->sfg_warehouse_ids = [];
+        $this->fg_warehouse_id   = null;
         $this->selectedEventTypes = [];
-        $this->editing          = false;
+        $this->departmentWarehouses = [];
+        $this->itemTypeRoutingGroups = [];
+        $this->itemTypeWarehouses = [];
+        $this->editing           = false;
         $this->resetValidation();
     }
 
@@ -78,25 +87,37 @@ class LineIndex extends Component
         $this->resetForm();
 
         $line = Line::with('eventTypes')->findOrFail($id);
-        $this->line_id          = $line->id;
-        $this->name             = $line->name;
-        $this->department_id    = $line->department_id;
-        $this->sfg_warehouse_id = $line->sfg_warehouse_id;
-        $this->fg_warehouse_id  = $line->fg_warehouse_id;
+        $this->line_id           = $line->id;
+        $this->name              = $line->name;
+        $this->department_id     = $line->department_id;
+        $this->sfg_warehouse_ids = $line->sourceWarehouseIds();
+        $this->fg_warehouse_id   = $line->fg_warehouse_id;
         $this->selectedEventTypes = $line->eventTypes->pluck('id')->toArray();
-        $this->editing          = true;
+        $this->editing           = true;
 
-        $this->dispatch('openModal', warehouses: $this->fetchInternalWarehouses($this->department_id));
+        $this->departmentWarehouses = $this->fetchInternalWarehouses($this->department_id);
+        $this->loadItemTypeRouting($line->item_type_warehouses, $this->selectedEventTypes);
+
+        $this->dispatch('openModal', warehouses: $this->departmentWarehouses);
     }
 
     public function onDepartmentChange(?int $deptId): void
     {
-        $this->department_id    = $deptId;
-        $this->sfg_warehouse_id = null;
-        $this->fg_warehouse_id  = null;
+        $this->department_id     = $deptId;
+        $this->sfg_warehouse_ids = [];
+        $this->fg_warehouse_id   = null;
 
-        $warehouses = $this->fetchInternalWarehouses($deptId);
-        $this->dispatch('lineWarehousesReady', warehouses: $warehouses);
+        $this->departmentWarehouses = $this->fetchInternalWarehouses($deptId);
+        $this->dispatch('lineWarehousesReady', warehouses: $this->departmentWarehouses);
+    }
+
+    /**
+     * Rebuild the item-type routing table whenever the event types change.
+     */
+    public function onEventTypesChange(array $eventTypeIds): void
+    {
+        $this->selectedEventTypes = array_values(array_filter(array_map('intval', $eventTypeIds)));
+        $this->buildItemTypeRouting($this->selectedEventTypes);
     }
 
     private function fetchInternalWarehouses(?int $deptId): array
@@ -116,12 +137,20 @@ class LineIndex extends Component
     protected function rules(): array
     {
         return [
-            'name'             => 'required|string|max:255',
-            'department_id'    => 'required|integer',
-            'sfg_warehouse_id' => 'required|integer',
-            'fg_warehouse_id'  => 'required|integer',
+            'name'                 => 'required|string|max:255',
+            'department_id'        => 'required|integer',
+            'sfg_warehouse_ids'    => 'required|array|min:1',
+            'sfg_warehouse_ids.*'  => 'integer',
+            'fg_warehouse_id'      => 'required|integer',
             'selectedEventTypes'   => 'required|array|min:1',
             'selectedEventTypes.*' => 'exists:event_types,id',
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return [
+            'sfg_warehouse_ids' => 'raw material warehouses',
         ];
     }
 
@@ -129,11 +158,17 @@ class LineIndex extends Component
     {
         $this->validate();
 
+        $sfgIds = array_values(array_unique(array_map('intval', $this->sfg_warehouse_ids)));
+
         $data = [
-            'name'             => $this->name,
-            'department_id'    => $this->department_id,
-            'sfg_warehouse_id' => $this->sfg_warehouse_id,
-            'fg_warehouse_id'  => $this->fg_warehouse_id,
+            'name'                 => $this->name,
+            'department_id'        => $this->department_id,
+            // The scalar column stays the default warehouse for anything
+            // resolved without an item type.
+            'sfg_warehouse_id'     => $sfgIds[0],
+            'sfg_warehouse_ids'    => $sfgIds,
+            'fg_warehouse_id'      => $this->fg_warehouse_id,
+            'item_type_warehouses' => $this->itemTypeWarehousesForSave($sfgIds),
         ];
 
         if ($this->editing) {
