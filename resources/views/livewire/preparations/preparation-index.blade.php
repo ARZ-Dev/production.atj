@@ -44,9 +44,11 @@
                                 </td>
                                 <td>
                                     @php
-                                        $rmWh = collect($warehouses)->firstWhere('id', $prep->rm_warehouse_id);
+                                        $rmNames = collect($prep->sourceWarehouseIds())
+                                            ->map(fn($id) => collect($warehouses)->firstWhere('id', $id)['name'] ?? null)
+                                            ->filter();
                                     @endphp
-                                    {{ $rmWh['name'] ?? '—' }}
+                                    {{ $rmNames->isNotEmpty() ? $rmNames->implode(', ') : '—' }}
                                 </td>
                                 <td>
                                     @php
@@ -98,7 +100,7 @@
     <!-- Create / Edit Modal -->
     <div class="modal fade" id="preparationModal" tabindex="-1" aria-labelledby="preparationModalLabel" aria-hidden="true"
         wire:ignore.self data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="preparationModalLabel">
@@ -138,16 +140,20 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Raw Material Warehouse <span class="text-danger">*</span></label>
+                            <label class="form-label">Raw Material Warehouses <span class="text-danger">*</span></label>
                             <div wire:ignore>
-                                <select id="prep_rm_warehouse_id"
-                                    class="selectpicker w-100 @error('rm_warehouse_id') is-invalid @enderror"
-                                    title="Select warehouse…"
+                                <select id="prep_rm_warehouse_ids"
+                                    class="selectpicker w-100 @error('rm_warehouse_ids') is-invalid @enderror"
+                                    multiple
+                                    title="Select warehouses…"
                                     data-style="btn-default"
-                                    data-live-search="true">
+                                    data-live-search="true"
+                                    data-actions-box="true"
+                                    data-selected-text-format="count > 2">
                                 </select>
                             </div>
-                            @error('rm_warehouse_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                            <div class="form-text">Items are consumed from the first one unless an item type is routed elsewhere below.</div>
+                            @error('rm_warehouse_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                         </div>
 
                         <div class="col-md-6">
@@ -184,6 +190,14 @@
                             @error('selectedEventTypes')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                         </div>
 
+                        <div class="col-12">
+                            @include('livewire.partials.item-type-warehouse-routing', [
+                                'groups'             => $itemTypeRoutingGroups,
+                                'sourceWarehouseIds' => $rm_warehouse_ids,
+                                'warehouseOptions'   => $departmentWarehouses,
+                            ])
+                        </div>
+
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -203,12 +217,20 @@
     <script>
         const prepModal = new bootstrap.Modal(document.getElementById('preparationModal'));
 
-        function buildPrepWarehouseSelect(selector, warehouses, selectedId) {
+        // Rebuilt from the department's warehouses, re-applying whatever is
+        // already selected server-side. `selected` is an array for the
+        // multi-select raw-material picker, a single id for the FG one.
+        function buildPrepWarehouseSelect(selector, warehouses, selected) {
+            const ids = (Array.isArray(selected) ? selected : [selected]).map(Number);
             const $sel = $(selector);
             $sel.selectpicker('destroy');
             $sel.empty();
             (warehouses || []).forEach(wh => {
-                $sel.append($('<option>', { value: wh.id, text: wh.name, selected: wh.id == selectedId }));
+                $sel.append($('<option>', {
+                    value: wh.id,
+                    text: wh.name,
+                    selected: ids.includes(Number(wh.id)),
+                }));
             });
             $sel.selectpicker();
         }
@@ -218,7 +240,7 @@
             setTimeout(() => {
                 $('#prep_department_id').selectpicker('destroy').selectpicker();
                 $('#prep_department_id').selectpicker('val', String($wire.get('department_id') || ''));
-                buildPrepWarehouseSelect('#prep_rm_warehouse_id', warehouses, $wire.get('rm_warehouse_id'));
+                buildPrepWarehouseSelect('#prep_rm_warehouse_ids', warehouses, $wire.get('rm_warehouse_ids'));
                 buildPrepWarehouseSelect('#prep_fg_warehouse_id', warehouses, $wire.get('fg_warehouse_id'));
                 $('#prep_event_types').selectpicker('destroy').selectpicker();
                 $('#prep_event_types').selectpicker('val', ($wire.get('selectedEventTypes') || []).map(String));
@@ -226,21 +248,22 @@
         });
 
         $wire.on('prepWarehousesReady', ({ warehouses }) => {
-            buildPrepWarehouseSelect('#prep_rm_warehouse_id', warehouses, null);
+            buildPrepWarehouseSelect('#prep_rm_warehouse_ids', warehouses, []);
             buildPrepWarehouseSelect('#prep_fg_warehouse_id', warehouses, null);
         });
 
         $(document).on('change', '#prep_department_id', function () {
             $wire.call('onDepartmentChange', parseInt($(this).val()) || null);
         });
-        $(document).on('change', '#prep_rm_warehouse_id', function () {
-            $wire.set('rm_warehouse_id', parseInt($(this).val()) || null);
+        $(document).on('change', '#prep_rm_warehouse_ids', function () {
+            $wire.set('rm_warehouse_ids', ($(this).val() || []).map(Number));
         });
         $(document).on('change', '#prep_fg_warehouse_id', function () {
             $wire.set('fg_warehouse_id', parseInt($(this).val()) || null);
         });
+        // Rebuilds the item-type routing table for the newly selected types.
         $(document).on('change', '#prep_event_types', function () {
-            $wire.set('selectedEventTypes', ($(this).val() || []).map(Number));
+            $wire.call('onEventTypesChange', ($(this).val() || []).map(Number));
         });
     </script>
     @endscript

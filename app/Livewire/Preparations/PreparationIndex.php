@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Preparations;
 
+use App\Livewire\Concerns\BuildsItemTypeRouting;
 use App\Models\EventType;
 use App\Models\Preparation;
 use App\Services\ApiService;
@@ -10,19 +11,24 @@ use Livewire\Component;
 
 class PreparationIndex extends Component
 {
+    use BuildsItemTypeRouting;
+
     public $preparations = [];
     public $departments  = [];
     public $warehouses   = [];
     public $eventTypes   = [];
 
     // Form fields
-    public ?int    $preparation_id  = null;
-    public string  $name            = '';
-    public ?int    $department_id   = null;
-    public ?int    $rm_warehouse_id = null;
-    public ?int    $fg_warehouse_id = null;
+    public ?int    $preparation_id   = null;
+    public string  $name             = '';
+    public ?int    $department_id    = null;
+    public array   $rm_warehouse_ids = [];
+    public ?int    $fg_warehouse_id  = null;
     public array   $selectedEventTypes = [];
-    public bool    $editing         = false;
+    public bool    $editing          = false;
+
+    // Warehouses of the selected department, for the routing table's dropdowns.
+    public array   $departmentWarehouses = [];
 
     protected ApiService $api;
 
@@ -55,13 +61,16 @@ class PreparationIndex extends Component
 
     public function resetForm(): void
     {
-        $this->preparation_id  = null;
-        $this->name            = '';
-        $this->department_id   = null;
-        $this->rm_warehouse_id = null;
-        $this->fg_warehouse_id = null;
+        $this->preparation_id   = null;
+        $this->name             = '';
+        $this->department_id    = null;
+        $this->rm_warehouse_ids = [];
+        $this->fg_warehouse_id  = null;
         $this->selectedEventTypes = [];
-        $this->editing         = false;
+        $this->departmentWarehouses = [];
+        $this->itemTypeRoutingGroups = [];
+        $this->itemTypeWarehouses = [];
+        $this->editing          = false;
         $this->resetValidation();
     }
 
@@ -78,25 +87,37 @@ class PreparationIndex extends Component
         $this->resetForm();
 
         $prep = Preparation::with('eventTypes')->findOrFail($id);
-        $this->preparation_id  = $prep->id;
-        $this->name            = $prep->name;
-        $this->department_id   = $prep->department_id;
-        $this->rm_warehouse_id = $prep->rm_warehouse_id;
-        $this->fg_warehouse_id = $prep->fg_warehouse_id;
+        $this->preparation_id   = $prep->id;
+        $this->name             = $prep->name;
+        $this->department_id    = $prep->department_id;
+        $this->rm_warehouse_ids = $prep->sourceWarehouseIds();
+        $this->fg_warehouse_id  = $prep->fg_warehouse_id;
         $this->selectedEventTypes = $prep->eventTypes->pluck('id')->toArray();
-        $this->editing         = true;
+        $this->editing          = true;
 
-        $this->dispatch('openModal', warehouses: $this->fetchInternalWarehouses($this->department_id));
+        $this->departmentWarehouses = $this->fetchInternalWarehouses($this->department_id);
+        $this->loadItemTypeRouting($prep->item_type_warehouses, $this->selectedEventTypes);
+
+        $this->dispatch('openModal', warehouses: $this->departmentWarehouses);
     }
 
     public function onDepartmentChange(?int $deptId): void
     {
-        $this->department_id   = $deptId;
-        $this->rm_warehouse_id = null;
-        $this->fg_warehouse_id = null;
+        $this->department_id    = $deptId;
+        $this->rm_warehouse_ids = [];
+        $this->fg_warehouse_id  = null;
 
-        $warehouses = $this->fetchInternalWarehouses($deptId);
-        $this->dispatch('prepWarehousesReady', warehouses: $warehouses);
+        $this->departmentWarehouses = $this->fetchInternalWarehouses($deptId);
+        $this->dispatch('prepWarehousesReady', warehouses: $this->departmentWarehouses);
+    }
+
+    /**
+     * Rebuild the item-type routing table whenever the event types change.
+     */
+    public function onEventTypesChange(array $eventTypeIds): void
+    {
+        $this->selectedEventTypes = array_values(array_filter(array_map('intval', $eventTypeIds)));
+        $this->buildItemTypeRouting($this->selectedEventTypes);
     }
 
     private function fetchInternalWarehouses(?int $deptId): array
@@ -115,12 +136,20 @@ class PreparationIndex extends Component
     protected function rules(): array
     {
         return [
-            'name'            => 'required|string|max:255',
-            'department_id'   => 'required|integer',
-            'rm_warehouse_id' => 'required|integer',
-            'fg_warehouse_id' => 'required|integer',
+            'name'                 => 'required|string|max:255',
+            'department_id'        => 'required|integer',
+            'rm_warehouse_ids'     => 'required|array|min:1',
+            'rm_warehouse_ids.*'   => 'integer',
+            'fg_warehouse_id'      => 'required|integer',
             'selectedEventTypes'   => 'required|array|min:1',
             'selectedEventTypes.*' => 'exists:event_types,id',
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return [
+            'rm_warehouse_ids' => 'raw material warehouses',
         ];
     }
 
@@ -128,11 +157,17 @@ class PreparationIndex extends Component
     {
         $this->validate();
 
+        $rmIds = array_values(array_unique(array_map('intval', $this->rm_warehouse_ids)));
+
         $data = [
-            'name'            => $this->name,
-            'department_id'   => $this->department_id,
-            'rm_warehouse_id' => $this->rm_warehouse_id,
-            'fg_warehouse_id' => $this->fg_warehouse_id,
+            'name'                 => $this->name,
+            'department_id'        => $this->department_id,
+            // The scalar column stays the default warehouse for anything
+            // resolved without an item type.
+            'rm_warehouse_id'      => $rmIds[0],
+            'rm_warehouse_ids'     => $rmIds,
+            'fg_warehouse_id'      => $this->fg_warehouse_id,
+            'item_type_warehouses' => $this->itemTypeWarehousesForSave($rmIds),
         ];
 
         if ($this->editing) {

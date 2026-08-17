@@ -68,6 +68,9 @@ class PlanBoard extends Component
     /** Per-request cache of item type names (id => name), lazily loaded. */
     protected ?array $itemTypeNames = null;
 
+    /** Per-request cache of resolved placeables ("Type:id" => model|null). */
+    protected array $placeableCache = [];
+
     #[Url(except: 'board')]
     public string $view = 'board';
 
@@ -1284,8 +1287,10 @@ class PlanBoard extends Component
             ->whereNull('ended_at')
             ->findOrFail($this->endingActivity['id']);
 
-        $warehouseId = $activity->event ? $this->outWarehouseId($activity->event) : null;
-        $endedAt     = Carbon::parse($this->endingActivity['time']);
+        // Each recorded quantity remembers the warehouse it was held in; older
+        // rows fall back to the placeable's default source store.
+        $fallbackWarehouseId = $activity->event ? $this->outWarehouseId($activity->event) : null;
+        $endedAt             = Carbon::parse($this->endingActivity['time']);
 
         DB::beginTransaction();
         try {
@@ -1294,11 +1299,11 @@ class PlanBoard extends Component
                 'end_note' => $this->endingActivity['note'] ?: null,
             ]);
 
-            // The items used were reserved out when the emergency was added —
-            // confirm them out of stock now that it has ended.
-            if ($warehouseId) {
-                $this->inventory->applyOrFail($this->confirmOutOps($warehouseId, $activity->quantities));
-            }
+            // The items used were held in process when the emergency was added
+            // — confirm them out of stock now that it has ended.
+            $this->inventory->applyOrFail(
+                $this->confirmOutOpsByWarehouse($activity->quantities, $fallbackWarehouseId)
+            );
 
             // Mark them confirmed out for the activity report.
             $activity->quantities()->whereNull('confirmed_at')->update(['confirmed_at' => $endedAt]);
@@ -1351,10 +1356,10 @@ class PlanBoard extends Component
             ]
         );
 
-        $pauseLog    = $this->latestPauseLog($event->id);
-        $warehouseId = $this->outWarehouseId($event);
+        $pauseLog = $this->latestPauseLog($event->id);
 
-        // Items to reserve out (every entered quantity across all rows).
+        // Items to hold in process (every entered quantity across all rows),
+        // grouped by the warehouse their item type is routed to.
         $reserve = [];
         foreach ($this->pauseActivityRows as $row) {
             foreach ($row['items'] ?? [] as $item) {
@@ -1362,6 +1367,7 @@ class PlanBoard extends Component
 
                 if ($qty > 0 && !empty($item['item_id']) && !empty($item['item_unit_id'])) {
                     $reserve[] = [
+                        'item_type_id' => $item['item_type_id'] ?? null,
                         'item_id'      => $item['item_id'],
                         'item_unit_id' => $item['item_unit_id'],
                         'quantity'     => $qty,
@@ -1371,9 +1377,11 @@ class PlanBoard extends Component
             }
         }
 
-        // Block the emergency if any used item is not available in stock,
-        // before touching the DB or the pending-out reservation.
-        if ($warehouseId && !$this->stockAvailable($warehouseId, $reserve, 'Cannot record emergency events')) {
+        $grouped = $this->groupRowsBySourceWarehouse($event, $reserve);
+
+        // Block the emergency if any used item is not available in the
+        // warehouse it comes from, before touching the DB or the holds.
+        if (!$this->stockAvailableForGroups($grouped, 'Cannot record emergency events')) {
             return;
         }
 
@@ -1394,14 +1402,12 @@ class PlanBoard extends Component
                     'created_by_name'     => authUser()?->name,
                 ]);
 
-                $this->storeEmergencyQuantities($event, $pauseLog, $activity, $row['items'] ?? [], $warehouseId);
+                $this->storeEmergencyQuantities($event, $pauseLog, $activity, $row['items'] ?? []);
             }
 
-            // Reserve the used items as pending out. The pre-check above guards
+            // Hold the used items in process. The pre-check above guards
             // availability; this still throws on a race and rolls back.
-            if ($warehouseId) {
-                $this->inventory->applyOrFail($this->reserveOutOps($warehouseId, $reserve));
-            }
+            $this->inventory->applyOrFail($this->reserveOutOpsForGroups($grouped));
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -1421,7 +1427,7 @@ class PlanBoard extends Component
      * Persist only the emergency items the user actually entered a quantity
      * for — the table lists every candidate item, most stay empty.
      */
-    protected function storeEmergencyQuantities(Event $event, ?EventStatusLog $pauseLog, EventPauseActivity $activity, array $items, ?int $warehouseId = null): void
+    protected function storeEmergencyQuantities(Event $event, ?EventStatusLog $pauseLog, EventPauseActivity $activity, array $items): void
     {
         foreach ($items as $item) {
             $quantity = $item['quantity'] ?? null;
@@ -1436,7 +1442,7 @@ class PlanBoard extends Component
                 'event_id'                => $event->id,
                 'event_status_log_id'     => $pauseLog?->id,
                 'event_pause_activity_id' => $activity->id,
-                'warehouse_id'            => $warehouseId,
+                'warehouse_id'            => $this->outWarehouseId($event, $item['item_type_id'] ?? null),
                 'source'                  => 'emergency',
                 'item_type_id'            => $item['item_type_id'] ?? null,
                 'item_id'                 => $item['item_id'] ?? null,
@@ -1506,7 +1512,8 @@ class PlanBoard extends Component
     // on insufficient stock so the surrounding transaction rolls back.
 
     /**
-     * The placeable (preparation or line) the event runs on.
+     * The placeable (preparation or line) the event runs on. Resolved once per
+     * request — a single status change asks for it per quantity row.
      */
     protected function placeableFor(Event $event)
     {
@@ -1514,35 +1521,82 @@ class PlanBoard extends Component
             return null;
         }
 
-        return $event->placeable_type::find($event->placeable_id);
+        $key = $event->placeable_type . ':' . $event->placeable_id;
+
+        if (!array_key_exists($key, $this->placeableCache)) {
+            $this->placeableCache[$key] = $event->placeable_type::find($event->placeable_id);
+        }
+
+        return $this->placeableCache[$key];
     }
 
     /**
-     * Warehouse items are consumed from: a preparation's raw-material store
-     * (rm_warehouse_id) or a line's semi-finished-goods store (sfg_warehouse_id).
+     * Warehouse items of a given item type are consumed from: the warehouse
+     * the placeable routes that item type to, otherwise its default source
+     * store — a preparation's raw-material warehouse or a line's
+     * semi-finished-goods warehouse. Pass no item type for the default.
      */
-    protected function outWarehouseId(Event $event): ?int
+    protected function outWarehouseId(Event $event, ?int $itemTypeId = null): ?int
     {
-        $placeable = $this->placeableFor($event);
-
-        if (!$placeable) {
-            return null;
-        }
-
-        $column = $event->placeable_type === Preparation::class ? 'rm_warehouse_id' : 'sfg_warehouse_id';
-
-        return $placeable->{$column} ? (int) $placeable->{$column} : null;
+        return $this->placeableFor($event)?->sourceWarehouseFor($itemTypeId);
     }
 
     /**
      * Warehouse produced items and side products are added into: the
-     * finished-goods store (fg_warehouse_id) for both preparations and lines.
+     * finished-goods store, a single warehouse for both preparations and lines.
      */
     protected function inWarehouseId(Event $event): ?int
     {
-        $placeable = $this->placeableFor($event);
+        return $this->placeableFor($event)?->destinationWarehouseId();
+    }
 
-        return $placeable && $placeable->fg_warehouse_id ? (int) $placeable->fg_warehouse_id : null;
+    /**
+     * Group quantity rows by the warehouse their item type is consumed from.
+     * Rows on a placeable with no source warehouse configured are dropped —
+     * that leg of the inventory update is skipped, as it always has been.
+     *
+     * @return array<int, array<int, array>> warehouse id => rows
+     */
+    protected function groupRowsBySourceWarehouse(Event $event, array $rows): array
+    {
+        $grouped = [];
+
+        foreach ($rows as $row) {
+            $warehouseId = $this->outWarehouseId($event, $row['item_type_id'] ?? null);
+
+            if ($warehouseId) {
+                $grouped[$warehouseId][] = $row;
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Verify every grouped batch against its own warehouse before anything is
+     * written. Returns false (after showing the error) on the first shortfall.
+     */
+    protected function stockAvailableForGroups(array $grouped, string $errorTitle): bool
+    {
+        foreach ($grouped as $warehouseId => $rows) {
+            if (!$this->stockAvailable($warehouseId, $rows, $errorTitle)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** reserve_process ops across every warehouse in a grouped batch. */
+    protected function reserveOutOpsForGroups(array $grouped): array
+    {
+        $ops = [];
+
+        foreach ($grouped as $warehouseId => $rows) {
+            $ops = array_merge($ops, $this->reserveOutOps($warehouseId, $rows));
+        }
+
+        return $ops;
     }
 
     /** reserve_process ops (hold in process) for [item_id, item_unit_id, quantity] rows. */
@@ -1555,6 +1609,26 @@ class PlanBoard extends Component
 
             if (!empty($row['item_id']) && !empty($row['item_unit_id']) && $qty > 0) {
                 $ops[] = InventoryService::reserveProcess($warehouseId, $row['item_id'], $row['item_unit_id'], $qty);
+            }
+        }
+
+        return $ops;
+    }
+
+    /**
+     * confirm_process_out ops that put each recorded quantity back out of the
+     * warehouse it was actually held in. Rows recorded before the warehouse
+     * was stored fall back to the placeable's default source store.
+     */
+    protected function confirmOutOpsByWarehouse(iterable $quantities, ?int $fallbackWarehouseId): array
+    {
+        $ops = [];
+
+        foreach ($quantities as $qty) {
+            $warehouseId = $qty->warehouse_id ? (int) $qty->warehouse_id : $fallbackWarehouseId;
+
+            if ($warehouseId) {
+                $ops = array_merge($ops, $this->confirmOutOps($warehouseId, [$qty]));
             }
         }
 
@@ -1661,13 +1735,13 @@ class PlanBoard extends Component
             ['actionInputs.*.actual_quantity' => 'used quantity']
         );
 
-        $warehouseId = $this->outWarehouseId($event);
-
-        // Items to reserve out of stock (every row with a quantity).
+        // Items to reserve out of stock (every row with a quantity), grouped by
+        // the warehouse their item type is routed to.
         $reserve = [];
         foreach ($this->actionInputs as $row) {
             if ((float) ($row['actual_quantity'] ?? 0) > 0) {
                 $reserve[] = [
+                    'item_type_id' => $row['item_type_id'] ?? null,
                     'item_id'      => $row['item_id'],
                     'item_unit_id' => $row['item_unit_id'],
                     'quantity'     => (float) $row['actual_quantity'],
@@ -1676,9 +1750,11 @@ class PlanBoard extends Component
             }
         }
 
-        // Block the start if any consumed item is not available in stock,
-        // before touching the event or the pending-out reservation.
-        if ($warehouseId && !$this->stockAvailable($warehouseId, $reserve, 'Cannot start event')) {
+        $grouped = $this->groupRowsBySourceWarehouse($event, $reserve);
+
+        // Block the start if any consumed item is not available in the
+        // warehouse it comes from, before touching the event or its holds.
+        if (!$this->stockAvailableForGroups($grouped, 'Cannot start event')) {
             return;
         }
 
@@ -1697,14 +1773,12 @@ class PlanBoard extends Component
                     continue;
                 }
 
-                $this->storeQuantity($event, $log, 'input', $row, $warehouseId);
+                $this->storeQuantity($event, $log, 'input', $row, $this->outWarehouseId($event, $row['item_type_id'] ?? null));
             }
 
-            // Reserve the consumed items as pending out. The pre-check above
-            // guards availability; this still throws on a race and rolls back.
-            if ($warehouseId) {
-                $this->inventory->applyOrFail($this->reserveOutOps($warehouseId, $reserve));
-            }
+            // Hold the consumed items in process. The pre-check above guards
+            // availability; this still throws on a race and rolls back.
+            $this->inventory->applyOrFail($this->reserveOutOpsForGroups($grouped));
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -1734,9 +1808,8 @@ class PlanBoard extends Component
             ]
         );
 
-        $outWarehouseId = $this->outWarehouseId($event);
-        $inWarehouseId  = $this->inWarehouseId($event);
-        $endedAt        = $this->parsedActionTime();
+        $inWarehouseId = $this->inWarehouseId($event);
+        $endedAt       = $this->parsedActionTime();
 
         DB::beginTransaction();
         try {
@@ -1756,14 +1829,14 @@ class PlanBoard extends Component
                 $produced->push($this->storeQuantity($event, $log, 'side_product', $row, $inWarehouseId, $endedAt));
             }
 
-            // Consumed inputs (held in process at start): in process → out of the
-            // raw-material/semi-finished store. Produced item + side products:
-            // added into the finished-goods store.
-            $ops = [];
-
-            if ($outWarehouseId) {
-                $ops = array_merge($ops, $this->confirmOutOps($outWarehouseId, $this->reservedInputQuantities($event)));
-            }
+            // Consumed inputs (held in process at start): in process → out of
+            // the warehouse each was held in — item types can be routed to
+            // different stores. Produced item + side products: added into the
+            // single finished-goods store.
+            $ops = $this->confirmOutOpsByWarehouse(
+                $this->reservedInputQuantities($event),
+                $this->outWarehouseId($event)
+            );
 
             if ($inWarehouseId) {
                 $ops = array_merge($ops, $this->stockInOps($inWarehouseId, $produced));

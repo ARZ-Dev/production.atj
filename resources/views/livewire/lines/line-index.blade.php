@@ -41,11 +41,17 @@
                                     {{ $dept['name'] ?? '—' }}
                                 </td>
                                 <td>
-                                    @php $sfgWh = collect($warehouses)->firstWhere('id', $line->sfg_warehouse_id); @endphp
-                                    {{ $sfgWh['name'] ?? '—' }}
+                                    @php
+                                        $sfgNames = collect($line->sourceWarehouseIds())
+                                            ->map(fn($id) => collect($warehouses)->firstWhere('id', $id)['name'] ?? null)
+                                            ->filter();
+                                    @endphp
+                                    {{ $sfgNames->isNotEmpty() ? $sfgNames->implode(', ') : '—' }}
                                 </td>
                                 <td>
-                                    @php $fgWh = collect($warehouses)->firstWhere('id', $line->fg_warehouse_id); @endphp
+                                    @php
+                                        $fgWh = collect($warehouses)->firstWhere('id', $line->fg_warehouse_id);
+                                    @endphp
                                     {{ $fgWh['name'] ?? '—' }}
                                 </td>
                                 <td>
@@ -92,7 +98,7 @@
     <!-- Create / Edit Modal -->
     <div class="modal fade" id="lineModal" tabindex="-1" aria-labelledby="lineModalLabel" aria-hidden="true"
         wire:ignore.self data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="lineModalLabel">
@@ -132,16 +138,20 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Raw Material Warehouse <span class="text-danger">*</span></label>
+                            <label class="form-label">Raw Material Warehouses <span class="text-danger">*</span></label>
                             <div wire:ignore>
-                                <select id="line_sfg_warehouse_id"
-                                    class="selectpicker w-100 @error('sfg_warehouse_id') is-invalid @enderror"
-                                    title="Select warehouse…"
+                                <select id="line_sfg_warehouse_ids"
+                                    class="selectpicker w-100 @error('sfg_warehouse_ids') is-invalid @enderror"
+                                    multiple
+                                    title="Select warehouses…"
                                     data-style="btn-default"
-                                    data-live-search="true">
+                                    data-live-search="true"
+                                    data-actions-box="true"
+                                    data-selected-text-format="count > 2">
                                 </select>
                             </div>
-                            @error('sfg_warehouse_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                            <div class="form-text">Items are consumed from the first one unless an item type is routed elsewhere below.</div>
+                            @error('sfg_warehouse_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                         </div>
 
                         <div class="col-md-6">
@@ -178,6 +188,14 @@
                             @error('selectedEventTypes')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                         </div>
 
+                        <div class="col-12">
+                            @include('livewire.partials.item-type-warehouse-routing', [
+                                'groups'             => $itemTypeRoutingGroups,
+                                'sourceWarehouseIds' => $sfg_warehouse_ids,
+                                'warehouseOptions'   => $departmentWarehouses,
+                            ])
+                        </div>
+
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -197,12 +215,20 @@
     <script>
         const lineModal = new bootstrap.Modal(document.getElementById('lineModal'));
 
-        function buildLineWarehouseSelect(selector, warehouses, selectedId) {
+        // Rebuilt from the department's warehouses, re-applying whatever is
+        // already selected server-side. `selected` is an array for the
+        // multi-select raw-material picker, a single id for the FG one.
+        function buildLineWarehouseSelect(selector, warehouses, selected) {
+            const ids = (Array.isArray(selected) ? selected : [selected]).map(Number);
             const $sel = $(selector);
             $sel.selectpicker('destroy');
             $sel.empty();
             (warehouses || []).forEach(wh => {
-                $sel.append($('<option>', { value: wh.id, text: wh.name, selected: wh.id == selectedId }));
+                $sel.append($('<option>', {
+                    value: wh.id,
+                    text: wh.name,
+                    selected: ids.includes(Number(wh.id)),
+                }));
             });
             $sel.selectpicker();
         }
@@ -212,7 +238,7 @@
             setTimeout(() => {
                 $('#line_department_id').selectpicker('destroy').selectpicker();
                 $('#line_department_id').selectpicker('val', String($wire.get('department_id') || ''));
-                buildLineWarehouseSelect('#line_sfg_warehouse_id', warehouses, $wire.get('sfg_warehouse_id'));
+                buildLineWarehouseSelect('#line_sfg_warehouse_ids', warehouses, $wire.get('sfg_warehouse_ids'));
                 buildLineWarehouseSelect('#line_fg_warehouse_id', warehouses, $wire.get('fg_warehouse_id'));
                 $('#line_event_types').selectpicker('destroy').selectpicker();
                 $('#line_event_types').selectpicker('val', ($wire.get('selectedEventTypes') || []).map(String));
@@ -220,21 +246,22 @@
         });
 
         $wire.on('lineWarehousesReady', ({ warehouses }) => {
-            buildLineWarehouseSelect('#line_sfg_warehouse_id', warehouses, null);
+            buildLineWarehouseSelect('#line_sfg_warehouse_ids', warehouses, []);
             buildLineWarehouseSelect('#line_fg_warehouse_id', warehouses, null);
         });
 
         $(document).on('change', '#line_department_id', function () {
             $wire.call('onDepartmentChange', parseInt($(this).val()) || null);
         });
-        $(document).on('change', '#line_sfg_warehouse_id', function () {
-            $wire.set('sfg_warehouse_id', parseInt($(this).val()) || null);
+        $(document).on('change', '#line_sfg_warehouse_ids', function () {
+            $wire.set('sfg_warehouse_ids', ($(this).val() || []).map(Number));
         });
         $(document).on('change', '#line_fg_warehouse_id', function () {
             $wire.set('fg_warehouse_id', parseInt($(this).val()) || null);
         });
+        // Rebuilds the item-type routing table for the newly selected types.
         $(document).on('change', '#line_event_types', function () {
-            $wire.set('selectedEventTypes', ($(this).val() || []).map(Number));
+            $wire.call('onEventTypesChange', ($(this).val() || []).map(Number));
         });
     </script>
     @endscript
