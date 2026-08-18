@@ -43,11 +43,7 @@ class PreparationIndex extends Component
 
         $this->departments = $api->get('/v1/departments', ['module' => 'production', 'filter' => 'production'])['data'] ?? [];
 
-        $allWarehouses    = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
-        $this->warehouses = collect($allWarehouses)
-            ->filter(fn($wh) => !empty($wh['type']['is_internal']))
-            ->values()
-            ->toArray();
+        $this->warehouses = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
 
         $this->eventTypes = EventType::orderBy('name')->get();
 
@@ -107,6 +103,7 @@ class PreparationIndex extends Component
         $this->rm_warehouse_ids = [];
         $this->fg_warehouse_id  = null;
 
+        $this->warehouses           = $this->fetchWarehouses($deptId);
         $this->departmentWarehouses = $this->fetchInternalWarehouses($deptId);
         $this->dispatch('prepWarehousesReady', warehouses: $this->departmentWarehouses);
     }
@@ -118,6 +115,19 @@ class PreparationIndex extends Component
     {
         $this->selectedEventTypes = array_values(array_filter(array_map('intval', $eventTypeIds)));
         $this->buildItemTypeRouting($this->selectedEventTypes);
+    }
+
+    private function fetchWarehouses(?int $deptId): array
+    {
+        if (!$deptId) return [];
+        $all = $this->api->get('/v1/warehouses', [
+            'related_to_production' => true,
+            'department_id'         => $deptId,
+        ])['data'] ?? [];
+        return collect($all)
+            ->filter(fn($wh) => (int) ($wh['department_id'] ?? $wh['department']['id'] ?? null) === $deptId)
+            ->values()
+            ->toArray();
     }
 
     private function fetchInternalWarehouses(?int $deptId): array
