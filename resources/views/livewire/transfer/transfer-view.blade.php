@@ -22,6 +22,14 @@
                     <i class="bi bi-calendar3 chip-icon"></i>
                     {{ $transfer->created_at?->format('d M Y, H:i') }}
                 </span>
+                <span class="pv-chip muted">
+                    <i class="bi bi-diagram-3 chip-icon"></i>
+                    {{ $departmentName }}
+                </span>
+                <span class="pv-chip {{ $transfer->is_internal ? 'blue' : 'muted' }}">
+                    <i class="bi {{ $transfer->is_internal ? 'bi-house' : 'bi-box-arrow-right' }} chip-icon"></i>
+                    {{ $transfer->is_internal ? 'Internal' : 'External' }}
+                </span>
             </div>
         </div>
         <a href="{{ route('item-transfers') }}" class="btn btn-light btn-sm flex-shrink-0">

@@ -43,7 +43,10 @@ class LineIndex extends Component
 
         $this->departments = $api->get('/v1/departments', ['module' => 'production', 'filter' => 'production'])['data'] ?? [];
 
-        $allWarehouses    = $api->get('/v1/warehouses', ['related_to_production' => true])['data'] ?? [];
+        // Internal warehouses only — these back the source/destination pickers and
+        // the index table's name lookup. The parent applies `is_internal`; the local
+        // filter is a backstop for a parent build that predates that query string.
+        $allWarehouses    = $api->get('/v1/warehouses', ['is_internal' => 1])['data'] ?? [];
         $this->warehouses = collect($allWarehouses)
             ->filter(fn($wh) => !empty($wh['type']['is_internal']))
             ->values()
@@ -124,9 +127,12 @@ class LineIndex extends Component
     {
         if (!$deptId) return [];
         $all = $this->api->get('/v1/warehouses', [
-            'related_to_production' => true,
-            'department_id'         => $deptId,
+            'department_id' => $deptId,
+            'is_internal'   => 1,
         ])['data'] ?? [];
+        // Backstop: keep filtering locally in case the parent hasn't shipped the
+        // `is_internal` query string yet, so the picker can never offer an
+        // external warehouse.
         return collect($all)
             ->filter(fn($wh) => !empty($wh['type']['is_internal'])
                 && (int) ($wh['department_id'] ?? $wh['department']['id'] ?? null) === $deptId)

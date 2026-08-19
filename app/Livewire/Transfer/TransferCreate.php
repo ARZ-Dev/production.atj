@@ -24,6 +24,15 @@ class TransferCreate extends Component
     public $warehouse_to_id;
     public $warehouses         = [];
 
+    /** Internal transfer: both ends are internal warehouses. */
+    public bool $is_internal   = false;
+    public $department_id;
+    public $departments        = [];
+
+    /** Warehouses offered by each picker, narrowed by department + transfer kind. */
+    public $warehousesFrom     = [];
+    public $warehousesTo       = [];
+
     public $allItems           = [];   // items common to both warehouses' item types
     public $transferItems      = [];   // row data
     public $rowUnits           = [];   // units per row keyed by index
@@ -59,6 +68,11 @@ class TransferCreate extends Component
 
         $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
+        $this->departments = $this->api->get('/v1/departments', [
+            'module' => 'production',
+            'filter' => 'production',
+        ])['data'] ?? [];
+
         if ($id) {
             $this->id      = $id;
             $this->editing = true;
@@ -76,8 +90,14 @@ class TransferCreate extends Component
                 return redirect()->route('item-transfers');
             }
 
+            $this->is_internal       = (bool) $transfer->is_internal;
+            $this->department_id     = $transfer->department_id;
             $this->warehouse_from_id = $transfer->warehouse_from_id;
             $this->warehouse_to_id   = $transfer->warehouse_to_id;
+
+            // Populate the pickers without pruning: an older transfer may point at a
+            // warehouse the current filters no longer offer, and it must still render.
+            $this->loadWarehouseOptions();
 
             $this->getTransferItems(dispatch: false);
 
@@ -106,6 +126,90 @@ class TransferCreate extends Component
     {
         $response = $this->api->get("/v1/items/{$itemId}");
         return $response['data']['units'] ?? [];
+    }
+
+    /**
+     * Fetch the warehouses one end of the transfer may use.
+     *
+     * Internal transfer  → both ends must be internal.
+     * External transfer  → the source must be internal and allowed to send,
+     *                      the destination external and allowed to receive.
+     *
+     * The filters are optional query strings on the shared warehouses endpoint,
+     * so callers elsewhere that omit them are unaffected.
+     */
+    protected function fetchWarehouses(bool $forSource): array
+    {
+        if (!$this->department_id) {
+            return [];
+        }
+
+        $query = [
+            'module'        => 'production',
+            'department_id' => $this->department_id,
+        ];
+
+        if ($this->is_internal) {
+            $query['is_internal'] = 1;
+        } elseif ($forSource) {
+            $query['is_internal']       = 1;
+            $query['can_send_transfer'] = 1;
+        } else {
+            $query['is_internal']          = 0;
+            $query['can_receive_transfer'] = 1;
+        }
+
+        return $this->api->get('/v1/warehouses', $query)['data'] ?? [];
+    }
+
+    /** Refill both pickers for the current department + transfer kind. */
+    protected function loadWarehouseOptions(): void
+    {
+        $this->warehousesFrom = $this->fetchWarehouses(forSource: true);
+
+        // An internal transfer offers the same set on both ends — no second call needed.
+        $this->warehousesTo = $this->is_internal
+            ? $this->warehousesFrom
+            : $this->fetchWarehouses(forSource: false);
+    }
+
+    public function updatedIsInternal(): void
+    {
+        $this->refreshWarehouseOptions();
+    }
+
+    public function updatedDepartmentId(): void
+    {
+        $this->refreshWarehouseOptions();
+    }
+
+    /**
+     * Reload both pickers, drop any selection the new filters no longer offer,
+     * and push the fresh option lists to the (wire:ignore'd) selectpickers.
+     */
+    protected function refreshWarehouseOptions(): void
+    {
+        $this->loadWarehouseOptions();
+
+        if (!collect($this->warehousesFrom)->firstWhere('id', (int) $this->warehouse_from_id)) {
+            $this->warehouse_from_id = null;
+        }
+
+        if (!collect($this->warehousesTo)->firstWhere('id', (int) $this->warehouse_to_id)) {
+            $this->warehouse_to_id = null;
+        }
+
+        // The item list depends on both warehouses, so it has to follow.
+        $this->getTransferItems(dispatch: false);
+
+        $this->dispatch(
+            'setTransferWarehouses',
+            $this->warehousesFrom,
+            $this->warehousesTo,
+            $this->warehouse_from_id,
+            $this->warehouse_to_id
+        );
+        $this->dispatch('setWarehouseItems', $this->allItems);
     }
 
     /**
@@ -199,7 +303,7 @@ class TransferCreate extends Component
             ];
         }
 
-        return [
+        $rules = [
             'warehouse_from_id'            => 'required|integer',
             'warehouse_to_id'             => 'required|integer|different:warehouse_from_id',
             'transferItems'                => 'required|array|min:1',
@@ -207,11 +311,21 @@ class TransferCreate extends Component
             'transferItems.*.item_unit_id' => 'required|integer',
             'transferItems.*.quantity'     => 'required|numeric|min:0.000001',
         ];
+
+        // Only create/edit picks the department; the approve screens re-validate
+        // transfers that may predate these columns, so don't require them there.
+        if (!$this->confirmStatus) {
+            $rules['department_id'] = 'required|integer';
+            $rules['is_internal']   = 'boolean';
+        }
+
+        return $rules;
     }
 
     protected function messages(): array
     {
         return [
+            'department_id.required'                     => 'Department is required.',
             'warehouse_to_id.different'                  => 'Warehouse To must be different from Warehouse From.',
             'transferItems.required'                     => 'Please add at least one item.',
             'transferItems.min'                          => 'Please add at least one item.',
@@ -268,11 +382,15 @@ class TransferCreate extends Component
                 }
 
                 $transfer->update([
+                    'is_internal'       => $this->is_internal,
+                    'department_id'     => $this->department_id,
                     'warehouse_from_id' => $this->warehouse_from_id,
                     'warehouse_to_id'   => $this->warehouse_to_id,
                 ]);
             } else {
                 $transfer = Transfer::create([
+                    'is_internal'       => $this->is_internal,
+                    'department_id'     => $this->department_id,
                     'warehouse_from_id' => $this->warehouse_from_id,
                     'warehouse_to_id'   => $this->warehouse_to_id,
                     'status'            => 'pending',
@@ -477,20 +595,32 @@ class TransferCreate extends Component
         return $rows;
     }
 
+    protected function departmentName($departmentId): string
+    {
+        return collect($this->departments)->firstWhere('id', (int) $departmentId)['name'] ?? '—';
+    }
+
     public function render()
     {
         if ($this->viewStatus == 1) {
             return view('livewire.transfer.transfer-view', [
                 'warehouseFromName' => $this->warehouseName($this->warehouse_from_id),
                 'warehouseToName'   => $this->warehouseName($this->warehouse_to_id),
+                'departmentName'    => $this->departmentName($this->department_id),
                 'rows'              => $this->resolvedRows(),
             ]);
         }
 
+        // The approve screens are read-only and may show a transfer whose warehouses
+        // the current filters no longer offer, so fall back to the full list there.
+        $fallback = $this->confirmStatus ? $this->warehouses : [];
+
         return view('livewire.transfer.transfer-create', [
-            'items'      => $this->allItems,
-            'warehouses' => $this->warehouses,
-            'rowUnits'   => $this->rowUnits,
+            'items'          => $this->allItems,
+            'warehouses'     => $this->warehouses,
+            'warehousesFrom' => $this->warehousesFrom ?: $fallback,
+            'warehousesTo'   => $this->warehousesTo ?: $fallback,
+            'rowUnits'       => $this->rowUnits,
         ]);
     }
 }
