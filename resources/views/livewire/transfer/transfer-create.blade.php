@@ -29,6 +29,53 @@
                     <div class="card-body">
                         <div class="row g-4">
 
+                            {{-- Department --}}
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="department_id">
+                                    Department <span class="text-danger">*</span>
+                                </label>
+                                <div wire:ignore>
+                                    <select id="department_id"
+                                            class="selectpicker w-100"
+                                            title="Select Department"
+                                            data-style="btn-default"
+                                            data-live-search="true"
+                                            data-icon-base="ti"
+                                            data-size="5"
+                                            data-tick-icon="ti-check text-white"
+                                            wire:model="department_id"
+                                            {{ $confirmStatus ? 'disabled' : '' }}>
+                                        @foreach($departments as $department)
+                                            <option value="{{ $department['id'] }}"
+                                                @selected($department['id'] == $department_id)>
+                                                {{ $department['name'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                @error('department_id')
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- Internal transfer --}}
+                            <div class="col-12 col-md-6 d-flex align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           id="is_internal"
+                                           wire:model.live="is_internal"
+                                           {{ $confirmStatus ? 'disabled' : '' }}>
+                                    <label class="form-check-label" for="is_internal">
+                                        Internal Transfer
+                                        <span class="text-muted small d-block">
+                                            Both warehouses are internal. Otherwise stock moves from an
+                                            internal warehouse to an external one.
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
                             {{-- Warehouse From --}}
                             <div class="col-12 col-md-6">
                                 <label class="form-label" for="warehouse_from_id">
@@ -45,7 +92,7 @@
                                             data-tick-icon="ti-check text-white"
                                             wire:model="warehouse_from_id"
                                             {{ $confirmStatus ? 'disabled' : '' }}>
-                                        @foreach($warehouses as $warehouse)
+                                        @foreach($warehousesFrom as $warehouse)
                                             <option value="{{ $warehouse['id'] }}"
                                                 @selected($warehouse['id'] == $warehouse_from_id)>
                                                 {{ $warehouse['name'] }}
@@ -74,7 +121,7 @@
                                             data-tick-icon="ti-check text-white"
                                             wire:model="warehouse_to_id"
                                             {{ $confirmStatus ? 'disabled' : '' }}>
-                                        @foreach($warehouses as $warehouse)
+                                        @foreach($warehousesTo as $warehouse)
                                             <option value="{{ $warehouse['id'] }}"
                                                 @selected($warehouse['id'] == $warehouse_to_id)>
                                                 {{ $warehouse['name'] }}
@@ -296,6 +343,20 @@
 
         $(document).on('change', '#warehouse_from_id, #warehouse_to_id', function () {
             dispatchTransferItems();
+        });
+
+        // Department / internal toggle changed server-side — refill both warehouse pickers
+        $wire.on('setTransferWarehouses', function (params) {
+            const fromList = params[0] ?? [];
+            const toList   = params[1] ?? [];
+            const fromId   = params[2] ?? null;
+            const toId     = params[3] ?? null;
+
+            setOptions($('#warehouse_from_id'), fromList);
+            setOptions($('#warehouse_to_id'), toList);
+
+            $('#warehouse_from_id').selectpicker('val', fromId ? String(fromId) : '');
+            $('#warehouse_to_id').selectpicker('val', toId ? String(toId) : '');
         });
 
         $wire.on('setWarehouseItems', function (params) {
