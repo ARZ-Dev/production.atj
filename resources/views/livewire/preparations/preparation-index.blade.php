@@ -219,7 +219,9 @@
 
         // Rebuilt from the department's warehouses, re-applying whatever is
         // already selected server-side. `selected` is an array for the
-        // multi-select raw-material picker, a single id for the FG one.
+        // multi-select source picker, a single id for the FG one. The source
+        // picker gets every warehouse in the department; the FG picker only
+        // the internal ones.
         function buildPrepWarehouseSelect(selector, warehouses, selected) {
             const ids = (Array.isArray(selected) ? selected : [selected]).map(Number);
             const $sel = $(selector);
@@ -235,21 +237,21 @@
             $sel.selectpicker();
         }
 
-        $wire.on('openModal', ({ warehouses }) => {
+        $wire.on('openModal', ({ warehouses, internalWarehouses }) => {
             prepModal.show();
             setTimeout(() => {
                 $('#prep_department_id').selectpicker('destroy').selectpicker();
                 $('#prep_department_id').selectpicker('val', String($wire.get('department_id') || ''));
                 buildPrepWarehouseSelect('#prep_rm_warehouse_ids', warehouses, $wire.get('rm_warehouse_ids'));
-                buildPrepWarehouseSelect('#prep_fg_warehouse_id', warehouses, $wire.get('fg_warehouse_id'));
+                buildPrepWarehouseSelect('#prep_fg_warehouse_id', internalWarehouses, $wire.get('fg_warehouse_id'));
                 $('#prep_event_types').selectpicker('destroy').selectpicker();
                 $('#prep_event_types').selectpicker('val', ($wire.get('selectedEventTypes') || []).map(String));
             }, 150);
         });
 
-        $wire.on('prepWarehousesReady', ({ warehouses }) => {
+        $wire.on('prepWarehousesReady', ({ warehouses, internalWarehouses }) => {
             buildPrepWarehouseSelect('#prep_rm_warehouse_ids', warehouses, []);
-            buildPrepWarehouseSelect('#prep_fg_warehouse_id', warehouses, null);
+            buildPrepWarehouseSelect('#prep_fg_warehouse_id', internalWarehouses, null);
         });
 
         $(document).on('change', '#prep_department_id', function () {
