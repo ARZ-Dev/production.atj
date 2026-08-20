@@ -217,7 +217,9 @@
 
         // Rebuilt from the department's warehouses, re-applying whatever is
         // already selected server-side. `selected` is an array for the
-        // multi-select raw-material picker, a single id for the FG one.
+        // multi-select source picker, a single id for the FG one. The source
+        // picker gets every warehouse in the department; the FG picker only
+        // the internal ones.
         function buildLineWarehouseSelect(selector, warehouses, selected) {
             const ids = (Array.isArray(selected) ? selected : [selected]).map(Number);
             const $sel = $(selector);
@@ -233,21 +235,21 @@
             $sel.selectpicker();
         }
 
-        $wire.on('openModal', ({ warehouses }) => {
+        $wire.on('openModal', ({ warehouses, internalWarehouses }) => {
             lineModal.show();
             setTimeout(() => {
                 $('#line_department_id').selectpicker('destroy').selectpicker();
                 $('#line_department_id').selectpicker('val', String($wire.get('department_id') || ''));
                 buildLineWarehouseSelect('#line_sfg_warehouse_ids', warehouses, $wire.get('sfg_warehouse_ids'));
-                buildLineWarehouseSelect('#line_fg_warehouse_id', warehouses, $wire.get('fg_warehouse_id'));
+                buildLineWarehouseSelect('#line_fg_warehouse_id', internalWarehouses, $wire.get('fg_warehouse_id'));
                 $('#line_event_types').selectpicker('destroy').selectpicker();
                 $('#line_event_types').selectpicker('val', ($wire.get('selectedEventTypes') || []).map(String));
             }, 150);
         });
 
-        $wire.on('lineWarehousesReady', ({ warehouses }) => {
+        $wire.on('lineWarehousesReady', ({ warehouses, internalWarehouses }) => {
             buildLineWarehouseSelect('#line_sfg_warehouse_ids', warehouses, []);
-            buildLineWarehouseSelect('#line_fg_warehouse_id', warehouses, null);
+            buildLineWarehouseSelect('#line_fg_warehouse_id', internalWarehouses, null);
         });
 
         $(document).on('change', '#line_department_id', function () {

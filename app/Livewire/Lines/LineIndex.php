@@ -27,8 +27,11 @@ class LineIndex extends Component
     public array  $selectedEventTypes = [];
     public bool   $editing           = false;
 
-    // Warehouses of the selected department, for the routing table's dropdowns.
+    // All warehouses of the selected department: the source picker and the
+    // routing table offer these, internal or not.
     public array  $departmentWarehouses = [];
+    // The internal subset — the finished-goods picker is still limited to these.
+    public array  $departmentInternalWarehouses = [];
 
     protected ApiService $api;
 
@@ -43,14 +46,9 @@ class LineIndex extends Component
 
         $this->departments = $api->get('/v1/departments', ['module' => 'production', 'filter' => 'production'])['data'] ?? [];
 
-        // Internal warehouses only — these back the source/destination pickers and
-        // the index table's name lookup. The parent applies `is_internal`; the local
-        // filter is a backstop for a parent build that predates that query string.
-        $allWarehouses    = $api->get('/v1/warehouses', ['is_internal' => 1])['data'] ?? [];
-        $this->warehouses = collect($allWarehouses)
-            ->filter(fn($wh) => !empty($wh['type']['is_internal']))
-            ->values()
-            ->toArray();
+        // Every production warehouse — used to resolve names in the index table.
+        $allWarehouses    = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
+        $this->warehouses = $allWarehouses;
 
         $this->eventTypes = EventType::orderBy('name')->get();
 
@@ -71,6 +69,7 @@ class LineIndex extends Component
         $this->fg_warehouse_id   = null;
         $this->selectedEventTypes = [];
         $this->departmentWarehouses = [];
+        $this->departmentInternalWarehouses = [];
         $this->itemTypeRoutingGroups = [];
         $this->itemTypeWarehouses = [];
         $this->editing           = false;
@@ -98,10 +97,14 @@ class LineIndex extends Component
         $this->selectedEventTypes = $line->eventTypes->pluck('id')->toArray();
         $this->editing           = true;
 
-        $this->departmentWarehouses = $this->fetchInternalWarehouses($this->department_id);
+        $this->loadDepartmentWarehouses($this->department_id);
         $this->loadItemTypeRouting($line->item_type_warehouses, $this->selectedEventTypes);
 
-        $this->dispatch('openModal', warehouses: $this->departmentWarehouses);
+        $this->dispatch(
+            'openModal',
+            warehouses: $this->departmentWarehouses,
+            internalWarehouses: $this->departmentInternalWarehouses,
+        );
     }
 
     public function onDepartmentChange(?int $deptId): void
@@ -110,8 +113,12 @@ class LineIndex extends Component
         $this->sfg_warehouse_ids = [];
         $this->fg_warehouse_id   = null;
 
-        $this->departmentWarehouses = $this->fetchInternalWarehouses($deptId);
-        $this->dispatch('lineWarehousesReady', warehouses: $this->departmentWarehouses);
+        $this->loadDepartmentWarehouses($deptId);
+        $this->dispatch(
+            'lineWarehousesReady',
+            warehouses: $this->departmentWarehouses,
+            internalWarehouses: $this->departmentInternalWarehouses,
+        );
     }
 
     /**
@@ -123,17 +130,19 @@ class LineIndex extends Component
         $this->buildItemTypeRouting($this->selectedEventTypes);
     }
 
-    private function fetchInternalWarehouses(?int $deptId): array
+    /**
+     * Load the selected department's warehouses in one call and split them:
+     * the source picker (and the routing table under it) offers all of them,
+     * while the finished-goods picker stays limited to the internal ones.
+     */
+    private function loadDepartmentWarehouses(?int $deptId): void
     {
-        if (!$deptId) return [];
-        $all = $this->api->get('/v1/warehouses', [
-            'department_id' => $deptId,
-            'is_internal'   => 1,
-        ])['data'] ?? [];
-        // Backstop: keep filtering locally in case the parent hasn't shipped the
-        // `is_internal` query string yet, so the picker can never offer an
-        // external warehouse.
-        return collect($all)
+        $all = $deptId
+            ? ($this->api->get('/v1/warehouses', ['department_id' => $deptId])['data'] ?? [])
+            : [];
+
+        $this->departmentWarehouses         = $all;
+        $this->departmentInternalWarehouses = collect($all)
             ->filter(fn($wh) => !empty($wh['type']['is_internal']))
             ->values()
             ->toArray();
