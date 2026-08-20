@@ -29,6 +29,13 @@
                     <i class="bi bi-gear"></i>
                 </button> --}}
 
+                {{-- View Guide --}}
+                <a href="{{ route('guides.view') }}" class="btn btn-light-primary d-flex align-items-center gap-1 me-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="Open the user guide">
+                    <i class="bi bi-journal-text"></i>
+                    <span class="d-none d-md-inline">View Guide</span>
+                </a>
+
                 {{-- Brightness --}}
                 <div class="dark-mode-btn" id="toggleMode">
                     <button class="btn header-btn active" id="lightModeBtn">

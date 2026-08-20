@@ -1,7 +1,7 @@
 <x-layouts.app title="Users Management">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">User List</h5>
+            <h5 class="card-title mb-0">Warehouse Types List</h5>
             @hasPermission('production.warehouseType-create')
             <a href="{{ route('warehouse-types.create') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg me-1"></i> Add New Warehouse Type

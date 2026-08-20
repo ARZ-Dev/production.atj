@@ -111,7 +111,8 @@ class ProductionLineIndex extends Component
             'department_id'         => $deptId,
         ])['data'] ?? [];
         return collect($all)
-            ->filter(fn($wh) => !empty($wh['type']['is_factory']))
+            ->filter(fn($wh) => !empty($wh['type']['is_factory'])
+                && (int) ($wh['department_id'] ?? $wh['department']['id'] ?? null) === $deptId)
             ->values()
             ->toArray();
     }

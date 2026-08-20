@@ -3,6 +3,10 @@
 use App\Livewire\Capacities\CapacityManage;
 use App\Livewire\DashboardView;
 use App\Livewire\EventTypes\EventTypeIndex;
+use App\Livewire\Guides\GuideCategoryIndex;
+use App\Livewire\Guides\GuideIndex;
+use App\Livewire\Guides\GuideManage;
+use App\Livewire\Guides\GuideView;
 use App\Livewire\ItemRequests\ItemRequestCreate;
 use App\Livewire\ItemRequests\ItemRequestIndex;
 use App\Livewire\Lines\LineIndex;
@@ -266,6 +270,20 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------
     Route::group(['prefix' => 'production-lines'], function () {
         Route::get('/', ProductionLineIndex::class)->name('production-lines');
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Guides
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'guide-categories'], function () {
+        Route::get('/', GuideCategoryIndex::class)->name('guide-categories');
+    });
+
+    Route::group(['prefix' => 'guides'], function () {
+        Route::get('/', GuideIndex::class)->name('guides');
+        Route::get('/view', GuideView::class)->name('guides.view');
+        Route::get('/view/{id}', GuideView::class)->name('guides.view.show');
+        Route::get('/{id}/manage', GuideManage::class)->name('guides.manage');
     });
 });
 

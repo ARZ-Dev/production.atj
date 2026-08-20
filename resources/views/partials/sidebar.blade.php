@@ -406,6 +406,41 @@
                                 </li>
                                 @endhasAnyPermission
 
+                                <li class="pe-slide pe-has-sub">
+                                    @php
+                                    $guideActive = request()->is('admin/guide-categories*')
+                                    || request()->is('admin/guides*');
+                                    @endphp
+                                    <a href="#collapseGuides"
+                                        class="pe-nav-link {{ $guideActive ? 'active' : '' }}"
+                                        data-bs-toggle="collapse"
+                                        aria-expanded="{{ $guideActive ? 'true' : 'false' }}"
+                                        aria-controls="collapseGuides">
+                                        <i class="bi bi-journal-text pe-nav-icon"></i>
+                                        <span class="pe-nav-content">Guide</span>
+                                        <i class="ri-arrow-down-s-line pe-nav-arrow"></i>
+                                    </a>
+
+                                    <ul class="pe-slide-menu collapse {{ $guideActive ? 'show' : '' }}"
+                                        id="collapseGuides">
+
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('guide-categories') }}"
+                                                class="pe-nav-link {{ request()->is('admin/guide-categories*') ? 'active' : '' }}">
+                                                Guide Categories
+                                            </a>
+                                        </li>
+
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('guides') }}"
+                                                class="pe-nav-link {{ request()->is('admin/guides*') && !request()->is('admin/guides/view*') ? 'active' : '' }}">
+                                                Guides
+                                            </a>
+                                        </li>
+
+                                    </ul>
+                                </li>
+
                             </ul>
                         </div>
                     </div>
