@@ -129,11 +129,12 @@ class TransferCreate extends Component
     }
 
     /**
-     * Fetch the warehouses one end of the transfer may use.
+     * Fetch the warehouses one end of the transfer may use. Both ends are always
+     * limited to the selected department and to the matching transfer capability:
+     * the source must be able to send, the destination to receive.
      *
-     * Internal transfer  → both ends must be internal.
-     * External transfer  → the source must be internal and allowed to send,
-     *                      the destination external and allowed to receive.
+     * The Internal Transfer checkbox narrows the **source only** — it additionally
+     * has to be an internal warehouse. The destination list is the same either way.
      *
      * The filters are optional query strings on the shared warehouses endpoint,
      * so callers elsewhere that omit them are unaffected.
@@ -149,13 +150,13 @@ class TransferCreate extends Component
             'department_id' => $this->department_id,
         ];
 
-        if ($this->is_internal) {
-            $query['is_internal'] = 1;
-        } elseif ($forSource) {
-            $query['is_internal']       = 1;
+        if ($forSource) {
             $query['can_send_transfer'] = 1;
+
+            if ($this->is_internal) {
+                $query['is_internal'] = 1;
+            }
         } else {
-            $query['is_internal']          = 0;
             $query['can_receive_transfer'] = 1;
         }
 
@@ -166,11 +167,7 @@ class TransferCreate extends Component
     protected function loadWarehouseOptions(): void
     {
         $this->warehousesFrom = $this->fetchWarehouses(forSource: true);
-
-        // An internal transfer offers the same set on both ends — no second call needed.
-        $this->warehousesTo = $this->is_internal
-            ? $this->warehousesFrom
-            : $this->fetchWarehouses(forSource: false);
+        $this->warehousesTo   = $this->fetchWarehouses(forSource: false);
     }
 
     public function updatedIsInternal(): void
