@@ -69,8 +69,8 @@
                                     <label class="form-check-label" for="is_internal">
                                         Internal Transfer
                                         <span class="text-muted small d-block">
-                                            Both warehouses are internal. Otherwise stock moves from an
-                                            internal warehouse to an external one.
+                                            Limits Warehouse From to internal warehouses. Warehouse To is
+                                            unaffected.
                                         </span>
                                     </label>
                                 </div>
