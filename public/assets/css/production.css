@@ -719,3 +719,275 @@
     .ir-remove { width: auto; height: auto; padding: 8px 14px; margin-top: 2px; }
     .ir-remove-text { display: inline; }
 }
+
+/* ================================================================
+   Dashboard — production overview (db-*)
+   Shares the Plan View palette: indigo #818cf8, green #34d399,
+   amber #fbbf24, sky #38bdf8, red #f87171.
+   ================================================================ */
+
+/* ── Dashboard — header ───────────────────────────────────────── */
+.db-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px; margin: 4px 0 20px;
+}
+.db-title    { font-size: 22px; font-weight: 700; margin-bottom: 5px; }
+.db-subtitle { font-size: 12px; opacity: .6; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.db-header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.db-factory-select  { width: auto; min-width: 170px; font-size: 12px; }
+
+/* Small round separator used between inline facts */
+.db-dot-sep {
+    display: inline-block; width: 3px; height: 3px; border-radius: 50%;
+    background: currentColor; opacity: .4; margin: 0 7px; vertical-align: middle;
+}
+
+/* ── Dashboard — period switcher ──────────────────────────────── */
+.db-period {
+    display: inline-flex; padding: 3px; gap: 2px;
+    background: rgba(130,130,180,.09); border-radius: 9px;
+}
+.db-period-btn {
+    border: none; background: transparent; border-radius: 7px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+    color: inherit; opacity: .6; white-space: nowrap;
+    cursor: pointer; transition: background .15s, opacity .15s;
+}
+.db-period-btn:hover     { opacity: .9; background: rgba(130,130,180,.12); }
+.db-period-btn.is-active { opacity: 1; background: #818cf8; color: #fff; }
+
+/* ── Dashboard — KPI cards ────────────────────────────────────── */
+.db-kpis {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 4px;
+}
+.db-kpi {
+    border-radius: 12px; padding: 16px 18px 18px;
+    border: 1px solid rgba(130,130,180,.12);
+    border-left: 3px solid rgba(130,130,180,.4);
+    background: var(--bs-card-bg, #fff);
+}
+.db-kpi--primary { border-left-color: #818cf8; }
+.db-kpi--info    { border-left-color: #38bdf8; }
+.db-kpi--warning { border-left-color: #fbbf24; }
+.db-kpi--success { border-left-color: #34d399; }
+
+.db-kpi-top   { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.db-kpi-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .7px;
+    opacity: .5; font-weight: 700;
+}
+.db-kpi-icon  { font-size: 15px; opacity: .35; }
+.db-kpi-value {
+    font-size: 27px; font-weight: 700; line-height: 1.15; margin-top: 6px;
+    display: flex; align-items: center; gap: 8px;
+}
+.db-kpi-foot  { font-size: 11.5px; opacity: .6; margin-top: 3px; }
+
+.db-kpi-bar {
+    height: 4px; border-radius: 999px; margin-top: 12px;
+    background: rgba(130,130,180,.16); overflow: hidden;
+}
+.db-kpi-bar > span { display: block; height: 100%; border-radius: 999px; background: #818cf8; }
+.db-kpi-bar-note   { font-size: 10.5px; opacity: .45; margin-top: 5px; }
+
+/* Live indicator on the "running now" tile */
+.db-pulse {
+    width: 9px; height: 9px; border-radius: 50%; background: #38bdf8;
+    box-shadow: 0 0 0 0 rgba(56,189,248,.6);
+    animation: db-pulse 1.8s infinite;
+}
+@keyframes db-pulse {
+    70%  { box-shadow: 0 0 0 9px rgba(56,189,248,0); }
+    100% { box-shadow: 0 0 0 0 rgba(56,189,248,0); }
+}
+
+/* ── Dashboard — shared bits ──────────────────────────────────── */
+.db-hint { font-size: 11px; opacity: .45; }
+.db-hint-link { font-size: 11.5px; font-weight: 600; text-decoration: none; color: #818cf8; }
+.db-hint-link:hover { color: #6366f1; }
+.db-section-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .7px;
+    opacity: .45; font-weight: 700; margin-bottom: 10px;
+}
+.db-count {
+    font-size: 11px; font-weight: 700; vertical-align: middle;
+    background: rgba(129,140,248,.14); color: #6366f1;
+    padding: 2px 9px; border-radius: 999px; margin-left: 4px;
+}
+.db-count--danger { background: rgba(248,113,113,.16); color: #ef4444; }
+.db-swatch {
+    display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+    flex-shrink: 0; margin-right: 2px;
+}
+.db-nowrap { white-space: nowrap; }
+
+.db-empty {
+    text-align: center; padding: 34px 16px; opacity: .5; font-size: 12.5px;
+}
+.db-empty i { font-size: 30px; opacity: .45; display: block; margin-bottom: 9px; }
+.db-empty-inline { font-size: 12px; opacity: .45; padding: 6px 0; }
+
+/* ── Dashboard — horizontal bar rows ──────────────────────────── */
+.db-bar-row {
+    display: grid; grid-template-columns: minmax(0, 108px) 1fr auto;
+    align-items: center; gap: 10px; margin-bottom: 9px;
+}
+.db-bar-row:last-child { margin-bottom: 0; }
+.db-bar-name {
+    display: flex; align-items: center; gap: 6px; min-width: 0;
+    font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.db-bar-track {
+    height: 7px; border-radius: 999px;
+    background: rgba(130,130,180,.14); overflow: hidden;
+}
+.db-bar-fill  { display: block; height: 100%; border-radius: 999px; min-width: 2px; }
+.db-bar-value { font-size: 12px; font-weight: 700; opacity: .75; }
+
+/* ── Dashboard — tables ───────────────────────────────────────── */
+.db-table > thead > tr > th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+    font-weight: 700; opacity: .45; border-bottom-width: 1px;
+}
+.db-table > tbody > tr > td { font-size: 12.5px; }
+.db-event-name {
+    font-size: 12.5px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+}
+.db-event-sub  { font-size: 11px; opacity: .5; }
+
+/* Red "!" badge for events carrying an open emergency */
+.db-flag {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: rgba(248,113,113,.18); color: #ef4444;
+    font-size: 10px; font-weight: 800;
+}
+
+/* ── Dashboard — status pills ─────────────────────────────────── */
+.db-status {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; white-space: nowrap;
+    background: rgba(130,130,180,.14); color: rgba(130,130,180,1);
+}
+.db-status--in_progress { background: rgba(56,189,248,.14);  color: #0ea5e9; }
+.db-status--paused      { background: rgba(251,191,36,.16);  color: #d97706; }
+.db-status--terminated  { background: rgba(52,211,153,.14);  color: #059669; }
+.db-status--pending     { background: rgba(251,191,36,.16);  color: #d97706; }
+.db-status--loaded      { background: rgba(56,189,248,.14);  color: #0ea5e9; }
+.db-status--approved    { background: rgba(52,211,153,.14);  color: #059669; }
+
+/* ── Dashboard — emergency cards ──────────────────────────────── */
+.db-emg {
+    border: 1px solid rgba(248,113,113,.22);
+    border-left: 3px solid #f87171;
+    background: rgba(248,113,113,.045);
+    border-radius: 10px; padding: 11px 13px; margin-bottom: 10px;
+}
+.db-emg:last-child { margin-bottom: 0; }
+.db-emg-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.db-emg-type    { font-size: 12.5px; font-weight: 700; color: #ef4444; }
+.db-emg-elapsed {
+    font-size: 11px; font-weight: 700; color: #ef4444;
+    background: rgba(248,113,113,.14); padding: 2px 8px; border-radius: 999px;
+}
+.db-emg-body   { font-size: 12px; margin-top: 3px; }
+.db-emg-reason {
+    font-size: 11.5px; opacity: .7; margin-top: 5px; font-style: italic;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.db-emg-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap; font-size: 10.5px; opacity: .55; margin-top: 7px;
+}
+.db-emg-link { font-weight: 700; text-decoration: none; color: #ef4444; opacity: .9; }
+.db-emg-link:hover { color: #dc2626; }
+
+/* ── Dashboard — plan rows ────────────────────────────────────── */
+.db-plan {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; margin-bottom: 8px;
+    border: 1px solid rgba(130,130,180,.12); border-radius: 10px;
+    text-decoration: none; color: inherit;
+    transition: box-shadow .15s, transform .15s, border-color .15s;
+}
+.db-plan:last-child { margin-bottom: 0; }
+.db-plan:hover      { color: inherit; border-color: rgba(129,140,248,.4); box-shadow: 0 4px 12px rgba(0,0,0,.07); transform: translateY(-1px); }
+.db-plan.is-today   { border-color: rgba(129,140,248,.45); background: rgba(129,140,248,.05); }
+.db-plan.is-past .db-plan-date { background: rgba(130,130,180,.12); color: rgba(130,130,180,1); }
+.db-plan.is-past .db-plan-name { opacity: .75; }
+
+.db-plan-date {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 40px; height: 40px; flex-shrink: 0; border-radius: 9px;
+    background: rgba(129,140,248,.12); color: #6366f1;
+}
+.db-plan-day { font-size: 15px; font-weight: 700; line-height: 1; }
+.db-plan-mon { font-size: 9px; font-weight: 700; text-transform: uppercase; opacity: .75; }
+
+.db-plan-main { flex: 1; min-width: 0; }
+.db-plan-name {
+    font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 7px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.db-badge-today {
+    font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+    background: #818cf8; color: #fff; padding: 2px 6px; border-radius: 4px;
+}
+.db-plan-meta  { font-size: 11px; opacity: .55; margin-top: 1px; }
+.db-plan-track {
+    height: 3px; border-radius: 999px; margin-top: 7px;
+    background: rgba(130,130,180,.16); overflow: hidden;
+}
+.db-plan-track > span { display: block; height: 100%; border-radius: 999px; background: #34d399; }
+.db-plan-chev  { font-size: 12px; opacity: .3; flex-shrink: 0; }
+
+/* ── Dashboard — stock queue tiles ────────────────────────────── */
+.db-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.db-tile {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 13px 14px; border-radius: 10px; text-decoration: none; color: inherit;
+    border: 1px solid rgba(130,130,180,.12);
+    border-top: 3px solid var(--tile-accent, #818cf8);
+    transition: box-shadow .15s, transform .15s;
+}
+.db-tile:hover      { color: inherit; box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateY(-1px); }
+.db-tile-icon       { font-size: 14px; color: var(--tile-accent, #818cf8); opacity: .85; }
+.db-tile-count      { font-size: 21px; font-weight: 700; line-height: 1.2; }
+.db-tile-label      {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+    opacity: .5; font-weight: 700;
+}
+
+.db-doc-link { display: flex; align-items: center; gap: 9px; text-decoration: none; color: inherit; }
+.db-doc-link:hover .db-event-name { color: #6366f1; }
+.db-doc-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0; font-size: 12px;
+    background: rgba(130,130,180,.12);
+    color: var(--tile-accent, #818cf8);
+}
+
+/* ── Dashboard — variance pill ────────────────────────────────── */
+.db-variance {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: rgba(130,130,180,.14); color: rgba(130,130,180,1);
+}
+.db-variance.is-up   { background: rgba(52,211,153,.14); color: #059669; }
+.db-variance.is-down { background: rgba(248,113,113,.14); color: #ef4444; }
+
+/* ── Dashboard — responsive ───────────────────────────────────── */
+@media (max-width: 1199.98px) {
+    .db-kpis  { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 767.98px) {
+    .db-kpis   { grid-template-columns: 1fr; }
+    .db-tiles  { grid-template-columns: repeat(2, 1fr); }
+    .db-header { flex-direction: column; align-items: stretch; }
+    .db-header-controls { justify-content: space-between; }
+    .db-period { overflow-x: auto; }
+    .db-bar-row { grid-template-columns: minmax(0, 86px) 1fr auto; }
+}
