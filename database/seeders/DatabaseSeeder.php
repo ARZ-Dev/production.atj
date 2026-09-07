@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
         // $this->call(MachineTypeSeeder::class);
         $this->call(EventTypeSeeder::class);
         $this->call(RecipeTypeSeeder::class);
+        $this->call(RecipeSeeder::class);
         $this->call(ShiftSeeder::class);
     }
 }
