@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\EventType;
 use App\Models\RecipeType;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -14,20 +13,35 @@ class RecipeTypeSeeder extends Seeder
      */
     public function run(): void
     {
-        RecipeType::create([
-            'id' => 1,
-            'name' => 'Preparation MT',
-            'item_type_ids' => [11],
-            'side_item_type_ids' => [14],
-            'output_item_type_ids' => [12],
-        ]);
+        $recipeTypes = [
+            [
+                'id' => 1,
+                'name' => 'Preparation - Mixing of tomato paste',
+                'item_type_ids' => [11],
+                'side_item_type_ids' => [],
+                'output_item_type_ids' => [12],
+            ],
+            [
+                'id' => 2,
+                'name' => 'Production of FG 70g can',
+                'item_type_ids' => [13, 12],
+                'side_item_type_ids' => [],
+                'output_item_type_ids' => [4],
+            ],
+            [
+                'id' => 3,
+                'name' => 'Production Plastico',
+                'item_type_ids' => [11],
+                'side_item_type_ids' => [],
+                'output_item_type_ids' => [14],
+            ],
+        ];
 
-        RecipeType::create([
-            'id' => 2,
-            'name' => 'Production MT',
-            'item_type_ids' => [12],
-            'side_item_type_ids' => [14],
-            'output_item_type_ids' => [7],
-        ]);
+        foreach ($recipeTypes as $recipeType) {
+            RecipeType::updateOrCreate(
+                ['id' => $recipeType['id']],
+                $recipeType
+            );
+        }
     }
 }
