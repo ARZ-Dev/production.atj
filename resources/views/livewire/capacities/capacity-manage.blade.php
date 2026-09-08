@@ -49,11 +49,11 @@
                     </div>
                     @else
                     <form wire:submit.prevent="save">
-                        @foreach($sections as $index => $section)
-                        <div class="card mb-3" wire:key="cap-section-{{ $section['item_type_id'] }}">
+                        @foreach($sections as $typeId => $section)
+                        <div class="card mb-3" wire:key="cap-section-{{ $typeId }}">
                             <div class="card-header d-flex justify-content-between align-items-center py-2">
                                 <h6 class="fw-semibold mb-0 text-capitalize">{{ $section['item_type_name'] }}</h6>
-                                <button type="button" class="btn btn-light-danger icon-btn-sm" wire:click="removeItemType({{ $index }})" title="Remove">
+                                <button type="button" class="btn btn-light-danger icon-btn-sm" wire:click="removeItemType({{ $typeId }})" title="Remove">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
                             </div>
@@ -75,7 +75,8 @@
                                             $row        = $section['capacityRows'][$item['id']] ?? ['unit_id' => null, 'value' => ''];
                                             $basicValue = $row['value'] !== '' ? (float) $row['value'] : null;
                                         @endphp
-                                        <tr class="cap-item-row" data-units="{{ json_encode($units) }}">
+                                        <tr class="cap-item-row" wire:key="cap-row-{{ $typeId }}-{{ $item['id'] }}"
+                                            data-units="{{ json_encode($units) }}">
                                             <td class="align-middle">{{ $item['name'] }}</td>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-2">
@@ -104,10 +105,10 @@
                                                     @endforeach
                                                 </div>
                                                 <input type="hidden" class="cap-basic-value"
-                                                    wire:model="sections.{{ $index }}.capacityRows.{{ $item['id'] }}.value">
+                                                    wire:model="sections.{{ $typeId }}.capacityRows.{{ $item['id'] }}.value">
                                                 <input type="hidden" class="cap-unit-id-value"
-                                                    wire:model="sections.{{ $index }}.capacityRows.{{ $item['id'] }}.unit_id">
-                                                @error('sections.'.$index.'.capacityRows.'.$item['id'].'.value')
+                                                    wire:model="sections.{{ $typeId }}.capacityRows.{{ $item['id'] }}.unit_id">
+                                                @error('sections.'.$typeId.'.capacityRows.'.$item['id'].'.value')
                                                     <div class="text-danger small mt-1">{{ $message }}</div>
                                                 @enderror
                                             </td>
