@@ -12,7 +12,10 @@ class CapacityManage extends Component
     public string $modelName = '';
 
     public array $itemTypes = [];
-    public array $sections  = [];  // [ ['item_type_id', 'item_type_name', 'items', 'capacityRows'] ]
+    // Keyed by item type id — never by position. wire:model paths embed this key,
+    // and Livewire captures the path in a closure when the directive initialises,
+    // so a positional key would go stale the moment another section is removed.
+    public array $sections  = [];  // item_type_id => ['item_type_name', 'items', 'capacityRows']
     public array $itemUnits = [];  // item_id => [ ['id','name','symbol','basic','formula'], ... ]
 
     public array $removedTypeIds = [];
@@ -61,11 +64,11 @@ class CapacityManage extends Component
 
     public function availableItemTypes(): array
     {
-        $used = collect($this->sections)->pluck('item_type_id')->all();
+        $used = array_map('intval', array_keys($this->sections));
 
         return array_values(array_filter(
             $this->itemTypes,
-            fn ($type) => !in_array($type['id'], $used)
+            fn ($type) => !in_array((int) $type['id'], $used, true)
         ));
     }
 
@@ -106,8 +109,7 @@ class CapacityManage extends Component
             ];
         }
 
-        $this->sections[] = [
-            'item_type_id'   => $typeId,
+        $this->sections[$typeId] = [
             'item_type_name' => $type['name'],
             'items'          => $items,
             'capacityRows'   => $capacityRows,
@@ -116,7 +118,7 @@ class CapacityManage extends Component
 
     public function addItemType(int $typeId): void
     {
-        if (collect($this->sections)->contains('item_type_id', $typeId)) {
+        if (isset($this->sections[$typeId])) {
             return;
         }
 
@@ -124,28 +126,25 @@ class CapacityManage extends Component
         $this->removedTypeIds = array_values(array_diff($this->removedTypeIds, [$typeId]));
     }
 
-    public function removeItemType(int $index): void
+    public function removeItemType(int $typeId): void
     {
-        $section = $this->sections[$index] ?? null;
-
-        if (!$section) {
+        if (!isset($this->sections[$typeId])) {
             return;
         }
 
-        $this->removedTypeIds[] = $section['item_type_id'];
+        $this->removedTypeIds[] = $typeId;
 
-        unset($this->sections[$index]);
-        $this->sections = array_values($this->sections);
+        unset($this->sections[$typeId]);
     }
 
     protected function rules(): array
     {
         $rules = [];
 
-        foreach ($this->sections as $index => $section) {
-            foreach (array_keys($section['capacityRows']) as $itemId) {
-                $rules["sections.{$index}.capacityRows.{$itemId}.value"]   = 'nullable|numeric|min:0';
-                $rules["sections.{$index}.capacityRows.{$itemId}.unit_id"] = 'nullable|integer';
+        foreach ($this->sections as $typeId => $section) {
+            foreach (array_keys($section['capacityRows'] ?? []) as $itemId) {
+                $rules["sections.{$typeId}.capacityRows.{$itemId}.value"]   = 'nullable|numeric|min:0';
+                $rules["sections.{$typeId}.capacityRows.{$itemId}.unit_id"] = 'nullable|integer';
             }
         }
 
@@ -162,12 +161,16 @@ class CapacityManage extends Component
             $model->capacities()->where('item_type_id', $typeId)->delete();
         }
 
-        foreach ($this->sections as $section) {
-            $typeId = $section['item_type_id'];
+        foreach ($this->sections as $typeId => $section) {
+            $typeId = (int) $typeId;
+
+            if ($typeId <= 0) {
+                continue;
+            }
 
             $model->capacities()->where('item_type_id', $typeId)->delete();
 
-            foreach ($section['capacityRows'] as $itemId => $row) {
+            foreach ($section['capacityRows'] ?? [] as $itemId => $row) {
                 $value = $row['value'] ?? '';
 
                 if ($value === '' || $value === null) {

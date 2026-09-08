@@ -354,12 +354,19 @@
                         @endif
                     </p>
                     @include('livewire.plans.partials._action-quantity-table', [
-                        'rows'         => $actionInputs,
-                        'model'        => 'actionInputs',
-                        'actualLabel'  => 'Used Qty',
-                        'percentLabel' => '% Difference',
-                        'showOriginal' => true,
+                        'rows'          => $actionInputs,
+                        'model'         => 'actionInputs',
+                        'actualLabel'   => 'Used Qty',
+                        'percentLabel'  => '% Difference',
+                        'showOriginal'  => true,
+                        'showAvailable' => true,
                     ])
+                    <div class="text-muted mb-2" style="font-size: 11px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        "In Stock" is what the source warehouse had when this window opened
+                        (on hand minus reserved and in process). Availability is checked again
+                        against live stock when you start the event.
+                    </div>
                     @else
                     <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
                         <i class="bi bi-exclamation-triangle me-1"></i>
@@ -390,6 +397,14 @@
                     @elseif($eventAction['action'] === 'terminate')
 
                     @if($eventAction['has_recipe'])
+                    @php $endBatchCount = $eventAction['batch_count'] ?? 1; @endphp
+                    <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 12px;">
+                        <i class="bi bi-stack me-1"></i>
+                        This event runs <strong>{{ $endBatchCount + 0 }}</strong>
+                        {{ $endBatchCount == 1 ? 'batch' : 'batches' }}. The recipe states its
+                        quantities per batch, so every expected total below is the per-batch
+                        amount × {{ $endBatchCount + 0 }}.
+                    </div>
                     <div class="fw-bold mb-1" style="font-size: 13px;">
                         <i class="bi bi-box-seam me-1 text-primary"></i> Produced Item
                     </div>
@@ -398,6 +413,7 @@
                         'model'        => 'actionOutputs',
                         'actualLabel'  => 'Produced Qty',
                         'percentLabel' => '% Produced',
+                        'showPerBatch' => true,
                     ])
 
                     @if(count($actionSideProducts))
@@ -409,6 +425,7 @@
                         'model'        => 'actionSideProducts',
                         'actualLabel'  => 'Produced Qty',
                         'percentLabel' => '% Produced',
+                        'showPerBatch' => true,
                     ])
                     @endif
                     @endif

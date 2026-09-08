@@ -515,6 +515,26 @@
     font-size: 11px; font-weight: 700; letter-spacing: 0;
 }
 
+/* Start modal: available stock in the item's source warehouse (display only) */
+.aqt-stock {
+    display: inline-block; border-radius: 6px;
+    padding: 2px 9px; font-size: 12px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.aqt-stock--ok      { background: rgba(25,135,84,.12);  color: #0f5132; }
+.aqt-stock--none    { background: rgba(220,53,69,.12);  color: #842029; }
+.aqt-stock--unknown { background: rgba(108,117,125,.12); color: #6c757d; }
+.aqt-stock-where {
+    margin-top: 2px; font-size: 10px; color: #8a91a0;
+    max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* End modal: how a produced total was reached (per batch × batches) */
+.aqt-batch-math {
+    margin-top: 3px; font-size: 10px; color: #8a91a0;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
 /* Board mode legend (Actual / Downtime) */
 .pbc-legend { display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .pbc-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; }

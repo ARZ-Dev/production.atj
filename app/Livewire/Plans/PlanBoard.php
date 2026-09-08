@@ -71,6 +71,12 @@ class PlanBoard extends Component
     /** Per-request cache of resolved placeables ("Type:id" => model|null). */
     protected array $placeableCache = [];
 
+    /** Per-request cache of available stock ("warehouse:item:unit" => float|null). */
+    protected array $availabilityCache = [];
+
+    /** Per-request cache of warehouse names (id => name), lazily loaded. */
+    protected ?array $warehouseNames = null;
+
     #[Url(except: 'board')]
     public string $view = 'board';
 
@@ -848,9 +854,66 @@ class PlanBoard extends Component
             $this->actionInputs = $this->eventTypeItemRows($event->eventType);
         }
 
+        $this->actionInputs = $this->withAvailableStock($event, $this->actionInputs);
+
         $this->eventAction = array_merge($this->baseActionPayload($event, 'start'), [
             'has_recipe' => $hasRecipe,
         ]);
+    }
+
+    /**
+     * Decorate start rows with what is currently available in the warehouse
+     * each item type is consumed from.
+     *
+     * Read once, when the modal opens — this is a hint for the operator, never
+     * a gate. submitStart() re-reads the inventory through stockAvailable()
+     * and the parent re-validates again on apply, so a stale number here can
+     * neither let an unavailable start through nor block an available one.
+     */
+    protected function withAvailableStock(Event $event, array $rows): array
+    {
+        foreach ($rows as $i => $row) {
+            $warehouseId = $this->outWarehouseId($event, $row['item_type_id'] ?? null);
+            $itemId      = (int) ($row['item_id'] ?? 0);
+            $unitId      = (int) ($row['item_unit_id'] ?? 0);
+
+            $rows[$i]['warehouse_id']       = $warehouseId;
+            $rows[$i]['warehouse_name']     = $warehouseId ? $this->warehouseName($warehouseId) : null;
+            $rows[$i]['available_quantity'] = ($warehouseId && $itemId && $unitId)
+                ? $this->availableStock($warehouseId, $itemId, $unitId)
+                : null;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Available = on-hand - pending out - in process, the same formula
+     * stockAvailable() checks against. Null when the parent service can't be
+     * reached, so the modal degrades to "-" instead of failing to open.
+     */
+    protected function availableStock(int $warehouseId, int $itemId, int $itemUnitId): ?float
+    {
+        $key = "{$warehouseId}:{$itemId}:{$itemUnitId}";
+
+        if (!array_key_exists($key, $this->availabilityCache)) {
+            $this->availabilityCache[$key] = $this->inventory->available($warehouseId, $itemId, $itemUnitId);
+        }
+
+        return $this->availabilityCache[$key];
+    }
+
+    /** Warehouse names live in the parent service; fall back to the id when it's down. */
+    protected function warehouseName(int $warehouseId): string
+    {
+        if ($this->warehouseNames === null) {
+            // Unfiltered: a placeable can consume from a warehouse outside the
+            // production module, and this is only ever used to label a row.
+            $data = $this->api->get('/v1/warehouses')['data'] ?? [];
+            $this->warehouseNames = collect($data)->pluck('name', 'id')->all();
+        }
+
+        return $this->warehouseNames[$warehouseId] ?? "Warehouse #{$warehouseId}";
     }
 
     /**
@@ -876,24 +939,27 @@ class PlanBoard extends Component
 
     protected function prepareTerminateModal(Event $event): void
     {
-        $hasRecipe = (bool) $event->eventType?->has_recipe && $event->recipe;
+        $hasRecipe  = (bool) $event->eventType?->has_recipe && $event->recipe;
+        $batchCount = $this->batchCountFor($event);
 
         if ($hasRecipe) {
             $recipe = $event->recipe;
 
-            $this->actionOutputs = [$this->quantityRow(
+            $this->actionOutputs = [$this->producedRow(
                 $recipe->item_type_id,
                 $event->item_id ?: $recipe->item_id,
                 $recipe->item_unit_id,
                 (float) ($recipe->quantity_per_batch ?? 0),
+                $batchCount,
             )];
 
             $this->actionSideProducts = $recipe->sideProducts
-                ->map(fn(RecipeSideProduct $side) => $this->quantityRow(
+                ->map(fn(RecipeSideProduct $side) => $this->producedRow(
                     $side->item_type_id,
                     $side->item_id,
                     $side->item_unit_id,
                     (float) $side->quantity,
+                    $batchCount,
                     recipeSideProductId: $side->id,
                 ))
                 ->values()
@@ -903,8 +969,45 @@ class PlanBoard extends Component
         // Non-recipe events have nothing produced — the modal just collects
         // the end time and optional notes.
         $this->eventAction = array_merge($this->baseActionPayload($event, 'terminate'), [
-            'has_recipe' => $hasRecipe,
+            'has_recipe'  => $hasRecipe,
+            'batch_count' => $batchCount,
         ]);
+    }
+
+    /**
+     * How many batches this event runs. Recipe quantities are stated per
+     * batch, so produced amounts scale by it. batch_count is a free-text
+     * column and is only set on recipe events — anything missing or not a
+     * positive number means a single batch.
+     */
+    protected function batchCountFor(Event $event): float
+    {
+        $count = (float) str_replace(',', '', (string) $event->batch_count);
+
+        return $count > 0 ? $count : 1.0;
+    }
+
+    /**
+     * A produced-quantity row (finished item or side product). The recipe
+     * states the amount for one batch, so the planned total is that amount
+     * × the event's batch count; both halves stay on the row so the end modal
+     * can show the multiplication rather than just its result.
+     */
+    protected function producedRow(?int $itemTypeId, ?int $itemId, ?int $itemUnitId, float $perBatch, float $batchCount, ?int $recipeSideProductId = null): array
+    {
+        return array_merge(
+            $this->quantityRow(
+                $itemTypeId,
+                $itemId,
+                $itemUnitId,
+                $perBatch * $batchCount,
+                recipeSideProductId: $recipeSideProductId,
+            ),
+            [
+                'per_batch_quantity' => $perBatch,
+                'batch_count'        => $batchCount,
+            ]
+        );
     }
 
     protected function preparePauseModal(Event $event): void
@@ -1698,10 +1801,9 @@ class PlanBoard extends Component
         }
 
         foreach ($needed as $entry) {
-            $inv       = $this->inventory->find($warehouseId, $entry['item_id'], $entry['item_unit_id']);
-            $available = (float) ($inv['quantity'] ?? 0)
-                - (float) ($inv['quantity_pending_out'] ?? 0)
-                - (float) ($inv['quantity_in_process'] ?? 0);
+            // An unreadable inventory counts as zero here, as it always has:
+            // a start is never let through on a failed lookup.
+            $available = $this->inventory->available($warehouseId, $entry['item_id'], $entry['item_unit_id']) ?? 0.0;
 
             if ($entry['quantity'] > $available + 1e-6) {
                 $this->dispatch('swal:error', [
