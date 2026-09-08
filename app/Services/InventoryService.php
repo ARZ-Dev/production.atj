@@ -32,6 +32,33 @@ class InventoryService
         ])['data'] ?? [];
     }
 
+    /**
+     * What can still be claimed for one item/unit: on hand, minus what is
+     * already reserved out or held in process.
+     *
+     * Null means the read itself failed — the API layer turns an unreachable
+     * parent into an empty payload, which is otherwise indistinguishable from
+     * a warehouse that simply has no row for the item (a genuine 0).
+     */
+    public function available($warehouseId, $itemId, $itemUnitId): ?float
+    {
+        $response = $this->api->get('/v1/warehouse-inventories/find', [
+            'warehouse_id' => $warehouseId,
+            'item_id'      => $itemId,
+            'item_unit_id' => $itemUnitId,
+        ]);
+
+        if (!($response['success'] ?? false)) {
+            return null;
+        }
+
+        $row = $response['data'] ?? [];
+
+        return (float) ($row['quantity'] ?? 0)
+            - (float) ($row['quantity_pending_out'] ?? 0)
+            - (float) ($row['quantity_in_process'] ?? 0);
+    }
+
     // ─── Writes ──────────────────────────────────────────────
 
     /** Apply a batch of operations atomically. Returns the raw API response. */
