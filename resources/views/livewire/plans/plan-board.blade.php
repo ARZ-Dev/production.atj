@@ -320,7 +320,7 @@
     <!-- Event Status Action Modal (start / pause / resume / terminate) -->
     <div class="modal fade" id="eventActionModal" tabindex="-1" aria-labelledby="eventActionModalLabel" aria-hidden="true"
         data-bs-backdrop="static" wire:ignore.self>
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 @if($eventAction)
                 @php
@@ -348,9 +348,10 @@
                     @if(count($actionInputs))
                     <p class="text-muted mb-2" style="font-size: 12px;">
                         @if($startHasRecipe)
-                        Record the actual quantity used for each recipe item, then start the event.
+                        Used quantities are pre-filled from the recipe — adjust any that differed, then start the event.
                         @else
-                        Record the actual quantity used for each item — leave unused items empty — then start the event.
+                        Used quantities are pre-filled from this event type's planned amounts — adjust any that
+                        differed, clear the items you didn't use, then start the event.
                         @endif
                     </p>
                     @include('livewire.plans.partials._action-quantity-table', [
@@ -428,6 +429,28 @@
                         'showPerBatch' => true,
                     ])
                     @endif
+                    @endif
+
+                    @if(count($actionReconciliation))
+                    <div class="fw-bold mb-1 mt-3" style="font-size: 13px;">
+                        <i class="bi bi-clipboard-check me-1 text-primary"></i> Used Items — Actual
+                    </div>
+                    <p class="text-muted mb-2" style="font-size: 12px;">
+                        These quantities were taken when the event started but couldn't be verified then.
+                        Enter what was really used; anything left over is booked back into stock or
+                        written off as waste, on its own document.
+                    </p>
+                    @include('livewire.plans.partials._end-reconciliation-table', [
+                        'rows'  => $actionReconciliation,
+                        'model' => 'actionReconciliation',
+                    ])
+                    <div class="text-muted mb-2" style="font-size: 11px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Only the actual used quantity is deducted from stock. A leftover sent
+                        <strong>back to stock</strong> creates an approved Stock In and leaves the on-hand
+                        unchanged; a leftover sent to <strong>waste</strong> creates an approved Waste and
+                        deducts it. Both name this event in their notes.
+                    </div>
                     @endif
 
                     <div class="row g-3 mt-0">
@@ -887,7 +910,17 @@
                                             <td>{{ $qty['item_name'] }}</td>
                                             <td>{{ $qty['unit_name'] ?? '—' }}</td>
                                             <td class="text-end">{{ $qty['planned'] + 0 }}</td>
-                                            <td class="text-end">{{ $qty['actual'] + 0 }}</td>
+                                            <td class="text-end">
+                                                {{ $qty['actual'] + 0 }}
+                                                @if($qty['reconciled'])
+                                                <div class="aqt-batch-math">
+                                                    used {{ $qty['reconciled']['used'] + 0 }}@if($qty['reconciled']['remaining'] > 0),
+                                                    {{ $qty['reconciled']['remaining'] + 0 }}
+                                                    {{ $qty['reconciled']['action'] === 'waste' ? 'wasted' : 'back to stock' }}
+                                                    @endif
+                                                </div>
+                                                @endif
+                                            </td>
                                             <td class="text-end">{{ $qty['percentage'] !== null ? ($qty['percentage'] + 0) . '%' : '—' }}</td>
                                         </tr>
                                         @endforeach

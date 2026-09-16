@@ -21,6 +21,16 @@ class EventQuantity extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * The Stock In / Waste document the unused part of this quantity was
+     * filed on when the event ended. Only set on `input` rows of events whose
+     * type is flagged `start_items_unverifiable`.
+     */
+    public function remainingDocument()
+    {
+        return $this->morphTo();
+    }
+
     public function statusLog()
     {
         return $this->belongsTo(EventStatusLog::class, 'event_status_log_id');

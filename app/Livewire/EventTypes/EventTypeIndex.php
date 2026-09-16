@@ -16,6 +16,9 @@ class EventTypeIndex extends Component
     public $event_type_id;
     public $editing = false;
     public bool $has_recipe = false;
+    // Recipe event types only: the consumed quantities can't be measured when
+    // the event starts, so the operator records the planned amounts.
+    public bool $start_items_unverifiable = false;
     public $duration = null;
     public string $color = '#818cf8';
     public $item_type_ids = [];
@@ -52,6 +55,7 @@ class EventTypeIndex extends Component
         $this->event_type_id = null;
         $this->name = '';
         $this->has_recipe = false;
+        $this->start_items_unverifiable = false;
         $this->duration = null;
         $this->color = '#818cf8';
         $this->item_type_ids = [];
@@ -76,6 +80,7 @@ class EventTypeIndex extends Component
         $this->event_type_id = $eventType->id;
         $this->name = $eventType->name;
         $this->has_recipe = (bool) $eventType->has_recipe;
+        $this->start_items_unverifiable = (bool) $eventType->start_items_unverifiable;
         $this->duration = $eventType->duration;
         $this->color = $eventType->color ?? '#818cf8';
         $this->item_type_ids = $eventType->item_type_ids ?? [];
@@ -96,6 +101,9 @@ class EventTypeIndex extends Component
     {
         if ($value) {
             $this->duration = null;
+        } else {
+            // The flag only applies to recipe event types.
+            $this->start_items_unverifiable = false;
         }
 
         // Recipe event types don't carry a fixed items list.
@@ -160,6 +168,7 @@ class EventTypeIndex extends Component
         return [
             'name' => 'required|string|max:255',
             'has_recipe' => 'boolean',
+            'start_items_unverifiable' => 'boolean',
             'duration' => 'required_if:has_recipe,false|nullable|integer|min:1',
             'color' => 'required|string|max:7',
             'item_type_ids' => 'nullable|array',
@@ -173,6 +182,7 @@ class EventTypeIndex extends Component
         $data = [
             'name' => $this->name,
             'has_recipe' => $this->has_recipe,
+            'start_items_unverifiable' => $this->has_recipe ? $this->start_items_unverifiable : false,
             'duration' => $this->has_recipe ? null : $this->duration,
             'color' => $this->color,
             'item_type_ids' => array_map('intval', $this->item_type_ids ?? []),

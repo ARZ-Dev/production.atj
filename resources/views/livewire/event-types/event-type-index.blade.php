@@ -132,6 +132,24 @@
                         </div>
                     </div>
 
+                    @if($has_recipe)
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   id="et_start_items_unverifiable"
+                                   wire:model="start_items_unverifiable"
+                                   @checked($start_items_unverifiable)>
+                            <label class="form-check-label" for="et_start_items_unverifiable">
+                                ON START EVENT USED ITEMS CAN'T BE VERIFIED
+                                <span class="text-muted small d-block">
+                                    Tick this when the quantities consumed by these events can't be
+                                    measured as the event starts.
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    @endif
+
                     @if(!$has_recipe)
                     <div class="mb-3">
                         <label for="et_duration" class="form-label">Duration (minutes) <span class="text-danger">*</span></label>

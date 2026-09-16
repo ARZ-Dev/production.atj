@@ -15,6 +15,9 @@ use App\Models\Preparation;
 use App\Models\ProductionLine;
 use App\Models\RecipeInput;
 use App\Models\RecipeSideProduct;
+use App\Models\ReportItem;
+use App\Models\StockIn;
+use App\Models\Waste;
 use App\Services\ApiService;
 use App\Services\InventoryService;
 use App\Services\PlanCarryOverService;
@@ -52,6 +55,8 @@ class PlanBoard extends Component
     public array $actionInputs = [];          // start: recipe input rows
     public array $actionOutputs = [];         // terminate: produced item rows
     public array $actionSideProducts = [];    // terminate: side product rows
+    public array $actionReconciliation = [];  // terminate: leftover reconciliation rows
+                                              // (unverifiable-start event types only)
     public ?string $actionNotes = null;       // start/end global notes
     public ?string $actionReason = null;      // pause/resume reason
     public ?string $actionTime = null;        // when the action happened (defaults to now)
@@ -811,6 +816,7 @@ class PlanBoard extends Component
         $this->actionInputs       = [];
         $this->actionOutputs      = [];
         $this->actionSideProducts = [];
+        $this->actionReconciliation = [];
         $this->actionNotes        = null;
         $this->actionReason       = null;
         $this->actionTime         = now()->format('Y-m-d\TH:i');
@@ -854,11 +860,45 @@ class PlanBoard extends Component
             $this->actionInputs = $this->eventTypeItemRows($event->eventType);
         }
 
+        $this->actionInputs = $this->withPlannedAsActual($this->actionInputs);
         $this->actionInputs = $this->withAvailableStock($event, $this->actionInputs);
 
         $this->eventAction = array_merge($this->baseActionPayload($event, 'start'), [
             'has_recipe' => $hasRecipe,
         ]);
+    }
+
+    /**
+     * Seed each start row's used quantity with its planned one, so the
+     * operator only corrects what actually differed instead of retyping every
+     * line. The field stays editable and nothing downstream tells a pre-filled
+     * value apart from a typed one — the quantities are still validated and
+     * still checked against live stock on submit.
+     */
+    protected function withPlannedAsActual(array $rows): array
+    {
+        foreach ($rows as $i => $row) {
+            $planned = (float) ($row['planned_quantity'] ?? 0);
+
+            if ($planned <= 0) {
+                continue;
+            }
+
+            $rows[$i]['actual_quantity'] = $this->normalizeQuantity($planned);
+            $rows[$i]['percentage']      = $this->percentageOf($planned, $planned);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * A quantity as it should sit in a bound number input: whole amounts as
+     * ints so the field reads "30" rather than "30.0" next to a disabled
+     * column showing "30".
+     */
+    protected function normalizeQuantity(float $quantity)
+    {
+        return $quantity == (int) $quantity ? (int) $quantity : $quantity;
     }
 
     /**
@@ -966,12 +1006,59 @@ class PlanBoard extends Component
                 ->all();
         }
 
+        // Event types whose consumed quantities can't be verified at start were
+        // started on their planned amounts; ending reconciles them against what
+        // was really used and files the leftover.
+        $this->actionReconciliation = $this->reconciliationRows($event);
+
         // Non-recipe events have nothing produced — the modal just collects
         // the end time and optional notes.
         $this->eventAction = array_merge($this->baseActionPayload($event, 'terminate'), [
             'has_recipe'  => $hasRecipe,
             'batch_count' => $batchCount,
         ]);
+    }
+
+    /**
+     * Leftover-reconciliation rows for the end modal: one per input quantity
+     * recorded at start, with the actual used quantity pre-filled from it so
+     * an event that consumed exactly what it took needs no edits.
+     *
+     * Empty unless the event type is flagged `start_items_unverifiable` — every
+     * other event type keeps the original behaviour of confirming out exactly
+     * what was held.
+     */
+    protected function reconciliationRows(Event $event): array
+    {
+        if (!$event->eventType?->start_items_unverifiable) {
+            return [];
+        }
+
+        return $this->reservedInputQuantities($event)
+            ->map(function (EventQuantity $qty) use ($event) {
+                $start = (float) $qty->actual_quantity;
+
+                return [
+                    'event_quantity_id'    => $qty->id,
+                    'item_type_id'         => $qty->item_type_id ? (int) $qty->item_type_id : null,
+                    'item_type_name'       => $this->itemTypeName($qty->item_type_id ? (int) $qty->item_type_id : null),
+                    'item_id'              => $qty->item_id,
+                    'item_unit_id'         => $qty->item_unit_id,
+                    'item_name'            => $qty->item_name ?: ($qty->item_id ? "Item #{$qty->item_id}" : '—'),
+                    'unit_name'            => $qty->unit_name,
+                    // Where it was held; rows written before warehouse_id existed
+                    // fall back to the placeable's routing, as confirm-out does.
+                    'warehouse_id'         => $qty->warehouse_id
+                        ? (int) $qty->warehouse_id
+                        : $this->outWarehouseId($event, $qty->item_type_id ? (int) $qty->item_type_id : null),
+                    'start_quantity'       => $start,
+                    'actual_used_quantity' => $this->normalizeQuantity($start),
+                    'remaining_quantity'   => 0,
+                    'remaining_action'     => null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -1197,6 +1284,11 @@ class PlanBoard extends Component
             );
         }
 
+        // Live "remaining" while typing the actual used quantity at end.
+        if (preg_match('/^actionReconciliation\.(\d+)\.actual_used_quantity$/', $property, $matches)) {
+            $this->recalcRemaining((int) $matches[1]);
+        }
+
         // Picking an emergency event type loads the items it may consume.
         if (preg_match('/^pauseActivityRows\.(\d+)\.event_type_id$/', $property, $matches)) {
             $this->loadPauseActivityItems((int) $matches[1], $value);
@@ -1222,6 +1314,34 @@ class PlanBoard extends Component
             && strtotime((string) $value) !== false
         ) {
             $this->eventAction['actual_duration'] = $this->minutesBetween($this->eventAction['paused_at_raw'], $value);
+        }
+    }
+
+    /**
+     * Remaining = what was taken for the event − what was actually used.
+     * Recomputed server-side so the disabled field and the inventory movement
+     * can never disagree with the entered quantity. Clamped at zero: using
+     * more than was taken is rejected by validation, not silently negated.
+     *
+     * A row with nothing left over needs no disposition, so the dropdown is
+     * cleared (and disabled in the view) as soon as it balances.
+     */
+    protected function recalcRemaining(int $index): void
+    {
+        if (!isset($this->actionReconciliation[$index])) {
+            return;
+        }
+
+        $row  = $this->actionReconciliation[$index];
+        $used = $row['actual_used_quantity'];
+        $used = is_numeric($used) ? (float) $used : 0.0;
+
+        $remaining = max(0.0, round((float) ($row['start_quantity'] ?? 0) - $used, 4));
+
+        $this->actionReconciliation[$index]['remaining_quantity'] = $remaining;
+
+        if ($remaining <= 0) {
+            $this->actionReconciliation[$index]['remaining_action'] = null;
         }
     }
 
@@ -1898,12 +2018,22 @@ class PlanBoard extends Component
 
     protected function submitTerminate(Event $event): void
     {
+        // Recompute every leftover server-side first: a row whose debounced
+        // update never committed must not reach the inventory with a stale
+        // figure, and validation below reads these numbers.
+        foreach (array_keys($this->actionReconciliation) as $index) {
+            $this->recalcRemaining($index);
+        }
+
         $this->validate(
-            [
-                'actionOutputs.*.actual_quantity'      => 'required|numeric|min:0',
-                'actionSideProducts.*.actual_quantity' => 'required|numeric|min:0',
-            ],
-            [],
+            array_merge(
+                [
+                    'actionOutputs.*.actual_quantity'      => 'required|numeric|min:0',
+                    'actionSideProducts.*.actual_quantity' => 'required|numeric|min:0',
+                ],
+                $this->reconciliationRules()
+            ),
+            $this->reconciliationMessages(),
             [
                 'actionOutputs.*.actual_quantity'      => 'produced quantity',
                 'actionSideProducts.*.actual_quantity' => 'produced quantity',
@@ -1935,10 +2065,16 @@ class PlanBoard extends Component
             // the warehouse each was held in — item types can be routed to
             // different stores. Produced item + side products: added into the
             // single finished-goods store.
-            $ops = $this->confirmOutOpsByWarehouse(
-                $this->reservedInputQuantities($event),
-                $this->outWarehouseId($event)
-            );
+            //
+            // Event types whose start quantities can't be verified take the
+            // reconciled route instead: only what was really used is consumed,
+            // and the leftover is filed as its own Stock In / Waste document.
+            $ops = $this->actionReconciliation
+                ? $this->settleLeftovers($event, $endedAt)
+                : $this->confirmOutOpsByWarehouse(
+                    $this->reservedInputQuantities($event),
+                    $this->outWarehouseId($event)
+                );
 
             if ($inWarehouseId) {
                 $ops = array_merge($ops, $this->stockInOps($inWarehouseId, $produced));
@@ -1964,6 +2100,184 @@ class PlanBoard extends Component
         }
 
         $this->closeActionModal();
+    }
+
+    /**
+     * Validation for the leftover table. Empty — so no extra rules at all —
+     * unless the event type is flagged.
+     *
+     * Rules are built per row rather than with a `*` wildcard: the cap is that
+     * row's own start quantity, and a disposition is only demanded of rows that
+     * actually have something left over. It also has to be `required` rather
+     * than a closure, because a non-implicit rule is skipped on the empty value
+     * ("" from the select, or null) that this is exactly meant to catch.
+     */
+    protected function reconciliationRules(): array
+    {
+        $rules = [];
+
+        foreach ($this->actionReconciliation as $i => $row) {
+            $start     = (float) ($row['start_quantity'] ?? 0);
+            $remaining = (float) ($row['remaining_quantity'] ?? 0);
+
+            $rules["actionReconciliation.{$i}.actual_used_quantity"] = ['required', 'numeric', 'min:0', "max:{$start}"];
+
+            $rules["actionReconciliation.{$i}.remaining_action"] = $remaining > 0
+                ? ['required', 'in:stock_in,waste']
+                : ['nullable'];
+        }
+
+        return $rules;
+    }
+
+    /** Row-specific wording for the leftover rules above. */
+    protected function reconciliationMessages(): array
+    {
+        $messages = [];
+
+        foreach ($this->actionReconciliation as $i => $row) {
+            $start = $this->trimNumber((float) ($row['start_quantity'] ?? 0));
+
+            $messages["actionReconciliation.{$i}.actual_used_quantity.required"] = 'Enter how much was actually used.';
+            $messages["actionReconciliation.{$i}.actual_used_quantity.max"]      = "You can't use more than the {$start} taken for this event.";
+            $messages["actionReconciliation.{$i}.remaining_action.required"]     = 'Choose what happens to the remaining quantity.';
+            $messages["actionReconciliation.{$i}.remaining_action.in"]           = 'Choose what happens to the remaining quantity.';
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Reconcile an event whose consumed quantities couldn't be verified at
+     * start: confirm out only what was really used, and file the leftover as a
+     * confirmed Stock In (booked back into the store) or Waste (written off)
+     * against the warehouse the item was held in.
+     *
+     * The documents and the updated quantity rows are written here, inside the
+     * caller's transaction; the inventory operations are returned for it to
+     * apply as its last step.
+     *
+     * The two dispositions unwind the in-process hold differently, on purpose:
+     *
+     *   - **Stock In** — the leftover leaves the store on the event's ticket
+     *     (`confirm_process_out`) and the document's own `reserve_in` +
+     *     `confirm_in` puts it back, so on-hand nets out unchanged and the
+     *     document's arithmetic is genuinely applied rather than implied.
+     *   - **Waste** — the hold is simply released (`release_process`, on-hand
+     *     untouched) and the document's `reserve_out` + `confirm_out` removes
+     *     it, exactly as approving a hand-written waste would.
+     *
+     * Either way the total confirmed out of the warehouse equals what was held,
+     * so the on-hand a successful end requires is unchanged from before.
+     */
+    protected function settleLeftovers(Event $event, Carbon $endedAt): array
+    {
+        $ops       = [];
+        $documents = [];   // "warehouseId:action" => one document per group
+
+        foreach ($this->actionReconciliation as $row) {
+            $quantity = EventQuantity::find($row['event_quantity_id'] ?? null);
+
+            // The modal's rows are client state: only settle quantities that
+            // really belong to the event being ended.
+            if (!$quantity || (int) $quantity->event_id !== (int) $event->id || $quantity->source !== 'input') {
+                continue;
+            }
+
+            $warehouseId = (int) ($row['warehouse_id'] ?? 0);
+            $used        = (float) ($row['actual_used_quantity'] ?? 0);
+            $remaining   = (float) ($row['remaining_quantity'] ?? 0);
+            $action      = $remaining > 0 ? ($row['remaining_action'] ?? null) : null;
+            $document    = null;
+
+            // No source warehouse configured: that leg of the inventory update
+            // is skipped, as it always has been — but the figures are still
+            // recorded so the history shows what happened.
+            if ($warehouseId) {
+                if ($used > 0) {
+                    $ops[] = InventoryService::confirmProcessOut($warehouseId, $quantity->item_id, $quantity->item_unit_id, $used, $used);
+                }
+
+                if ($remaining > 0 && $action && $quantity->item_id && $quantity->item_unit_id) {
+                    $key      = "{$warehouseId}:{$action}";
+                    $document = $documents[$key] ??= $this->leftoverDocument($event, $action, $warehouseId, $endedAt);
+
+                    ReportItem::create([
+                        ($action === 'stock_in' ? 'stock_in_id' : 'waste_id') => $document->id,
+                        'warehouse_id' => $warehouseId,
+                        'item_id'      => $quantity->item_id,
+                        'item_unit_id' => $quantity->item_unit_id,
+                        'quantity'     => $remaining,
+                    ]);
+
+                    $ops = array_merge($ops, $this->leftoverOps($action, $warehouseId, $quantity->item_id, $quantity->item_unit_id, $remaining));
+                }
+            }
+
+            $quantity->update([
+                'actual_used_quantity'    => $used,
+                'remaining_quantity'      => $remaining,
+                'remaining_action'        => $action,
+                'remaining_document_type' => $document ? $document::class : null,
+                'remaining_document_id'   => $document?->id,
+                'confirmed_at'            => $endedAt,
+            ]);
+        }
+
+        return $ops;
+    }
+
+    /** The inventory operations that move one leftover to its chosen destination. */
+    protected function leftoverOps(string $action, int $warehouseId, $itemId, $itemUnitId, float $quantity): array
+    {
+        if ($action === 'stock_in') {
+            return [
+                InventoryService::confirmProcessOut($warehouseId, $itemId, $itemUnitId, $quantity, $quantity),
+                InventoryService::reserveIn($warehouseId, $itemId, $itemUnitId, $quantity),
+                InventoryService::confirmIn($warehouseId, $itemId, $itemUnitId, $quantity, $quantity),
+            ];
+        }
+
+        return [
+            InventoryService::releaseProcess($warehouseId, $itemId, $itemUnitId, $quantity),
+            InventoryService::reserveOut($warehouseId, $itemId, $itemUnitId, $quantity),
+            InventoryService::confirmOut($warehouseId, $itemId, $itemUnitId, $quantity, $quantity),
+        ];
+    }
+
+    /** An approved Stock In / Waste for one warehouse's share of the leftover. */
+    protected function leftoverDocument(Event $event, string $action, int $warehouseId, Carbon $endedAt)
+    {
+        $attributes = [
+            'warehouse_id' => $warehouseId,
+            'status'       => 'approved',
+            'notes'        => $this->leftoverDocumentNote($event, $action, $endedAt),
+        ];
+
+        return $action === 'stock_in' ? StockIn::create($attributes) : Waste::create($attributes);
+    }
+
+    /**
+     * Says on the document itself where it came from — these are created
+     * without anyone filling a form, so the trail back to the event has to be
+     * readable from the Stock In / Waste page alone.
+     */
+    protected function leftoverDocumentNote(Event $event, string $action, Carbon $endedAt): string
+    {
+        $planDate = $event->plan?->date ? Carbon::parse($event->plan->date)->format('d M Y') : null;
+
+        return sprintf(
+            'Auto-created from production event #%d "%s"%s%s, ended %s by %s. %s',
+            $event->id,
+            $event->name,
+            $event->eventType?->name ? " ({$event->eventType->name})" : '',
+            $planDate ? ", planned for {$planDate}" : '',
+            $endedAt->format('d M Y H:i'),
+            authUser()?->name ?: 'system',
+            $action === 'stock_in'
+                ? 'Quantities taken for the event but not used, booked back into stock.'
+                : 'Quantities taken for the event but not used, written off as waste.'
+        );
     }
 
     /**
@@ -2106,6 +2420,13 @@ class PlanBoard extends Component
                     'planned'    => (float) $qty->planned_quantity,
                     'actual'     => (float) $qty->actual_quantity,
                     'percentage' => $qty->percentage !== null ? (float) $qty->percentage : null,
+                    // Set only once an unverifiable-start event has been ended
+                    // and its leftover routed.
+                    'reconciled' => $qty->actual_used_quantity === null ? null : [
+                        'used'      => (float) $qty->actual_used_quantity,
+                        'remaining' => (float) $qty->remaining_quantity,
+                        'action'    => $qty->remaining_action,
+                    ],
                 ])->all(),
             ])->all(),
         ];

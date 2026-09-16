@@ -236,6 +236,22 @@ class WarehouseInventoryIndex extends Component
         if (in_array($eq->source, ['input', 'emergency'], true)) {
             $isEmergency = $eq->source === 'emergency';
 
+            // What the event actually took out of this warehouse when it ended.
+            // Normally all of it. On an unverifiable-start event the leftover
+            // was reconciled: a leftover written off leaves on its own Waste
+            // document, so only the used part is the event's deduction — while
+            // a leftover booked back leaves with the event and returns on a
+            // Stock In, which is already a separate row in this timeline.
+            $consumed = $eq->remaining_action === 'waste' && $eq->actual_used_quantity !== null
+                ? (float) $eq->actual_used_quantity
+                : $qty;
+
+            // The whole amount was written off: nothing is left for the event
+            // itself to deduct, and the Waste document carries the movement.
+            if ($confirmed && $consumed <= 0) {
+                return null;
+            }
+
             return [
                 'type_label'      => $isEmergency ? 'Emergency Use' : 'Event Use',
                 'badge_class'     => $isEmergency ? 'bg-danger' : 'bg-primary',
@@ -243,9 +259,9 @@ class WarehouseInventoryIndex extends Component
                 'view_url'        => $viewUrl,
                 'view_permission' => 'production.event-create',
                 'status'          => $confirmed ? 'consumed' : 'in process',
-                'qty'             => $qty,
+                'qty'             => $confirmed ? $consumed : $qty,
                 'bucket'          => $confirmed ? 'on_hand' : 'in_process',
-                'delta'           => $confirmed ? -$qty : 0,
+                'delta'           => $confirmed ? -$consumed : 0,
             ];
         }
 

@@ -14,6 +14,7 @@ class EventType extends Model
 
     protected $casts = [
         'has_recipe' => 'boolean',
+        'start_items_unverifiable' => 'boolean',
         'item_type_ids' => 'array',
     ];
 
