@@ -529,6 +529,14 @@
     max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* End modal: a leftover still waiting to be routed to stock or waste */
+.aqt-table td .form-control.aqt-remaining:disabled {
+    background: rgba(255,193,7,.14);
+    border-color: rgba(255,193,7,.45);
+    color: #664d03;
+    font-weight: 600;
+}
+
 /* End modal: how a produced total was reached (per batch × batches) */
 .aqt-batch-math {
     margin-top: 3px; font-size: 10px; color: #8a91a0;
