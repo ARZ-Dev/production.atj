@@ -754,14 +754,15 @@
                                         <td>
                                             <input type="number" step="any" min="0" placeholder="0"
                                                 class="form-control form-control-sm @error("pauseActivityRows.{$i}.items.{$j}.quantity") is-invalid @enderror"
-                                                wire:model.live.debounce.600ms="pauseActivityRows.{{ $i }}.items.{{ $j }}.quantity">
+                                                wire:model="pauseActivityRows.{{ $i }}.items.{{ $j }}.quantity"
+                                                data-qty-input data-planned="{{ $emItem['planned_quantity'] ?? '' }}">
                                             @error("pauseActivityRows.{$i}.items.{$j}.quantity")
                                             <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
                                         </td>
                                         <td>
                                             <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control"
+                                                <input type="text" class="form-control" data-qty-percent
                                                     value="{{ ($emItem['percentage'] ?? null) !== null ? $emItem['percentage'] + 0 : '' }}" disabled>
                                                 <span class="input-group-text">%</span>
                                             </div>
@@ -1097,6 +1098,77 @@
                 });
             });
         };
+
+        // ─── Live maths in the status-action modals ──────────────────────
+        // The quantity inputs bind deferred (plain wire:model): nothing is
+        // sent while the operator types, so a response already in flight can
+        // never write a stale value back over the character just typed — the
+        // "last digit appears then disappears" bug. The derived columns are
+        // recomputed here instead, mirroring PlanBoard::percentageOf() and
+        // ::recalcRemaining(); the server recomputes both from the submitted
+        // figures, so these are display only.
+        //
+        // Delegated on document so they keep working across Livewire morphs.
+
+        // PHP's round(), which differs from JS twice over: it takes halves
+        // away from zero rather than up, and it rounds the decimal the digits
+        // spell rather than the binary double they land on (1.005 → 1.01, not
+        // 1.00). Shifting through exponent notation re-parses the decimal, so
+        // both agree and a figure cannot change when the server recomputes it.
+        const roundTo = (value, decimals) => {
+            const magnitude = Math.abs(value);
+            const factor    = Math.pow(10, decimals);
+            const shifted   = Number(`${magnitude}e${decimals}`);
+            const rounded   = isFinite(shifted) ? Number(`${Math.round(shifted)}e-${decimals}`) : NaN;
+
+            return Math.sign(value) * (isFinite(rounded) ? rounded : Math.round(magnitude * factor) / factor);
+        };
+
+        document.addEventListener('input', (e) => {
+            const input = e.target.closest('[data-qty-input]');
+            if (!input) return;
+
+            const output = input.closest('tr')?.querySelector('[data-qty-percent]');
+            if (!output) return;
+
+            const planned = parseFloat(input.dataset.planned);
+            const actual  = parseFloat(input.value);
+
+            output.value = (input.value === '' || isNaN(actual) || !(planned > 0))
+                ? ''
+                : String(roundTo((actual - planned) / planned * 100, 2));
+        });
+
+        document.addEventListener('input', (e) => {
+            const input = e.target.closest('[data-recon-input]');
+            if (!input) return;
+
+            const row       = input.closest('tr');
+            const output    = row?.querySelector('[data-recon-remaining]');
+            const selectEl  = row?.querySelector('[data-recon-action]');
+            if (!output) return;
+
+            const start = parseFloat(input.dataset.start) || 0;
+            const used  = parseFloat(input.value);
+            const remaining = Math.max(0, roundTo(start - (isNaN(used) ? 0 : used), 4));
+
+            output.value = String(remaining);
+            output.classList.toggle('aqt-remaining', remaining > 0);
+
+            if (!selectEl) return;
+
+            selectEl.disabled = remaining <= 0;
+
+            const placeholder = selectEl.querySelector('option[value=""]');
+            if (placeholder) placeholder.textContent = remaining > 0 ? 'Select…' : '—';
+
+            // A row that balances needs no disposition — clear it the way the
+            // server does, notifying wire:model with a native change event.
+            if (remaining <= 0 && selectEl.value !== '') {
+                selectEl.value = '';
+                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
 
         const initAll = () => {
             initCalendarDrag();

@@ -1270,7 +1270,10 @@ class PlanBoard extends Component
     }
 
     /**
-     * Live recalculations while typing in the action modals.
+     * Recalculations for the action modals. The quantity inputs bind deferred,
+     * so these run when the modal is submitted (or on the next round trip)
+     * rather than per keystroke — the browser keeps the derived columns live
+     * while typing, using the same formulas.
      */
     public function updated($property, $value): void
     {
@@ -1284,7 +1287,7 @@ class PlanBoard extends Component
             );
         }
 
-        // Live "remaining" while typing the actual used quantity at end.
+        // Keep "remaining" in step with the actual used quantity at end.
         if (preg_match('/^actionReconciliation\.(\d+)\.actual_used_quantity$/', $property, $matches)) {
             $this->recalcRemaining((int) $matches[1]);
         }
@@ -1294,7 +1297,7 @@ class PlanBoard extends Component
             $this->loadPauseActivityItems((int) $matches[1], $value);
         }
 
-        // Live "% difference" for an emergency item's used quantity.
+        // "% difference" for an emergency item's used quantity.
         if (preg_match('/^pauseActivityRows\.(\d+)\.items\.(\d+)\.quantity$/', $property, $matches)) {
             $rowIndex  = (int) $matches[1];
             $itemIndex = (int) $matches[2];

@@ -8,6 +8,12 @@
     original index as the group key so the wire:model bindings stay pointed at
     the right row.
 
+    The actual-used input binds deferred (plain wire:model) so a response in
+    flight can never overwrite what is being typed; "Remaining Qty" and the
+    disposition dropdown are kept in step by the data-recon-* handler in
+    plan-board.blade.php, mirroring PlanBoard::recalcRemaining(), which runs
+    again over every row at the top of submitTerminate().
+
     Expects: $rows (array), $model (Livewire property name)
 --}}
 @php
@@ -48,18 +54,19 @@
                 <td>
                     <input type="number" step="any" min="0"
                         class="form-control form-control-sm @error("{$model}.{$i}.actual_used_quantity") is-invalid @enderror"
-                        wire:model.live.debounce.600ms="{{ $model }}.{{ $i }}.actual_used_quantity" placeholder="0">
+                        wire:model="{{ $model }}.{{ $i }}.actual_used_quantity" placeholder="0"
+                        data-recon-input data-start="{{ ($row['start_quantity'] ?? 0) + 0 }}">
                     @error("{$model}.{$i}.actual_used_quantity")
                     <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </td>
                 <td>
                     <input type="number" class="form-control form-control-sm {{ $remaining > 0 ? 'aqt-remaining' : '' }}"
-                        value="{{ $remaining + 0 }}" disabled>
+                        value="{{ $remaining + 0 }}" disabled data-recon-remaining>
                 </td>
                 <td>
                     <select class="form-select form-select-sm @error("{$model}.{$i}.remaining_action") is-invalid @enderror"
-                        wire:model="{{ $model }}.{{ $i }}.remaining_action"
+                        wire:model="{{ $model }}.{{ $i }}.remaining_action" data-recon-action
                         @disabled($remaining <= 0)>
                         <option value="">{{ $remaining > 0 ? 'Select…' : '—' }}</option>
                         <option value="stock_in" @selected(($row['remaining_action'] ?? null) === 'stock_in')>Back to stock</option>
