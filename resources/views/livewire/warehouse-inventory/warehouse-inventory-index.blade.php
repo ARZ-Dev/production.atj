@@ -45,6 +45,32 @@
             </h5>
         </div>
         <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <span class="text-muted small">
+                    @if(trim($itemSearch) !== '')
+                        Showing {{ count($units) }} of {{ $totalUnits }}
+                        {{ $totalUnits == 1 ? 'item' : 'items' }} matching "{{ $itemSearch }}"
+                    @endif
+                </span>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <div class="input-group input-group-sm" style="min-width: 260px;">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        {{-- .unintrusive keeps the response from writing the server's
+                             copy back over what is still being typed. --}}
+                        <input type="text" id="item_search" class="form-control"
+                               placeholder="{{ $warehouse_id ? 'Search item…' : 'Select a warehouse first' }}"
+                               autocomplete="off"
+                               @disabled(!$warehouse_id)
+                               wire:model.live.debounce.300ms.unintrusive="itemSearch">
+                    </div>
+                    @if(trim($itemSearch) !== '')
+                    <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap"
+                            wire:click="$set('itemSearch', '')">
+                        <i class="bi bi-x-lg me-1"></i>Clear search
+                    </button>
+                    @endif
+                </div>
+            </div>
             <div wire:loading wire:target="getData">
                 <div class="text-center py-5">
                     <div class="spinner-border text-primary" role="status">
@@ -67,7 +93,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($warehouseUnits as $index => $unit)
+                        @forelse($units as $index => $unit)
                         <tr>
                             <td>{{ $index + 1 }}</td>
                             <td>{{ $unit->item ?? 'N/A' }}</td>
@@ -103,7 +129,13 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="8" class="text-center">No items found for this warehouse</td>
+                            <td colspan="8" class="text-center">
+                                @if(trim($itemSearch) !== '')
+                                    No items match "{{ $itemSearch }}" in this warehouse
+                                @else
+                                    No items found for this warehouse
+                                @endif
+                            </td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -211,7 +243,7 @@
                                         <th>Qty</th>
                                         <th>In Process</th>
                                         <th>Stock Total</th>
-                                        <th>Date</th>
+                                        <th>Date &amp; Time</th>
                                     </tr>
                                 </thead>
                                 <tbody>

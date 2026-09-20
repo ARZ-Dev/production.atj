@@ -14,6 +14,13 @@
               $showPerBatch (bool, default false) — add a "Per Batch" column
               and spell out "per batch × batches" under the total, for
               produced quantities that scale with the event's batch count.
+
+    The quantity input binds deferred (plain wire:model), so nothing is sent
+    while the operator types and an in-flight response can never write a stale
+    value back over the character just typed. The "% Difference" cell is
+    therefore recomputed in the browser (see the data-qty-* handler in
+    plan-board.blade.php); the server recomputes it from the same figures when
+    the modal is submitted.
 --}}
 @php
     $showOriginal  = $showOriginal ?? true;
@@ -101,7 +108,8 @@
                 <td>
                     <input type="number" step="any" min="0"
                         class="form-control form-control-sm @error("{$model}.{$i}.actual_quantity") is-invalid @enderror"
-                        wire:model.live.debounce.600ms="{{ $model }}.{{ $i }}.actual_quantity" placeholder="0">
+                        wire:model="{{ $model }}.{{ $i }}.actual_quantity" placeholder="0"
+                        data-qty-input data-planned="{{ $row['planned_quantity'] ?? '' }}">
                     @error("{$model}.{$i}.actual_quantity")
                     <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
@@ -109,8 +117,8 @@
                 @if($showOriginal)
                 <td>
                     <div class="input-group input-group-sm">
-                        <input type="text" class="form-control"
-                            value="{{ $row['percentage'] !== null ? $row['percentage'] + 0 : '' }}" disabled>
+                        <input type="text" class="form-control" data-qty-percent
+                            value="{{ ($row['percentage'] ?? null) !== null ? $row['percentage'] + 0 : '' }}" disabled>
                         <span class="input-group-text">%</span>
                     </div>
                 </td>

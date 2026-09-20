@@ -20,6 +20,9 @@ class WarehouseInventoryIndex extends Component
     public $selectedWarehouse;
     public $selectedInventory;
 
+    // Free-text filter over the item names in the statement table
+    public string $itemSearch = '';
+
     // Active bucket filter for the activity popup: all|on_hand|pending_in|pending_out|in_process
     public string $activityFilter = 'all';
 
@@ -72,6 +75,12 @@ class WarehouseInventoryIndex extends Component
     protected function unitName(int $itemId, int $unitId): string
     {
         return $this->unitMap[$itemId][$unitId] ?? 'N/A';
+    }
+
+    /** A filter left over from the previous warehouse would hide everything. */
+    public function updatedWarehouseId(): void
+    {
+        $this->itemSearch = '';
     }
 
     public function getData(): void
@@ -177,7 +186,17 @@ class WarehouseInventoryIndex extends Component
             }
         }
 
-        usort($movements, fn ($a, $b) => (optional($a['date'])->timestamp ?? 0) <=> (optional($b['date'])->timestamp ?? 0));
+        // Order by the full date *and* time. Stock documents write all their
+        // lines in the same second, so equal timestamps fall back to the order
+        // the movements were collected in, keeping the running total stable.
+        $sequence = 0;
+        foreach ($movements as &$movement) {
+            $movement['sequence'] = $sequence++;
+        }
+        unset($movement);
+
+        usort($movements, fn ($a, $b) => [optional($a['date'])->getTimestamp() ?? 0, $a['sequence']]
+            <=> [optional($b['date'])->getTimestamp() ?? 0, $b['sequence']]);
 
         // Flatten to plain, serialisable rows so the filter round-trips keep the
         // computed fields (bucket, view link, running total) intact across requests.
@@ -205,7 +224,7 @@ class WarehouseInventoryIndex extends Component
                 'on_hand'         => $onHand                           ? $meta['qty'] : null,
                 'in_process'      => $meta['bucket'] === 'in_process'  ? $meta['qty'] : null,
                 'stock_total'     => $onHand ? $running : null,
-                'date'            => optional($movement['date'])->format('Y-m-d'),
+                'date'            => optional($movement['date'])->format('Y-m-d H:i'),
             ];
         }
 
@@ -390,8 +409,20 @@ class WarehouseInventoryIndex extends Component
             $activityRows = $activityRows->where('bucket', $this->activityFilter)->values();
         }
 
+        // Narrow the statement table to items matching the search box.
+        $units  = collect($this->warehouseUnits);
+        $needle = trim($this->itemSearch);
+
+        if ($needle !== '') {
+            $units = $units
+                ->filter(fn ($unit) => mb_stripos((string) ($unit->item ?? ''), $needle) !== false)
+                ->values();
+        }
+
         return view('livewire.warehouse-inventory.warehouse-inventory-index', [
             'activityRows' => $activityRows,
+            'units'        => $units,
+            'totalUnits'   => count($this->warehouseUnits),
         ]);
     }
 }
