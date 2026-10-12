@@ -102,13 +102,37 @@
 
     @if($boardMode !== 'planned')
 
-    @include('livewire.plans.partials._readonly-grid', [
-        'rows'         => $this->readonlyLaneRows($boardMode),
-        'mode'         => $boardMode,
-        'emptyMessage' => $boardMode === 'actual'
+    @php
+        $readonlyBoards = [
+            'production' => $this->readonlyLaneRows($boardMode),
+            'packaging'  => $this->readonlyLaneRows($boardMode, 'packaging'),
+        ];
+        $readonlyHasItems = collect($readonlyBoards)->flatten(1)->contains(
+            fn($row) => collect($row['lanes'])->contains(fn($laneRow) => count($laneRow['layout']['items']) > 0)
+        );
+    @endphp
+
+    @unless($readonlyHasItems)
+    <div class="alert alert-light border text-muted py-2 px-3 mb-3" style="font-size: 12px;">
+        <i class="bi bi-info-circle me-1"></i>
+        {{ $boardMode === 'actual'
             ? 'No events have been started on this day yet — start an event from the list view and it will appear here with its real run time.'
-            : 'No emergency events have been recorded on this day.',
-    ])
+            : 'No emergency events have been recorded on this day.' }}
+    </div>
+    @endunless
+
+    <div class="pbc-wrap">
+        @foreach($readonlyBoards as $board => $rows)
+        @include('livewire.plans.partials._readonly-grid', [
+            'rows'         => $rows,
+            'mode'         => $boardMode,
+            'board'        => $board,
+            'emptyMessage' => $board === 'packaging'
+                ? 'No packaging is set up for this factory.'
+                : 'No production lines found for this factory.',
+        ])
+        @endforeach
+    </div>
 
     @else
 
@@ -133,62 +157,18 @@
             </div>
         </div>
 
-        <div class="pbc-grid-wrap">
-            <div class="pbc-grid">
-                <div class="pbc-corner"></div>
-                <div class="pbc-hour-row">
-                    @for($slot = 0; $slot < 96; $slot++)
-                    @php $mins = $slot * 15; @endphp
-                    <div class="pbc-hour-cell {{ $mins % 60 === 0 ? 'is-hour' : '' }}"><span>{{ sprintf('%02d:%02d', intdiv($mins, 60), $mins % 60) }}</span></div>
-                    @endfor
-                </div>
+        @include('livewire.plans.partials._planned-grid', [
+            'rows'         => $this->laneRows(),
+            'board'        => 'production',
+            'emptyMessage' => 'No production lines found for this factory.',
+        ])
 
-                @php $laneRows = $this->laneRows(); @endphp
-                @forelse($laneRows as $row)
-                @php $pl = $row['production_line']; $laneCount = max(count($row['lanes']), 1); @endphp
-
-                @if(count($row['lanes']))
-                    @foreach($row['lanes'] as $i => $laneRow)
-                    @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
-                    @if($i === 0)
-                    <div class="pbc-pl-label" style="grid-row: span {{ $laneCount }};" wire:key="pbc-pl-{{ $pl->id }}">
-                        {{ $pl->name }}
-                    </div>
-                    @endif
-                    <div class="pbc-row-label" wire:key="pbc-lane-label-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
-                        <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }} me-1"></i>
-                        {{ $lane['name'] }}
-                    </div>
-                    <div class="pbc-row-track pbc-drop"
-                        data-production-line-id="{{ $pl->id }}"
-                        data-placeable-type="{{ $lane['type'] }}"
-                        data-placeable-id="{{ $lane['id'] }}"
-                        wire:key="pbc-lane-track-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}"
-                        style="height: {{ max($layout['tracks'], 1) * 48 + 12 }}px;">
-                        @foreach($layout['items'] as $item)
-                            @include('livewire.plans.partials._calendar-event-card', [
-                                'event' => $item['event'],
-                                'track' => $item['track'],
-                                'fromHour' => $item['fromHour'],
-                                'spanHours' => $item['spanHours'],
-                            ])
-                        @endforeach
-                    </div>
-                    @endforeach
-                @else
-                    <div class="pbc-pl-label" style="grid-row: span 1;" wire:key="pbc-pl-{{ $pl->id }}">
-                        {{ $pl->name }}
-                    </div>
-                    <div class="pbc-row-track-empty">No preparations or lines attached to this production line.</div>
-                @endif
-
-                @empty
-                <div class="pbc-empty">
-                    No production lines found for this factory.
-                </div>
-                @endforelse
-            </div>
-        </div>
+        {{-- Packaging runs separately from the production lines, on its own board --}}
+        @include('livewire.plans.partials._planned-grid', [
+            'rows'         => $this->laneRows('packaging'),
+            'board'        => 'packaging',
+            'emptyMessage' => 'No packaging is set up for this factory.',
+        ])
     </div>
 
     @endif
@@ -254,7 +234,13 @@
 
                         <div class="col-6">
                             <div class="pvc-body-label">Production Line</div>
-                            <div>{{ $selectedEvent['production_line_name'] ?? '—' }}</div>
+                            <div>
+                                @if(($selectedEvent['placeable_kind'] ?? null) === 'Packaging')
+                                <span class="text-muted">— (packaging board)</span>
+                                @else
+                                {{ $selectedEvent['production_line_name'] ?? '—' }}
+                                @endif
+                            </div>
                         </div>
                         <div class="col-6">
                             <div class="pvc-body-label">{{ $selectedEvent['placeable_kind'] ?? 'Lane' }}</div>
@@ -1084,7 +1070,8 @@
                         return;
                     }
 
-                    if (!productionLineId || !placeableType || !placeableId) {
+                    // Packaging lanes belong to no production line.
+                    if (!placeableType || !placeableId || (!productionLineId && placeableType !== 'packaging')) {
                         return;
                     }
 
@@ -1169,6 +1156,22 @@
                 selectEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
+
+        // ─── Production and packaging boards scroll together ─────────────
+        // Each board is its own horizontal scroller; keep them on the same
+        // time window. Scroll events don't bubble, hence the capture listener.
+        // A board already at the target position isn't touched, which is what
+        // stops the echo from the other board's own scroll event.
+        document.addEventListener('scroll', (e) => {
+            const source = e.target;
+            if (!(source instanceof Element) || !source.classList.contains('pbc-grid')) return;
+
+            document.querySelectorAll('.pbc-grid').forEach(grid => {
+                if (grid !== source && grid.scrollLeft !== source.scrollLeft) {
+                    grid.scrollLeft = source.scrollLeft;
+                }
+            });
+        }, true);
 
         const initAll = () => {
             initCalendarDrag();

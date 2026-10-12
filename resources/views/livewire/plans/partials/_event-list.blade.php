@@ -113,10 +113,24 @@
                         </td>
                         <td>{{ $event->recipe?->name ?? '—' }}</td>
                         <td style="white-space: nowrap;">{{ $durationLabel ?? '—' }}</td>
-                        <td>{{ $event->productionLine?->name ?? '—' }}</td>
+                        @php $isPackaging = $event->placeable_type === \App\Models\Packaging::class; @endphp
+                        <td>
+                            @if($isPackaging)
+                            <span class="text-muted">Packaging</span>
+                            @else
+                            {{ $event->productionLine?->name ?? '—' }}
+                            @endif
+                        </td>
                         <td>
                             @if($event->placeable_id)
-                            <i class="bi bi-{{ $event->placeable_type === \App\Models\Preparation::class ? 'egg-fried' : 'diagram-3' }} me-1"></i>{{ $event->placeable?->name ?? '—' }}
+                            @php
+                                $laneIcon = match ($event->placeable_type) {
+                                    \App\Models\Preparation::class => 'egg-fried',
+                                    \App\Models\Packaging::class   => 'box-seam',
+                                    default                        => 'diagram-3',
+                                };
+                            @endphp
+                            <i class="bi bi-{{ $laneIcon }} me-1"></i>{{ $event->placeable?->name ?? '—' }}
                             @else
                             <span class="badge bg-primary">Unplaced</span>
                             @endif
@@ -152,7 +166,7 @@
                                     <i class="bi bi-play-fill"></i> Start
                                 </button>
                                 @else
-                                <span class="text-muted" style="font-size: 11px;" title="Place this event on a preparation or line to start it">
+                                <span class="text-muted" style="font-size: 11px;" title="Place this event on a preparation, line or packaging to start it">
                                     <i class="bi bi-geo-alt"></i> Place to start
                                 </span>
                                 @endif

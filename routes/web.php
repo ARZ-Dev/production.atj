@@ -13,6 +13,8 @@ use App\Livewire\Lines\LineIndex;
 use App\Livewire\Plans\PlanBoard;
 use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Preparations\PreparationIndex;
+use App\Livewire\Packagings\PackagingCreate;
+use App\Livewire\Packagings\PackagingIndex;
 use App\Livewire\ProductionLines\ProductionLineIndex;
 use App\Livewire\RecipeTypes\RecipeTypeCreate;
 use App\Livewire\RecipeTypes\RecipeTypeIndex;
@@ -270,6 +272,15 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
     // |--------------------------------------------------------------------------
     Route::group(['prefix' => 'production-lines'], function () {
         Route::get('/', ProductionLineIndex::class)->name('production-lines');
+    });
+
+    // |--------------------------------------------------------------------------
+    // | Packaging
+    // |--------------------------------------------------------------------------
+    Route::group(['prefix' => 'packagings'], function () {
+        Route::get('/', PackagingIndex::class)->name('packagings');
+        Route::get('/create', PackagingCreate::class)->name('packagings.create');
+        Route::get('/edit/{id}', PackagingCreate::class)->name('packagings.edit');
     });
 
     // |--------------------------------------------------------------------------

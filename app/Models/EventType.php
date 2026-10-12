@@ -37,4 +37,9 @@ class EventType extends Model
     {
         return $this->belongsToMany(Preparation::class, 'event_type_preparation');
     }
+
+    public function packagings()
+    {
+        return $this->belongsToMany(Packaging::class, 'event_type_packaging');
+    }
 }

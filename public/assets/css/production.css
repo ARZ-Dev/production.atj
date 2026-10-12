@@ -415,6 +415,8 @@
     padding: 6px; font-size: 12px; font-weight: 800; line-height: 1.2;
     border-right: 1px solid rgba(130,130,180,.18); border-bottom: 1px solid rgba(130,130,180,.18);
 }
+/* The packaging board's group label, tinted so the two boards read apart */
+.pbc-pl-label.pbc-pl-label--packaging { background: rgba(20,184,166,.10); color: #0f766e; }
 .pbc-row-label {
     grid-column: 2; position: sticky; left: 64px; z-index: 1;
     background: inherit; display: flex; align-items: center;
@@ -542,6 +544,24 @@
     margin-top: 3px; font-size: 10px; color: #8a91a0;
     font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+
+/* Packaging page: capacity per item unit, grouped by item type (reuses the aqt-* band) */
+.pk-cap-table { font-size: 12.5px; }
+.pk-cap-table td.pk-item { border-right: 1px solid rgba(130,130,180,.14); }
+/* Lighter separator between units of the same item; the full rule marks the next item */
+.pk-cap-table tr.pk-unit-row--more > td:not(.pk-item) { border-bottom-style: dashed; }
+.pk-item-name { font-weight: 600; }
+.pk-item-code { margin-top: 1px; font-size: 11px; color: #8a91a0; }
+.pk-unit-basic {
+    display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 10px;
+    background: rgba(25,135,84,.12); color: #0f5132;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+}
+.pk-unit-math {
+    margin-top: 2px; font-size: 10.5px; color: #8a91a0;
+    font-variant-numeric: tabular-nums;
+}
+.pk-cap-table .form-control.pk-cap-input { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Board mode legend (Actual / Downtime) */
 .pbc-legend { display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap; }
