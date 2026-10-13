@@ -355,12 +355,13 @@
                                 </li>
                                 @endhasAnyPermission
 
-                                @hasAnyPermission(['production.preparation-list', 'production.line-list', 'production.production-line-list'])
+                                @hasAnyPermission(['production.preparation-list', 'production.line-list', 'production.production-line-list', 'production.packaging-list'])
                                 <li class="pe-slide pe-has-sub">
                                     @php
                                         $productionActive = request()->is('admin/preparations*')
                                             || request()->is('admin/lines*')
-                                            || request()->is('admin/production-lines*');
+                                            || request()->is('admin/production-lines*')
+                                            || request()->is('admin/packagings*');
                                     @endphp
                                     <a href="#collapseProductionModules"
                                         class="pe-nav-link {{ $productionActive ? 'active' : '' }}"
@@ -398,6 +399,15 @@
                                             <a href="{{ route('production-lines') }}"
                                                 class="pe-nav-link {{ request()->is('admin/production-lines*') ? 'active' : '' }}">
                                                 Production Lines
+                                            </a>
+                                        </li>
+                                        @endhasPermission
+
+                                        @hasPermission('production.packaging-list')
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('packagings') }}"
+                                                class="pe-nav-link {{ request()->is('admin/packagings*') ? 'active' : '' }}">
+                                                Packaging
                                             </a>
                                         </li>
                                         @endhasPermission

@@ -102,13 +102,37 @@
 
     @if($boardMode !== 'planned')
 
-    @include('livewire.plans.partials._readonly-grid', [
-        'rows'         => $this->readonlyLaneRows($boardMode),
-        'mode'         => $boardMode,
-        'emptyMessage' => $boardMode === 'actual'
+    @php
+        $readonlyBoards = [
+            'production' => $this->readonlyLaneRows($boardMode),
+            'packaging'  => $this->readonlyLaneRows($boardMode, 'packaging'),
+        ];
+        $readonlyHasItems = collect($readonlyBoards)->flatten(1)->contains(
+            fn($row) => collect($row['lanes'])->contains(fn($laneRow) => count($laneRow['layout']['items']) > 0)
+        );
+    @endphp
+
+    @unless($readonlyHasItems)
+    <div class="alert alert-light border text-muted py-2 px-3 mb-3" style="font-size: 12px;">
+        <i class="bi bi-info-circle me-1"></i>
+        {{ $boardMode === 'actual'
             ? 'No events have been started on this day yet — start an event from the list view and it will appear here with its real run time.'
-            : 'No emergency events have been recorded on this day.',
-    ])
+            : 'No emergency events have been recorded on this day.' }}
+    </div>
+    @endunless
+
+    <div class="pbc-wrap">
+        @foreach($readonlyBoards as $board => $rows)
+        @include('livewire.plans.partials._readonly-grid', [
+            'rows'         => $rows,
+            'mode'         => $boardMode,
+            'board'        => $board,
+            'emptyMessage' => $board === 'packaging'
+                ? 'No packaging is set up for this factory.'
+                : 'No production lines found for this factory.',
+        ])
+        @endforeach
+    </div>
 
     @else
 
@@ -133,62 +157,18 @@
             </div>
         </div>
 
-        <div class="pbc-grid-wrap">
-            <div class="pbc-grid">
-                <div class="pbc-corner"></div>
-                <div class="pbc-hour-row">
-                    @for($slot = 0; $slot < 96; $slot++)
-                    @php $mins = $slot * 15; @endphp
-                    <div class="pbc-hour-cell {{ $mins % 60 === 0 ? 'is-hour' : '' }}"><span>{{ sprintf('%02d:%02d', intdiv($mins, 60), $mins % 60) }}</span></div>
-                    @endfor
-                </div>
+        @include('livewire.plans.partials._planned-grid', [
+            'rows'         => $this->laneRows(),
+            'board'        => 'production',
+            'emptyMessage' => 'No production lines found for this factory.',
+        ])
 
-                @php $laneRows = $this->laneRows(); @endphp
-                @forelse($laneRows as $row)
-                @php $pl = $row['production_line']; $laneCount = max(count($row['lanes']), 1); @endphp
-
-                @if(count($row['lanes']))
-                    @foreach($row['lanes'] as $i => $laneRow)
-                    @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
-                    @if($i === 0)
-                    <div class="pbc-pl-label" style="grid-row: span {{ $laneCount }};" wire:key="pbc-pl-{{ $pl->id }}">
-                        {{ $pl->name }}
-                    </div>
-                    @endif
-                    <div class="pbc-row-label" wire:key="pbc-lane-label-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}">
-                        <i class="bi bi-{{ $lane['type'] === 'preparation' ? 'egg-fried' : 'diagram-3' }} me-1"></i>
-                        {{ $lane['name'] }}
-                    </div>
-                    <div class="pbc-row-track pbc-drop"
-                        data-production-line-id="{{ $pl->id }}"
-                        data-placeable-type="{{ $lane['type'] }}"
-                        data-placeable-id="{{ $lane['id'] }}"
-                        wire:key="pbc-lane-track-{{ $pl->id }}-{{ $lane['type'] }}-{{ $lane['id'] }}"
-                        style="height: {{ max($layout['tracks'], 1) * 48 + 12 }}px;">
-                        @foreach($layout['items'] as $item)
-                            @include('livewire.plans.partials._calendar-event-card', [
-                                'event' => $item['event'],
-                                'track' => $item['track'],
-                                'fromHour' => $item['fromHour'],
-                                'spanHours' => $item['spanHours'],
-                            ])
-                        @endforeach
-                    </div>
-                    @endforeach
-                @else
-                    <div class="pbc-pl-label" style="grid-row: span 1;" wire:key="pbc-pl-{{ $pl->id }}">
-                        {{ $pl->name }}
-                    </div>
-                    <div class="pbc-row-track-empty">No preparations or lines attached to this production line.</div>
-                @endif
-
-                @empty
-                <div class="pbc-empty">
-                    No production lines found for this factory.
-                </div>
-                @endforelse
-            </div>
-        </div>
+        {{-- Packaging runs separately from the production lines, on its own board --}}
+        @include('livewire.plans.partials._planned-grid', [
+            'rows'         => $this->laneRows('packaging'),
+            'board'        => 'packaging',
+            'emptyMessage' => 'No packaging is set up for this factory.',
+        ])
     </div>
 
     @endif
@@ -254,7 +234,13 @@
 
                         <div class="col-6">
                             <div class="pvc-body-label">Production Line</div>
-                            <div>{{ $selectedEvent['production_line_name'] ?? '—' }}</div>
+                            <div>
+                                @if(($selectedEvent['placeable_kind'] ?? null) === 'Packaging')
+                                <span class="text-muted">— (packaging board)</span>
+                                @else
+                                {{ $selectedEvent['production_line_name'] ?? '—' }}
+                                @endif
+                            </div>
                         </div>
                         <div class="col-6">
                             <div class="pvc-body-label">{{ $selectedEvent['placeable_kind'] ?? 'Lane' }}</div>
@@ -265,6 +251,28 @@
                         <div class="col-6">
                             <div class="pvc-body-label">Status</div>
                             <div>{{ $selectedEvent['status'] }}</div>
+                        </div>
+                        @endif
+
+                        @if($selectedEvent['linked'] ?? null)
+                        @php $linkedEvent = $selectedEvent['linked']; @endphp
+                        <div class="col-12">
+                            <div class="pvc-body-label">Runs together with</div>
+                            <div>
+                                <i class="bi bi-link-45deg text-primary"></i>
+                                <span class="d-inline-block rounded-circle mx-1" style="width:10px;height:10px;background-color: {{ $linkedEvent['color'] }}"></span>
+                                {{ $linkedEvent['type_name'] }} #{{ $linkedEvent['id'] }}
+                                @unless($linkedEvent['placed'])
+                                <span class="badge bg-primary ms-1">Unplaced</span>
+                                @endunless
+                            </div>
+                            <div class="text-muted" style="font-size: 11px;">
+                                @if($linkedEvent['is_lead'])
+                                Starts and ends with that event, and is edited and deleted with it.
+                                @else
+                                Both start and end together from this event, on the same time window.
+                                @endif
+                            </div>
                         </div>
                         @endif
 
@@ -344,10 +352,58 @@
                 <div class="modal-body">
                     @if($eventAction['action'] === 'start')
 
-                    @php $startHasRecipe = (bool) ($eventAction['has_recipe'] ?? false); @endphp
-                    @if(count($actionInputs))
+                    @php
+                        // One section per event: just the event, or both halves of a
+                        // linked pair, which start together from this one modal.
+                        $pairCompanion = $eventAction['companion'] ?? null;
+                        $startSections = [[
+                            'role'       => 'lead',
+                            'has_recipe' => (bool) ($eventAction['has_recipe'] ?? false),
+                            'type_name'  => $eventAction['type_name'],
+                            'color'      => $eventAction['color'],
+                            'placeable'  => $eventAction['placeable_name'] ?? null,
+                        ]];
+                        if ($pairCompanion) {
+                            $startSections[] = [
+                                'role'       => 'companion',
+                                'has_recipe' => (bool) $pairCompanion['has_recipe'],
+                                'type_name'  => $pairCompanion['type_name'],
+                                'color'      => $pairCompanion['color'],
+                                'placeable'  => $pairCompanion['placeable_name'],
+                            ];
+                        }
+                        $handoffTypes = collect($actionInputs)->where('handoff', true)->pluck('item_type_name')->filter()->unique()->implode(', ');
+                    @endphp
+
+                    @if($pairCompanion)
+                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
+                        <i class="bi bi-link-45deg me-1"></i>
+                        This starts <strong>{{ $eventAction['type_name'] }}</strong> and
+                        <strong>{{ $pairCompanion['type_name'] }}</strong> together. The items of both are checked
+                        against stock in one go — if anything is short, neither starts.
+                        @if($handoffTypes)
+                        <strong>{{ $handoffTypes }}</strong> passes straight from {{ $eventAction['type_name'] }} to
+                        {{ $pairCompanion['type_name'] }} without a warehouse, so it isn't counted.
+                        @endif
+                    </div>
+                    @endif
+
+                    @foreach($startSections as $section)
+                    @php $sectionRows = collect($actionInputs)->filter(fn($row) => ($row['role'] ?? 'lead') === $section['role'])->all(); @endphp
+
+                    @if($pairCompanion)
+                    <div class="aqt-pair-head {{ $loop->first ? '' : 'mt-3' }}">
+                        <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background-color: {{ $section['color'] }}"></span>
+                        {{ $section['type_name'] }}
+                        @if($section['placeable'])
+                        <span class="aqt-pair-where">· {{ $section['placeable'] }}</span>
+                        @endif
+                    </div>
+                    @endif
+
+                    @if(count($sectionRows))
                     <p class="text-muted mb-2" style="font-size: 12px;">
-                        @if($startHasRecipe)
+                        @if($section['has_recipe'])
                         Used quantities are pre-filled from the recipe — adjust any that differed, then start the event.
                         @else
                         Used quantities are pre-filled from this event type's planned amounts — adjust any that
@@ -355,28 +411,35 @@
                         @endif
                     </p>
                     @include('livewire.plans.partials._action-quantity-table', [
-                        'rows'          => $actionInputs,
+                        'rows'          => $sectionRows,
                         'model'         => 'actionInputs',
+                        'keyPrefix'     => 'actionInputs-' . $section['role'],
                         'actualLabel'   => 'Used Qty',
                         'percentLabel'  => '% Difference',
                         'showOriginal'  => true,
                         'showAvailable' => true,
+                        'handoffMode'   => 'skip',
+                        'handoffNote'   => 'Comes straight from ' . $eventAction['type_name'] . ' — not counted',
                     ])
-                    <div class="text-muted mb-2" style="font-size: 11px;">
-                        <i class="bi bi-info-circle me-1"></i>
-                        "In Stock" is what the source warehouse had when this window opened
-                        (on hand minus reserved and in process). Availability is checked again
-                        against live stock when you start the event.
-                    </div>
                     @else
                     <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
                         <i class="bi bi-exclamation-triangle me-1"></i>
-                        @if($startHasRecipe)
+                        @if($section['has_recipe'])
                         This recipe has no input items defined — no quantities will be recorded.
                         @else
                         No items are defined for this event type — no quantities will be recorded.
                         Add items to this event type if you want to track usage. You can still start the event below.
                         @endif
+                    </div>
+                    @endif
+                    @endforeach
+
+                    @if(count($actionInputs))
+                    <div class="text-muted mb-2" style="font-size: 11px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        "In Stock" is what the source warehouse had when this window opened
+                        (on hand minus reserved and in process). Availability is checked again
+                        against live stock when you start the event.
                     </div>
                     @endif
                     <div class="row g-3 mt-0">
@@ -397,8 +460,58 @@
 
                     @elseif($eventAction['action'] === 'terminate')
 
-                    @if($eventAction['has_recipe'])
-                    @php $endBatchCount = $eventAction['batch_count'] ?? 1; @endphp
+                    @php
+                        // One section per event: just the event, or both halves of a
+                        // linked pair, which end together from this one modal.
+                        $pairCompanion = $eventAction['companion'] ?? null;
+                        $endSections   = [[
+                            'role'        => 'lead',
+                            'has_recipe'  => (bool) ($eventAction['has_recipe'] ?? false),
+                            'batch_count' => $eventAction['batch_count'] ?? 1,
+                            'type_name'   => $eventAction['type_name'],
+                            'color'       => $eventAction['color'],
+                            'placeable'   => $eventAction['placeable_name'] ?? null,
+                        ]];
+                        if ($pairCompanion) {
+                            $endSections[] = [
+                                'role'        => 'companion',
+                                'has_recipe'  => (bool) $pairCompanion['has_recipe'],
+                                'batch_count' => $pairCompanion['batch_count'] ?? 1,
+                                'type_name'   => $pairCompanion['type_name'],
+                                'color'       => $pairCompanion['color'],
+                                'placeable'   => $pairCompanion['placeable_name'],
+                            ];
+                        }
+                        $ofRole = fn(array $rows, string $role) => collect($rows)->filter(fn($row) => ($row['role'] ?? 'lead') === $role)->all();
+                    @endphp
+
+                    @if($pairCompanion)
+                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
+                        <i class="bi bi-link-45deg me-1"></i>
+                        This ends <strong>{{ $eventAction['type_name'] }}</strong> and
+                        <strong>{{ $pairCompanion['type_name'] }}</strong> together, at the end time below.
+                    </div>
+                    @endif
+
+                    @foreach($endSections as $section)
+                    @php
+                        $sectionOutputs = $ofRole($actionOutputs, $section['role']);
+                        $sectionSides   = $ofRole($actionSideProducts, $section['role']);
+                        $sectionRecon   = $ofRole($actionReconciliation, $section['role']);
+                        $endBatchCount  = $section['batch_count'];
+                    @endphp
+
+                    @if($pairCompanion)
+                    <div class="aqt-pair-head {{ $loop->first ? '' : 'mt-4' }}">
+                        <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background-color: {{ $section['color'] }}"></span>
+                        {{ $section['type_name'] }}
+                        @if($section['placeable'])
+                        <span class="aqt-pair-where">· {{ $section['placeable'] }}</span>
+                        @endif
+                    </div>
+                    @endif
+
+                    @if($section['has_recipe'])
                     <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 12px;">
                         <i class="bi bi-stack me-1"></i>
                         This event runs <strong>{{ $endBatchCount + 0 }}</strong>
@@ -410,20 +523,24 @@
                         <i class="bi bi-box-seam me-1 text-primary"></i> Produced Item
                     </div>
                     @include('livewire.plans.partials._action-quantity-table', [
-                        'rows'         => $actionOutputs,
+                        'rows'         => $sectionOutputs,
                         'model'        => 'actionOutputs',
+                        'keyPrefix'    => 'actionOutputs-' . $section['role'],
                         'actualLabel'  => 'Produced Qty',
                         'percentLabel' => '% Produced',
                         'showPerBatch' => true,
+                        'handoffMode'  => 'record',
+                        'handoffNote'  => $pairCompanion ? 'Goes straight to ' . $pairCompanion['type_name'] . ' — recorded, not stocked' : null,
                     ])
 
-                    @if(count($actionSideProducts))
+                    @if(count($sectionSides))
                     <div class="fw-bold mb-1 mt-3" style="font-size: 13px;">
                         <i class="bi bi-boxes me-1 text-primary"></i> Side Products
                     </div>
                     @include('livewire.plans.partials._action-quantity-table', [
-                        'rows'         => $actionSideProducts,
+                        'rows'         => $sectionSides,
                         'model'        => 'actionSideProducts',
+                        'keyPrefix'    => 'actionSideProducts-' . $section['role'],
                         'actualLabel'  => 'Produced Qty',
                         'percentLabel' => '% Produced',
                         'showPerBatch' => true,
@@ -431,7 +548,7 @@
                     @endif
                     @endif
 
-                    @if(count($actionReconciliation))
+                    @if(count($sectionRecon))
                     <div class="fw-bold mb-1 mt-3" style="font-size: 13px;">
                         <i class="bi bi-clipboard-check me-1 text-primary"></i> Used Items — Actual
                     </div>
@@ -441,8 +558,9 @@
                         written off as waste, on its own document.
                     </p>
                     @include('livewire.plans.partials._end-reconciliation-table', [
-                        'rows'  => $actionReconciliation,
-                        'model' => 'actionReconciliation',
+                        'rows'      => $sectionRecon,
+                        'model'     => 'actionReconciliation',
+                        'keyPrefix' => 'actionReconciliation-' . $section['role'],
                     ])
                     <div class="text-muted mb-2" style="font-size: 11px;">
                         <i class="bi bi-info-circle me-1"></i>
@@ -452,6 +570,7 @@
                         deducts it. Both name this event in their notes.
                     </div>
                     @endif
+                    @endforeach
 
                     <div class="row g-3 mt-0">
                         <div class="col-md-6">
@@ -1084,7 +1203,8 @@
                         return;
                     }
 
-                    if (!productionLineId || !placeableType || !placeableId) {
+                    // Packaging lanes belong to no production line.
+                    if (!placeableType || !placeableId || (!productionLineId && placeableType !== 'packaging')) {
                         return;
                     }
 
@@ -1169,6 +1289,22 @@
                 selectEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
+
+        // ─── Production and packaging boards scroll together ─────────────
+        // Each board is its own horizontal scroller; keep them on the same
+        // time window. Scroll events don't bubble, hence the capture listener.
+        // A board already at the target position isn't touched, which is what
+        // stops the echo from the other board's own scroll event.
+        document.addEventListener('scroll', (e) => {
+            const source = e.target;
+            if (!(source instanceof Element) || !source.classList.contains('pbc-grid')) return;
+
+            document.querySelectorAll('.pbc-grid').forEach(grid => {
+                if (grid !== source && grid.scrollLeft !== source.scrollLeft) {
+                    grid.scrollLeft = source.scrollLeft;
+                }
+            });
+        }, true);
 
         const initAll = () => {
             initCalendarDrag();

@@ -165,6 +165,107 @@
                     @enderror
                 </div>
 
+                {{-- The event type executed with this one (e.g. packaging alongside
+                     production). Its fields live in this card — the two are one
+                     run — and are bound under events.{i}.companion. --}}
+                @if(!empty($event['companion']))
+                @php $companion = $event['companion']; @endphp
+                <div class="ec-companion" wire:key="ec-companion-{{ $rowKey }}">
+                    <div class="ec-companion-head">
+                        <i class="bi bi-link-45deg"></i>
+                        <span>Runs together with</span>
+                        <span class="ec-companion-type">
+                            <span class="d-inline-block rounded-circle" style="width:9px;height:9px;background-color: {{ $companion['color'] }};"></span>
+                            {{ $companion['type_name'] }}
+                        </span>
+                        <span class="{{ !empty($companion['id']) ? 'ec-badge-saved' : 'ec-badge-new' }}">
+                            {{ !empty($companion['id']) ? 'Saved' : 'New' }}
+                        </span>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Item Type <span class="text-danger">*</span></div>
+                            <div wire:ignore>
+                                <select id="ec_c_item_type_{{ $rowKey }}" data-key="{{ $rowKey }}"
+                                    class="selectpicker ec-c-item-type-select" data-width="100%"
+                                    data-live-search="true" title="— Select —">
+                                    @foreach($companionItemTypesByRow[$index] ?? [] as $type)
+                                    <option value="{{ $type['id'] }}" @selected((int)($companion['item_type_id'] ?? 0) === $type['id'])>
+                                        {{ $type['name'] }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('events.' . $index . '.companion.item_type_id')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Item <span class="text-danger">*</span></div>
+                            <div wire:ignore>
+                                <select id="ec_c_item_{{ $rowKey }}" data-key="{{ $rowKey }}"
+                                    class="selectpicker ec-c-item-select" data-width="100%"
+                                    data-live-search="true" title="— Select —">
+                                    @foreach($companionItemsByRow[$index] ?? [] as $item)
+                                    <option value="{{ $item['id'] }}" @selected((int)($companion['item_id'] ?? 0) === $item['id'])>
+                                        {{ $item['name'] }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('events.' . $index . '.companion.item_id')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Recipe <span class="text-danger">*</span></div>
+                            <div wire:ignore>
+                                <select id="ec_c_recipe_{{ $rowKey }}" data-key="{{ $rowKey }}"
+                                    class="selectpicker ec-c-recipe-select" data-width="100%"
+                                    data-live-search="true" title="— Select —">
+                                    @foreach($companionRecipesByRow[$index] ?? [] as $recipe)
+                                    <option value="{{ $recipe['id'] }}" @selected((int)($companion['recipe_id'] ?? 0) === $recipe['id'])>
+                                        {{ $recipe['name'] }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('events.' . $index . '.companion.recipe_id')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                            @if(!empty($companion['item_id']) && !empty($event['item_id']) && empty($companionRecipesByRow[$index] ?? []))
+                            <div class="text-warning small mt-1">
+                                <i class="bi bi-exclamation-circle"></i> No active recipe for this item uses what this production makes.
+                            </div>
+                            @endif
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="ec-field-label">Batch Number <span class="text-danger">*</span></div>
+                            <input type="text"
+                                class="form-control form-control-sm @error('events.'.$index.'.companion.batch_count') is-invalid @enderror"
+                                wire:model.defer="events.{{ $index }}.companion.batch_count"
+                                placeholder="e.g. 1">
+                            @error('events.' . $index . '.companion.batch_count')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                            @if($companion['batch_auto'] !== null)
+                            <div class="ec-companion-hint">Calculated from the production: {{ $companion['batch_auto'] }}</div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="ec-companion-note">
+                        <i class="bi bi-info-circle"></i>
+                        Both events start and end together. The pre-finished goods made here pass straight to
+                        {{ $companion['type_name'] }} without going through a warehouse, so they're never checked or stocked.
+                    </div>
+                </div>
+                @endif
+
             </div>
         </div>
         @endforeach
@@ -208,7 +309,8 @@
             $el.selectpicker('val', '');
         };
 
-        const EC_SELECTS = '.ec-event-type-select, .ec-item-type-select, .ec-item-select, .ec-recipe-select';
+        const EC_SELECTS = '.ec-event-type-select, .ec-item-type-select, .ec-item-select, .ec-recipe-select, '
+            + '.ec-c-item-type-select, .ec-c-item-select, .ec-c-recipe-select';
 
         // Boot: initialise pickers already in the DOM.
         $('.ec-card .selectpicker').each(function () { ecInitPicker(this); });
@@ -245,12 +347,31 @@
             $wire.call('onRecipeChanged', ecRowIndex(this), $(this).val());
         });
 
+        // The companion event's cascade (the event type executed with the
+        // row's type), inside the same card — same row index.
+        $(document).on('change', '.ec-c-item-type-select', function () {
+            if ($(this).val() === '') return;
+            $wire.call('onCompanionItemTypeChanged', ecRowIndex(this), $(this).val());
+        });
+        $(document).on('change', '.ec-c-item-select', function () {
+            if ($(this).val() === '') return;
+            $wire.call('onCompanionItemChanged', ecRowIndex(this), $(this).val());
+        });
+        $(document).on('change', '.ec-c-recipe-select', function () {
+            if ($(this).val() === '') return;
+            $wire.call('onCompanionRecipeChanged', ecRowIndex(this), $(this).val());
+        });
+
         $wire.on('ec-cascade', (e) => {
             if (!e || !e.key) return;
 
             if (e.itemTypes !== undefined) ecApplyOptions('ec_item_type_' + e.key, e.itemTypes);
             if (e.items      !== undefined) ecApplyOptions('ec_item_'      + e.key, e.items);
             if (e.recipes    !== undefined) ecApplyOptions('ec_recipe_'    + e.key, e.recipes);
+
+            if (e.cItemTypes !== undefined) ecApplyOptions('ec_c_item_type_' + e.key, e.cItemTypes);
+            if (e.cItems     !== undefined) ecApplyOptions('ec_c_item_'      + e.key, e.cItems);
+            if (e.cRecipes   !== undefined) ecApplyOptions('ec_c_recipe_'    + e.key, e.cRecipes);
         });
 
     </script>

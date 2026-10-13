@@ -28,6 +28,15 @@ class EventType extends Model
         return $this->hasMany(EventTypeItem::class);
     }
 
+    /**
+     * The event type executed in parallel with this one ("executed with
+     * another event type") — e.g. packaging alongside production.
+     */
+    public function companionEventType()
+    {
+        return $this->belongsTo(EventType::class, 'companion_event_type_id');
+    }
+
     public function lines()
     {
         return $this->belongsToMany(Line::class, 'event_type_line');
@@ -36,5 +45,10 @@ class EventType extends Model
     public function preparations()
     {
         return $this->belongsToMany(Preparation::class, 'event_type_preparation');
+    }
+
+    public function packagings()
+    {
+        return $this->belongsToMany(Packaging::class, 'event_type_packaging');
     }
 }

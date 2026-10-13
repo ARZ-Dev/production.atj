@@ -144,6 +144,12 @@ class PermissionSeeder extends Seeder
             'production.production-line-edit',
             'production.production-line-delete',
 
+            // Packaging
+            'production.packaging-list',
+            'production.packaging-create',
+            'production.packaging-edit',
+            'production.packaging-delete',
+
         ];
         
         $permissionsIds = [];

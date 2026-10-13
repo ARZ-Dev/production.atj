@@ -16,6 +16,9 @@
     $continuesNextDay = !$isCarryOver && $event->placeable_id && $event->from_time && $event->to_time
         && \Carbon\Carbon::parse($event->to_time)->gt(\Carbon\Carbon::parse($event->from_time)->startOfDay()->addDay());
 
+    // The other half of a linked pair, either way round.
+    $pairedWith = $event->leadEvent ?? $event->companionEvent;
+
     $timeLabel = $event->from_time ? ' — ' . \Carbon\Carbon::parse($event->from_time)->format('H:i') : '';
     $timeLabel .= $event->to_time ? ' – ' . \Carbon\Carbon::parse($event->to_time)->format('H:i') : '';
     if ($isCarryOver) {
@@ -28,8 +31,9 @@
     draggable="{{ $isCarryOver ? 'false' : 'true' }}" data-event-id="{{ $event->id }}" wire:key="pbc-event-{{ $event->id }}"
     wire:click="showEventDetails({{ $event->id }})"
     style="left: calc(var(--pbc-hour-w) * {{ $fromHour }}); width: calc(var(--pbc-hour-w) * {{ $spanHours }} - 4px); top: {{ $track * 48 + 4 }}px; background-color: {{ $color }}; color: #fff;"
-    title="{{ $event->eventType->name ?? 'No type' }}{{ $timeLabel }}">
+    title="{{ $event->eventType->name ?? 'No type' }}{{ $timeLabel }}{{ $pairedWith ? ' · runs together with ' . ($pairedWith->eventType->name ?? 'event') . ' #' . $pairedWith->id : '' }}">
     <span class="pbc-card-type">
+        @if($pairedWith)<i class="bi bi-link-45deg"></i>@endif
         @if($isCarryOver)<i class="bi bi-arrow-bar-right"></i>@endif
         {{ $event->eventType->name ?? 'No type' }}{{ $event->batch_count ? ' · '.$event->batch_count.' batches' : '' }}
         @if($continuesNextDay)<i class="bi bi-arrow-bar-right"></i>@endif

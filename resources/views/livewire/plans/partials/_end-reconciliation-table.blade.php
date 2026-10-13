@@ -15,8 +15,12 @@
     again over every row at the top of submitTerminate().
 
     Expects: $rows (array), $model (Livewire property name)
+    Optional: $keyPrefix (string, default $model) — wire:key prefix, for a
+              modal drawing one $model as several tables (a linked pair).
 --}}
 @php
+    $keyPrefix = $keyPrefix ?? $model;
+
     $groups = [];
     foreach ($rows as $i => $row) {
         $groups[$row['item_type_name'] ?? 'Other'][$i] = $row;
@@ -35,7 +39,7 @@
             </tr>
         </thead>
         @foreach($groups as $groupName => $groupRows)
-        <tbody wire:key="{{ $model }}-group-{{ $loop->index }}">
+        <tbody wire:key="{{ $keyPrefix }}-group-{{ $loop->index }}">
             <tr class="aqt-group-row">
                 <td colspan="6" class="aqt-group-title">
                     <i class="bi bi-tag-fill me-1"></i>{{ $groupName }}
