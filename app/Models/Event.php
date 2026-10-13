@@ -64,4 +64,20 @@ class Event extends Model
     {
         return $this->hasMany(EventPauseActivity::class);
     }
+
+    /**
+     * The event running in parallel with this one, created from the event
+     * type's companion setting (e.g. the packaging of this production run).
+     * The pair starts and ends together.
+     */
+    public function companionEvent()
+    {
+        return $this->hasOne(Event::class, 'linked_event_id');
+    }
+
+    /** On a companion event: the event it runs with. */
+    public function leadEvent()
+    {
+        return $this->belongsTo(Event::class, 'linked_event_id');
+    }
 }

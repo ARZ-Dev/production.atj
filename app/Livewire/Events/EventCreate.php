@@ -7,6 +7,7 @@ use App\Models\EventType;
 use App\Models\Plan;
 use App\Models\Recipe;
 use App\Services\ApiService;
+use App\Services\LinkedEventService;
 use App\Services\PlanCarryOverService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
@@ -27,15 +28,30 @@ class EventCreate extends Component
     public array $itemsByRow = [];
     public array $recipesByRow = [];
 
+    // The same option lists for each row's companion event (the event type
+    // executed with the row's type — e.g. packaging alongside production),
+    // keyed by the lead row's index.
+    public array $companionItemTypesByRow = [];
+    public array $companionItemsByRow = [];
+    public array $companionRecipesByRow = [];
+
+    /** Every per-row option map, reset and re-indexed together. */
+    private const ROW_MAPS = [
+        'itemTypesByRow', 'itemsByRow', 'recipesByRow',
+        'companionItemTypesByRow', 'companionItemsByRow', 'companionRecipesByRow',
+    ];
+
     protected ApiService $api;
     protected RecipeDurationService $durationService;
     protected PlanCarryOverService $carryOverService;
+    protected LinkedEventService $linkedEvents;
 
-    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService): void
+    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService, LinkedEventService $linkedEvents): void
     {
         $this->api              = $api;
         $this->durationService  = $durationService;
         $this->carryOverService = $carryOverService;
+        $this->linkedEvents     = $linkedEvents;
     }
 
     public function mount($planId): void
@@ -52,7 +68,7 @@ class EventCreate extends Component
     #[On('openForCreate')]
     public function openForCreate(): void
     {
-        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipesByRow');
+        $this->reset('events', 'removedEventIds', ...self::ROW_MAPS);
         $this->editingEventId = null;
         $this->addEventRow();
         $this->resetValidation();
@@ -61,10 +77,17 @@ class EventCreate extends Component
     #[On('openForEdit')]
     public function openForEdit(int $eventId): void
     {
-        $this->reset('events', 'removedEventIds', 'itemTypesByRow', 'itemsByRow', 'recipesByRow');
+        $this->reset('events', 'removedEventIds', ...self::ROW_MAPS);
         $this->editingEventId = $eventId;
 
         $event = Event::where('plan_id', $this->planId)->find($eventId);
+
+        // A companion is edited together with the event it runs with — its
+        // fields live in that event's card.
+        if ($event?->linked_event_id && ($lead = Event::where('plan_id', $this->planId)->find($event->linked_event_id))) {
+            $event = $lead;
+            $this->editingEventId = $lead->id;
+        }
 
         if (!$event) {
             $this->editingEventId = null;
@@ -107,6 +130,54 @@ class EventCreate extends Component
             'from_time_raw'         => $event->from_time,
             'scheduled_label'       => $this->scheduledLabel($event),
             'description'           => $event->description ?? '',
+            'companion'             => $this->companionRowFromEvent($event),
+        ];
+    }
+
+    /**
+     * The companion part of a lead row: the saved companion event, or — when
+     * the type was given a companion after this event was created — a blank
+     * one, so saving creates it. Not for an event that has already started:
+     * the pair starts together, so a companion added now could never be
+     * started — and the lead could then never be ended.
+     */
+    private function companionRowFromEvent(Event $event): ?array
+    {
+        $companion = $event->companionEvent()->with('eventType')->first();
+
+        if ($companion) {
+            return [
+                'id'             => $companion->id,
+                'event_type_id'  => $companion->event_type_id,
+                'type_name'      => $companion->eventType?->name ?? 'No type',
+                'color'          => $companion->eventType?->color ?? '#818cf8',
+                'item_type_id'   => $companion->item_type_id,
+                'item_id'        => $companion->item_id,
+                'recipe_type_id' => $companion->recipe_type_id,
+                'recipe_id'      => $companion->recipe_id,
+                'batch_count'    => $companion->batch_count ?? '',
+                'batch_auto'     => null,
+            ];
+        }
+
+        $companionType = $event->eventType?->companionEventType;
+
+        return $companionType && !$event->status ? $this->blankCompanion($companionType) : null;
+    }
+
+    private function blankCompanion(EventType $companionType, ?int $id = null): array
+    {
+        return [
+            'id'             => $id,
+            'event_type_id'  => $companionType->id,
+            'type_name'      => $companionType->name,
+            'color'          => $companionType->color ?? '#818cf8',
+            'item_type_id'   => null,
+            'item_id'        => null,
+            'recipe_type_id' => null,
+            'recipe_id'      => null,
+            'batch_count'    => '',
+            'batch_auto'     => null,
         ];
     }
 
@@ -151,6 +222,27 @@ class EventCreate extends Component
         if ($event->item_id) {
             $this->recipesByRow[$index] = $this->fetchRecipes((int) $event->item_id);
         }
+
+        $this->loadCompanionOptionsForRow($index);
+    }
+
+    private function loadCompanionOptionsForRow(int $index): void
+    {
+        $companion = $this->events[$index]['companion'] ?? null;
+
+        if (!$companion) {
+            return;
+        }
+
+        $this->companionItemTypesByRow[$index] = $this->allowedItemTypesFor(EventType::find($companion['event_type_id']));
+
+        if ($companion['item_type_id']) {
+            $this->companionItemsByRow[$index] = $this->fetchItemsForType((int) $companion['item_type_id']);
+        }
+
+        if ($companion['item_id']) {
+            $this->companionRecipesByRow[$index] = $this->fetchCompanionRecipes($index);
+        }
     }
 
     // ─── Item types assigned to an event type, filtering the full external
@@ -194,6 +286,7 @@ class EventCreate extends Component
             'from_time_raw'         => null,
             'scheduled_label'       => null,
             'description'           => '',
+            'companion'             => null,
         ];
     }
 
@@ -213,13 +306,18 @@ class EventCreate extends Component
             $this->removedEventIds[] = $event['id'];
         }
 
+        // Its companion goes with it.
+        if (!empty($event['companion']['id'])) {
+            $this->removedEventIds[] = $event['companion']['id'];
+        }
+
         unset($this->events[$index]);
         $this->events = array_values($this->events);
 
         // Keep the per-row option maps aligned with the re-indexed rows.
-        $this->itemTypesByRow = $this->reindexAfterRemoval($this->itemTypesByRow, $index);
-        $this->itemsByRow     = $this->reindexAfterRemoval($this->itemsByRow, $index);
-        $this->recipesByRow   = $this->reindexAfterRemoval($this->recipesByRow, $index);
+        foreach (self::ROW_MAPS as $map) {
+            $this->{$map} = $this->reindexAfterRemoval($this->{$map}, $index);
+        }
     }
 
     private function reindexAfterRemoval(array $map, int $removedIndex): array
@@ -259,6 +357,20 @@ class EventCreate extends Component
             ->toArray();
     }
 
+    /** Companion recipes for the row: only those consuming what the lead makes. */
+    private function fetchCompanionRecipes(int $index): array
+    {
+        $companionItemId = (int) ($this->events[$index]['companion']['item_id'] ?? 0);
+
+        if (!$companionItemId) {
+            return [];
+        }
+
+        $leadItemId = (int) ($this->events[$index]['item_id'] ?? 0) ?: null;
+
+        return $this->linkedEvents->companionRecipes($companionItemId, $leadItemId)->toArray();
+    }
+
     // ─── Cascade handlers (called explicitly via wire:change) ───────────────
 
     public function onEventTypeChanged(int $index, $eventTypeId): void
@@ -290,6 +402,162 @@ class EventCreate extends Component
             items: [],
             recipes: [],
         );
+
+        $this->setCompanionFor($index, $eventType);
+    }
+
+    /**
+     * Attach, replace or drop the row's companion to match its event type's
+     * "executed with another event type" setting. A saved companion keeps its
+     * id when the companion type stays the same; otherwise it's removed on save.
+     */
+    private function setCompanionFor(int $index, ?EventType $eventType): void
+    {
+        $existing      = $this->events[$index]['companion'] ?? null;
+        $companionType = $eventType?->companionEventType;
+
+        unset($this->companionItemsByRow[$index], $this->companionRecipesByRow[$index]);
+
+        $keepId = $existing && $companionType && (int) $existing['event_type_id'] === $companionType->id
+            ? $existing['id']
+            : null;
+
+        if (!empty($existing['id']) && !$keepId) {
+            $this->removedEventIds[] = $existing['id'];
+        }
+
+        // A started event can't gain a companion — see companionRowFromEvent().
+        $started = !empty($this->events[$index]['id'])
+            && Event::whereKey($this->events[$index]['id'])->whereNotNull('status')->exists();
+
+        if (!$companionType || ($started && !$keepId)) {
+            $this->events[$index]['companion'] = null;
+            unset($this->companionItemTypesByRow[$index]);
+
+            return;
+        }
+
+        $this->events[$index]['companion']     = $this->blankCompanion($companionType, $keepId);
+        $this->companionItemTypesByRow[$index] = $this->allowedItemTypesFor($companionType);
+
+        $this->dispatchCompanionCascade($index,
+            itemTypes: array_values($this->companionItemTypesByRow[$index]),
+            items: [],
+            recipes: [],
+        );
+    }
+
+    /** Push fresh options to the companion's wire:ignore'd selectpickers. */
+    private function dispatchCompanionCascade(int $index, ?array $itemTypes = null, ?array $items = null, ?array $recipes = null): void
+    {
+        $this->dispatch('ec-cascade', ...array_filter([
+            'key'        => $this->events[$index]['key'] ?? null,
+            'cItemTypes' => $itemTypes,
+            'cItems'     => $items,
+            'cRecipes'   => $recipes,
+        ], fn($value) => $value !== null));
+    }
+
+    // ─── Companion cascade (item type → item → recipe → batch count) ─────────
+
+    public function onCompanionItemTypeChanged(int $index, $itemTypeId): void
+    {
+        if (empty($this->events[$index]['companion'])) {
+            return;
+        }
+
+        $itemTypeId = $itemTypeId !== '' ? (int) $itemTypeId : null;
+
+        $this->events[$index]['companion']['item_type_id']   = $itemTypeId;
+        $this->events[$index]['companion']['item_id']        = null;
+        $this->events[$index]['companion']['recipe_type_id'] = null;
+        $this->events[$index]['companion']['recipe_id']      = null;
+        $this->events[$index]['companion']['batch_auto']     = null;
+
+        unset($this->companionRecipesByRow[$index]);
+
+        if ($itemTypeId) {
+            $this->companionItemsByRow[$index] = $this->fetchItemsForType($itemTypeId);
+        } else {
+            unset($this->companionItemsByRow[$index]);
+        }
+
+        $this->dispatchCompanionCascade($index,
+            items: array_values($this->companionItemsByRow[$index] ?? []),
+            recipes: [],
+        );
+    }
+
+    public function onCompanionItemChanged(int $index, $itemId): void
+    {
+        if (empty($this->events[$index]['companion'])) {
+            return;
+        }
+
+        $this->events[$index]['companion']['item_id'] = $itemId !== '' ? (int) $itemId : null;
+
+        $this->refreshCompanionRecipes($index);
+    }
+
+    public function onCompanionRecipeChanged(int $index, $recipeId): void
+    {
+        if (empty($this->events[$index]['companion'])) {
+            return;
+        }
+
+        $recipeId = $recipeId !== '' ? (int) $recipeId : null;
+
+        $this->events[$index]['companion']['recipe_id']      = $recipeId;
+        $this->events[$index]['companion']['recipe_type_id'] = $recipeId ? Recipe::find($recipeId)?->recipe_type_id : null;
+
+        $this->recalculateCompanionBatch($index);
+    }
+
+    /**
+     * Reload the companion's recipe list (it depends on the lead's item too)
+     * and clear the chosen recipe, which the list may no longer offer.
+     */
+    private function refreshCompanionRecipes(int $index): void
+    {
+        if (empty($this->events[$index]['companion'])) {
+            return;
+        }
+
+        $this->events[$index]['companion']['recipe_type_id'] = null;
+        $this->events[$index]['companion']['recipe_id']      = null;
+        $this->events[$index]['companion']['batch_auto']     = null;
+
+        $this->companionRecipesByRow[$index] = $this->fetchCompanionRecipes($index);
+
+        $this->dispatchCompanionCascade($index, recipes: array_values($this->companionRecipesByRow[$index]));
+    }
+
+    /**
+     * Fill the companion's batch count from the lead: as many companion
+     * batches as the lead's output fills. Left as it is when it can't be
+     * worked out; the field stays editable either way.
+     */
+    private function recalculateCompanionBatch(int $index): void
+    {
+        $row       = $this->events[$index] ?? null;
+        $companion = $row['companion'] ?? null;
+
+        if (!$companion || !$companion['recipe_id'] || !$row['recipe_id']) {
+            return;
+        }
+
+        $count = $this->linkedEvents->companionBatchCount(
+            Recipe::find($row['recipe_id']),
+            $row['batch_count'],
+            Recipe::with('inputs')->find($companion['recipe_id']),
+            $row['item_id'] ? (int) $row['item_id'] : null,
+        );
+
+        if ($count !== null) {
+            $this->events[$index]['companion']['batch_count'] = $count;
+        }
+
+        $this->events[$index]['companion']['batch_auto'] = $count;
     }
 
     public function onItemTypeChanged(int $index, $itemTypeId): void
@@ -324,6 +592,8 @@ class EventCreate extends Component
             items: array_values($this->itemsByRow[$index] ?? []),
             recipes: [],
         );
+
+        $this->refreshCompanionRecipes($index);
     }
 
     public function onItemChanged(int $index, $itemId): void
@@ -346,6 +616,9 @@ class EventCreate extends Component
         );
 
         $this->recalculateDuration($index);
+
+        // The companion only offers recipes consuming the lead's item.
+        $this->refreshCompanionRecipes($index);
     }
 
     public function onRecipeChanged(int $index, $recipeId): void
@@ -360,6 +633,7 @@ class EventCreate extends Component
             : null;
 
         $this->recalculateDuration($index);
+        $this->recalculateCompanionBatch($index);
     }
 
     public function onBatchCountChanged(int $index, $batchCount): void
@@ -367,6 +641,7 @@ class EventCreate extends Component
         $this->events[$index]['batch_count'] = $batchCount;
 
         $this->recalculateDuration($index);
+        $this->recalculateCompanionBatch($index);
     }
 
     /**
@@ -408,6 +683,14 @@ class EventCreate extends Component
             $rules["events.{$index}.recipe_type_id"] = 'nullable|integer|exists:recipe_types,id';
             $rules["events.{$index}.recipe_id"]      = "{$requiredIfRecipe}|integer|exists:recipes,id";
             $rules["events.{$index}.batch_count"]    = "{$requiredIfRecipe}|string|max:255";
+
+            // The companion is always a recipe event type.
+            if (!empty($event['companion'])) {
+                $rules["events.{$index}.companion.item_type_id"] = 'required|integer';
+                $rules["events.{$index}.companion.item_id"]      = 'required|integer';
+                $rules["events.{$index}.companion.recipe_id"]    = 'required|integer|exists:recipes,id';
+                $rules["events.{$index}.companion.batch_count"]  = 'required|string|max:255';
+            }
         }
 
         return $rules;
@@ -420,6 +703,10 @@ class EventCreate extends Component
         'events.*.item_id.required'        => 'Item is required.',
         'events.*.recipe_id.required'      => 'Recipe is required.',
         'events.*.batch_count.required'    => 'Batch number is required.',
+        'events.*.companion.item_type_id.required' => 'Item type is required.',
+        'events.*.companion.item_id.required'      => 'Item is required.',
+        'events.*.companion.recipe_id.required'    => 'Recipe is required.',
+        'events.*.companion.batch_count.required'  => 'Batch number is required.',
     ];
 
     /**
@@ -453,6 +740,52 @@ class EventCreate extends Component
             'planned_duration'    => $hasRecipe ? null : $duration,
             'to_time'             => $toTime,
         ];
+    }
+
+    /**
+     * Create or update the companion event run in parallel with $lead. New
+     * companions start unplaced, like any new event; a placed one has its
+     * duration recomputed for its lane, as the lead's is.
+     */
+    private function saveCompanion(Event $lead, array $companion): \Illuminate\Support\Collection
+    {
+        $data = [
+            'plan_id'         => $this->planId,
+            'linked_event_id' => $lead->id,
+            'event_type_id'   => $companion['event_type_id'],
+            'name'            => EventType::find($companion['event_type_id'])?->name ?? '',
+            'item_type_id'    => $companion['item_type_id'] ?: null,
+            'item_id'         => $companion['item_id'],
+            'recipe_type_id'  => $companion['recipe_type_id'],
+            'recipe_id'       => $companion['recipe_id'],
+            'batch_count'     => $companion['batch_count'],
+        ];
+
+        $existing = !empty($companion['id'])
+            ? Event::where('plan_id', $this->planId)->find($companion['id'])
+            : null;
+
+        if (!$existing) {
+            Event::create($data);
+
+            return collect();
+        }
+
+        $placement = $this->recomputePlacedDuration($data + [
+            'placeable_type' => $existing->placeable_type,
+            'placeable_id'   => $existing->placeable_id,
+            'from_time_raw'  => $existing->from_time,
+            'duration'       => null,
+        ], true);
+
+        // The pair's shared window is set by syncPair() once both are saved;
+        // this keeps the link right when only the companion is placed.
+        ['to_plan_id' => $toPlanId, 'created' => $created] =
+            $this->carryOverService->carryOverLink($this->plan, $existing->from_time, $placement['to_time']);
+
+        $existing->update($data + $placement + ['to_plan_id' => $toPlanId]);
+
+        return $created;
     }
 
     public function submit(): void
@@ -507,10 +840,19 @@ class EventCreate extends Component
                     Event::where('id', $event['id'])
                         ->where('plan_id', $this->planId)
                         ->update($data);
+
+                    $lead = Event::where('plan_id', $this->planId)->find($event['id']);
                 } else {
                     // New events start unplaced — their time slot is set by
                     // dragging them onto the plan board calendar.
-                    Event::create($data);
+                    $lead = Event::create($data);
+                }
+
+                if ($lead && !empty($event['companion'])) {
+                    $createdPlans = $createdPlans->merge($this->saveCompanion($lead, $event['companion']));
+
+                    // Both run on one window — as long as the longer of the two.
+                    $createdPlans = $createdPlans->merge($this->linkedEvents->syncPair($lead->fresh()));
                 }
             }
 

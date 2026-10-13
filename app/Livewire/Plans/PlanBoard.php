@@ -21,6 +21,7 @@ use App\Models\StockIn;
 use App\Models\Waste;
 use App\Services\ApiService;
 use App\Services\InventoryService;
+use App\Services\LinkedEventService;
 use App\Services\PlanCarryOverService;
 use App\Services\RecipeDurationService;
 use Carbon\Carbon;
@@ -104,13 +105,15 @@ class PlanBoard extends Component
     protected RecipeDurationService $durationService;
     protected PlanCarryOverService $carryOverService;
     protected InventoryService $inventory;
+    protected LinkedEventService $linkedEvents;
 
-    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService, InventoryService $inventory): void
+    public function boot(ApiService $api, RecipeDurationService $durationService, PlanCarryOverService $carryOverService, InventoryService $inventory, LinkedEventService $linkedEvents): void
     {
         $this->api              = $api;
         $this->durationService  = $durationService;
         $this->carryOverService = $carryOverService;
         $this->inventory        = $inventory;
+        $this->linkedEvents     = $linkedEvents;
     }
 
     public function mount($id): void
@@ -199,7 +202,7 @@ class PlanBoard extends Component
 
     protected function loadEvents(): void
     {
-        $events = Event::with('eventType', 'recipe', 'productionLine', 'placeable', 'statusLogs', 'pauseActivities')
+        $events = Event::with('eventType', 'recipe', 'productionLine', 'placeable', 'statusLogs', 'pauseActivities', 'companionEvent.eventType', 'leadEvent.eventType')
             ->withExists(['pauseActivities as has_open_emergencies' => fn($q) => $q->whereNull('ended_at')])
             ->where('plan_id', $this->plan->id)
             ->orderBy('from_time')
@@ -223,7 +226,7 @@ class PlanBoard extends Component
 
         $dayStart = Carbon::parse($this->plan->date)->startOfDay();
 
-        return Event::with('eventType', 'recipe', 'productionLine', 'placeable', 'statusLogs', 'pauseActivities')
+        return Event::with('eventType', 'recipe', 'productionLine', 'placeable', 'statusLogs', 'pauseActivities', 'companionEvent.eventType', 'leadEvent.eventType')
             ->where('plan_id', '!=', $this->plan->id)
             ->whereNotNull('placeable_id')
             ->whereNotNull('from_time')
@@ -711,6 +714,15 @@ class PlanBoard extends Component
             ->addMinutes($slot * 15)
             ->format('Y-m-d H:i:s');
 
+        // A companion runs in parallel with the event it's linked to, so it
+        // starts when that one does — once that one is placed, the drop only
+        // picks its lane.
+        $lead = $this->leadOf($event);
+
+        if ($lead?->placeable_id && $lead->from_time) {
+            $newFrom = Carbon::parse($lead->from_time)->format('Y-m-d H:i:s');
+        }
+
         $event->production_line_id = $productionLineId;
         $event->placeable_type     = $placeableClass;
         $event->placeable_id       = $placeableId;
@@ -739,6 +751,9 @@ class PlanBoard extends Component
         $event->to_plan_id = $toPlanId;
         $event->save();
 
+        // A linked pair shares one window, as long as the longer of the two.
+        $createdPlans = $createdPlans->merge($this->linkedEvents->syncPair($lead ?: $event));
+
         if ($message = $this->carryOverService->describeCreatedPlans($createdPlans)) {
             $this->dispatch('carryOverPlanCreated', message: "This event runs past midnight — {$message}");
         }
@@ -757,6 +772,19 @@ class PlanBoard extends Component
             return;
         }
 
+        $this->clearPlacement($event);
+
+        if ($lead = $this->leadOf($event)) {
+            // The lead no longer waits on its companion: back to its own length.
+            $this->linkedEvents->syncPair($lead);
+        } elseif (($companion = Event::where('linked_event_id', $event->id)->first()) && !$companion->status) {
+            // The companion runs alongside, so it comes off the board too.
+            $this->clearPlacement($companion);
+        }
+    }
+
+    protected function clearPlacement(Event $event): void
+    {
         $event->production_line_id  = null;
         $event->placeable_type      = null;
         $event->placeable_id        = null;
@@ -781,6 +809,11 @@ class PlanBoard extends Component
             ->where('plan_id', $this->plan->id)
             ->findOrFail($eventId);
 
+        // A companion starts and ends with the event it runs with, from there.
+        if ($this->rejectedAsCompanion($event, $action)) {
+            return;
+        }
+
         if (!$this->assertTransitionAllowed($event, $action)) {
             return;
         }
@@ -802,14 +835,22 @@ class PlanBoard extends Component
             return;
         }
 
+        // Starting or ending an event with a companion does the same to both,
+        // so the companion has to be ready for it too.
+        $companion = in_array($action, ['start', 'terminate'], true) ? $this->companionOf($event) : null;
+
+        if ($companion && !$this->companionReady($companion, $action)) {
+            return;
+        }
+
         $this->resetActionForm();
 
         // Every status change opens a modal: start records used items (recipe
         // inputs, or the event type's defined items) and the start time; end
         // records produced quantities and the end time; pause/resume a reason.
         match ($action) {
-            'start'     => $this->prepareStartModal($event),
-            'terminate' => $this->prepareTerminateModal($event),
+            'start'     => $this->prepareStartModal($event, $companion),
+            'terminate' => $this->prepareTerminateModal($event, $companion),
             'pause'     => $this->preparePauseModal($event),
             'resume'    => $this->prepareResumeModal($event),
         };
@@ -817,7 +858,7 @@ class PlanBoard extends Component
         $this->dispatch('openEventActionModal');
     }
 
-    protected function assertTransitionAllowed(Event $event, string $action): bool
+    protected function assertTransitionAllowed(Event $event, string $action, string $subject = 'an event'): bool
     {
         $current = $event->status ?: null;
 
@@ -830,7 +871,7 @@ class PlanBoard extends Component
 
         $this->dispatch('swal:error', [
             'title' => 'Action not allowed',
-            'text'  => "You can't {$verb} an event while it is \"{$label}\".",
+            'text'  => "You can't {$verb} {$subject} while it is \"{$label}\".",
         ]);
 
         return false;
@@ -847,7 +888,7 @@ class PlanBoard extends Component
      * Resume/end are blocked while emergency events are still ongoing, so
      * every one of them gets an end time and note.
      */
-    protected function blockedByOpenEmergencies(Event $event, string $action): bool
+    protected function blockedByOpenEmergencies(Event $event, string $action, string $subject = 'This event'): bool
     {
         $count = $this->openEmergencyCount($event->id);
 
@@ -860,7 +901,7 @@ class PlanBoard extends Component
 
         $this->dispatch('swal:error', [
             'title' => 'Ongoing emergency events',
-            'text'  => "This event has {$count} ongoing emergency event" . ($plural ? 's' : '')
+            'text'  => "{$subject} has {$count} ongoing emergency event" . ($plural ? 's' : '')
                 . '. Use the "Emergency" button to end ' . ($plural ? 'them' : 'it')
                 . " before {$verb} the event.",
         ]);
@@ -885,6 +926,93 @@ class PlanBoard extends Component
         $this->resetValidation();
     }
 
+    // ─── Linked events (an event type executed with another) ─────────────────
+    //
+    // A lead event (e.g. production on a line) and its companion (e.g. the
+    // packaging of that run) run in parallel: the companion starts and ends
+    // with its lead, from the lead's Start/End, in one modal that covers both.
+    // Pause, resume and emergency events stay per event. The pre-finished good
+    // passes straight from lead to companion, so it's never checked, reserved
+    // or stocked — see LinkedEventService::handoffItemTypeIds().
+
+    /** The companion run with $event, loaded with what the modals read. */
+    protected function companionOf(Event $event): ?Event
+    {
+        return Event::with('eventType.eventTypeItems', 'recipe.inputs', 'recipe.sideProducts', 'recipe.recipeType')
+            ->where('linked_event_id', $event->id)
+            ->first();
+    }
+
+    /** On a companion: the event it runs with (null once that's deleted). */
+    protected function leadOf(Event $event): ?Event
+    {
+        return $event->linked_event_id
+            ? Event::with('eventType')->find($event->linked_event_id)
+            : null;
+    }
+
+    /**
+     * A companion can't be started or ended on its own — it goes with its
+     * lead. Shows why and returns true when $event is one.
+     */
+    protected function rejectedAsCompanion(Event $event, string $action): bool
+    {
+        if (!in_array($action, ['start', 'terminate'], true) || !($lead = $this->leadOf($event))) {
+            return false;
+        }
+
+        $verb = $action === 'terminate' ? 'end' : 'start';
+
+        $this->dispatch('swal:error', [
+            'title' => 'Runs with another event',
+            'text'  => "This {$event->eventType?->name} event runs together with {$lead->eventType?->name} #{$lead->id}. "
+                . ucfirst($verb) . " that event and both will {$verb} at once.",
+        ]);
+
+        return true;
+    }
+
+    /** The companion side of a pair's start/end guards. */
+    protected function companionReady(Event $companion, string $action): bool
+    {
+        $name = $companion->eventType?->name ?? 'linked';
+
+        if ($action === 'start' && !$companion->placeable_id) {
+            $this->dispatch('swal:error', [
+                'title' => 'Event not placed',
+                'text'  => "The {$name} event that runs with this one isn't placed yet. Place it on a lane before starting — both start together.",
+            ]);
+
+            return false;
+        }
+
+        if (!$this->assertTransitionAllowed($companion, $action, "the {$name} event that runs with this one")) {
+            return false;
+        }
+
+        return !($action === 'terminate' && $this->blockedByOpenEmergencies($companion, $action, "The {$name} event that runs with this one"));
+    }
+
+    /** What the start/end modal needs to show the companion's half of a pair. */
+    protected function pairPayload(Event $event, ?Event $companion): array
+    {
+        if (!$companion) {
+            return ['companion' => null];
+        }
+
+        return [
+            'placeable_name' => $this->placeableFor($event)?->name,
+            'companion'      => [
+                'event_id'       => $companion->id,
+                'type_name'      => $companion->eventType?->name ?? 'No type',
+                'color'          => $companion->eventType?->color ?? '#818cf8',
+                'has_recipe'     => (bool) $companion->eventType?->has_recipe && $companion->recipe,
+                'placeable_name' => $this->placeableFor($companion)?->name,
+                'batch_count'    => $this->batchCountFor($companion),
+            ],
+        ];
+    }
+
     protected function baseActionPayload(Event $event, string $action): array
     {
         return [
@@ -896,13 +1024,38 @@ class PlanBoard extends Component
         ];
     }
 
-    protected function prepareStartModal(Event $event): void
+    protected function prepareStartModal(Event $event, ?Event $companion = null): void
+    {
+        $hasRecipe = (bool) $event->eventType?->has_recipe && $event->recipe;
+
+        $this->actionInputs = $this->startRows($event, 'lead');
+
+        // A pair is started in one go: the companion's inputs follow the
+        // lead's, minus what the lead hands it directly.
+        if ($companion) {
+            $handoff = $this->linkedEvents->handoffItemTypeIds($event->recipe, $companion->recipe);
+
+            $this->actionInputs = array_merge($this->actionInputs, $this->startRows($companion, 'companion', $handoff));
+        }
+
+        $this->eventAction = array_merge($this->baseActionPayload($event, 'start'), [
+            'has_recipe' => $hasRecipe,
+        ], $this->pairPayload($event, $companion));
+    }
+
+    /**
+     * One event's rows for the start modal, tagged with its role in the modal
+     * ('lead', or 'companion' for the second half of a pair). Rows of an item
+     * type in $handoffItemTypeIds pass straight from the lead and are only
+     * shown — never entered, checked or reserved.
+     */
+    protected function startRows(Event $event, string $role, array $handoffItemTypeIds = []): array
     {
         $hasRecipe = (bool) $event->eventType?->has_recipe && $event->recipe;
 
         if ($hasRecipe) {
             // Recipe events: the recipe's inputs, with their planned quantity.
-            $this->actionInputs = $event->recipe->inputs
+            $rows = $event->recipe->inputs
                 ->map(fn(RecipeInput $input) => $this->quantityRow(
                     $input->item_type_id,
                     $input->item_id,
@@ -915,15 +1068,15 @@ class PlanBoard extends Component
         } else {
             // Non-recipe events: the standard items defined on the event type,
             // each with its planned quantity as the "original".
-            $this->actionInputs = $this->eventTypeItemRows($event->eventType);
+            $rows = $this->eventTypeItemRows($event->eventType);
         }
 
-        $this->actionInputs = $this->withPlannedAsActual($this->actionInputs);
-        $this->actionInputs = $this->withAvailableStock($event, $this->actionInputs);
+        foreach ($rows as $i => $row) {
+            $rows[$i]['role']    = $role;
+            $rows[$i]['handoff'] = in_array((int) ($row['item_type_id'] ?? 0), $handoffItemTypeIds, true);
+        }
 
-        $this->eventAction = array_merge($this->baseActionPayload($event, 'start'), [
-            'has_recipe' => $hasRecipe,
-        ]);
+        return $this->withAvailableStock($event, $this->withPlannedAsActual($rows));
     }
 
     /**
@@ -971,6 +1124,15 @@ class PlanBoard extends Component
     protected function withAvailableStock(Event $event, array $rows): array
     {
         foreach ($rows as $i => $row) {
+            // Passed straight from the lead — no warehouse is involved.
+            if (!empty($row['handoff'])) {
+                $rows[$i]['warehouse_id']       = null;
+                $rows[$i]['warehouse_name']     = null;
+                $rows[$i]['available_quantity'] = null;
+
+                continue;
+            }
+
             $warehouseId = $this->outWarehouseId($event, $row['item_type_id'] ?? null);
             $itemId      = (int) ($row['item_id'] ?? 0);
             $unitId      = (int) ($row['item_unit_id'] ?? 0);
@@ -1035,46 +1197,76 @@ class PlanBoard extends Component
             ->all();
     }
 
-    protected function prepareTerminateModal(Event $event): void
+    protected function prepareTerminateModal(Event $event, ?Event $companion = null): void
     {
-        $hasRecipe  = (bool) $event->eventType?->has_recipe && $event->recipe;
-        $batchCount = $this->batchCountFor($event);
+        $hasRecipe = (bool) $event->eventType?->has_recipe && $event->recipe;
+        $handoff   = $companion ? $this->linkedEvents->handoffItemTypeIds($event->recipe, $companion->recipe) : [];
 
-        if ($hasRecipe) {
-            $recipe = $event->recipe;
-
-            $this->actionOutputs = [$this->producedRow(
-                $recipe->item_type_id,
-                $event->item_id ?: $recipe->item_id,
-                $recipe->item_unit_id,
-                (float) ($recipe->quantity_per_batch ?? 0),
-                $batchCount,
-            )];
-
-            $this->actionSideProducts = $recipe->sideProducts
-                ->map(fn(RecipeSideProduct $side) => $this->producedRow(
-                    $side->item_type_id,
-                    $side->item_id,
-                    $side->item_unit_id,
-                    (float) $side->quantity,
-                    $batchCount,
-                    recipeSideProductId: $side->id,
-                ))
-                ->values()
-                ->all();
-        }
+        [$this->actionOutputs, $this->actionSideProducts] = $this->producedRows($event, 'lead', $handoff);
 
         // Event types whose consumed quantities can't be verified at start were
         // started on their planned amounts; ending reconciles them against what
         // was really used and files the leftover.
-        $this->actionReconciliation = $this->reconciliationRows($event);
+        $this->actionReconciliation = $this->reconciliationRows($event, 'lead');
+
+        // A pair ends in one go: the companion's figures follow the lead's.
+        if ($companion) {
+            [$outputs, $sides] = $this->producedRows($companion, 'companion');
+
+            $this->actionOutputs        = array_merge($this->actionOutputs, $outputs);
+            $this->actionSideProducts   = array_merge($this->actionSideProducts, $sides);
+            $this->actionReconciliation = array_merge($this->actionReconciliation, $this->reconciliationRows($companion, 'companion'));
+        }
 
         // Non-recipe events have nothing produced — the modal just collects
         // the end time and optional notes.
         $this->eventAction = array_merge($this->baseActionPayload($event, 'terminate'), [
             'has_recipe'  => $hasRecipe,
-            'batch_count' => $batchCount,
-        ]);
+            'batch_count' => $this->batchCountFor($event),
+        ], $this->pairPayload($event, $companion));
+    }
+
+    /**
+     * One event's produced item and side products for the end modal, tagged
+     * with its role. A lead's produced item of a handed-over item type (the
+     * pre-finished good) is flagged: its quantity is still recorded, but it
+     * passes straight to the companion and is never stocked.
+     *
+     * @return array{0: array, 1: array} [outputs, side products]
+     */
+    protected function producedRows(Event $event, string $role, array $handoffItemTypeIds = []): array
+    {
+        if (!$event->eventType?->has_recipe || !$event->recipe) {
+            return [[], []];
+        }
+
+        $recipe     = $event->recipe;
+        $batchCount = $this->batchCountFor($event);
+
+        $output = $this->producedRow(
+            $recipe->item_type_id,
+            $event->item_id ?: $recipe->item_id,
+            $recipe->item_unit_id,
+            (float) ($recipe->quantity_per_batch ?? 0),
+            $batchCount,
+        ) + [
+            'role'    => $role,
+            'handoff' => in_array((int) $recipe->item_type_id, $handoffItemTypeIds, true),
+        ];
+
+        $sides = $recipe->sideProducts
+            ->map(fn(RecipeSideProduct $side) => $this->producedRow(
+                $side->item_type_id,
+                $side->item_id,
+                $side->item_unit_id,
+                (float) $side->quantity,
+                $batchCount,
+                recipeSideProductId: $side->id,
+            ) + ['role' => $role, 'handoff' => false])
+            ->values()
+            ->all();
+
+        return [[$output], $sides];
     }
 
     /**
@@ -1086,17 +1278,18 @@ class PlanBoard extends Component
      * other event type keeps the original behaviour of confirming out exactly
      * what was held.
      */
-    protected function reconciliationRows(Event $event): array
+    protected function reconciliationRows(Event $event, string $role = 'lead'): array
     {
         if (!$event->eventType?->start_items_unverifiable) {
             return [];
         }
 
         return $this->reservedInputQuantities($event)
-            ->map(function (EventQuantity $qty) use ($event) {
+            ->map(function (EventQuantity $qty) use ($event, $role) {
                 $start = (float) $qty->actual_quantity;
 
                 return [
+                    'role'                 => $role,
                     'event_quantity_id'    => $qty->id,
                     'item_type_id'         => $qty->item_type_id ? (int) $qty->item_type_id : null,
                     'item_type_name'       => $this->itemTypeName($qty->item_type_id ? (int) $qty->item_type_id : null),
@@ -1779,6 +1972,34 @@ class PlanBoard extends Component
             return;
         }
 
+        // A pair: the companion must still be the one the modal was opened
+        // for, and still ready to go with it.
+        if (in_array($action, ['start', 'terminate'], true)) {
+            if ($this->rejectedAsCompanion($event, $action)) {
+                $this->closeActionModal();
+
+                return;
+            }
+
+            $companion = $this->companionOf($event);
+
+            if ((int) ($companion?->id ?? 0) !== (int) ($this->eventAction['companion']['event_id'] ?? 0)) {
+                $this->dispatch('swal:error', [
+                    'title' => 'The event has changed',
+                    'text'  => 'The events that run together with this one changed since this window opened. Open it again.',
+                ]);
+                $this->closeActionModal();
+
+                return;
+            }
+
+            if ($companion && !$this->companionReady($companion, $action)) {
+                $this->closeActionModal();
+
+                return;
+            }
+        }
+
         match ($action) {
             'start'     => $this->submitStart($event),
             'terminate' => $this->submitTerminate($event),
@@ -2008,32 +2229,55 @@ class PlanBoard extends Component
 
     protected function submitStart(Event $event): void
     {
-        $hasRecipe = (bool) ($this->eventAction['has_recipe'] ?? false);
+        $events = $this->actionEvents($event);
+
+        $hasRecipe = [
+            'lead'      => (bool) ($this->eventAction['has_recipe'] ?? false),
+            'companion' => (bool) ($this->eventAction['companion']['has_recipe'] ?? false),
+        ];
 
         // Recipe inputs are all consumed, so each quantity is required;
         // non-recipe items are candidates — only the ones used are recorded.
-        $this->validate(
-            ['actionInputs.*.actual_quantity' => ($hasRecipe ? 'required' : 'nullable') . '|numeric|min:0'],
-            [],
-            ['actionInputs.*.actual_quantity' => 'used quantity']
-        );
+        // What a companion is handed straight from its lead isn't entered.
+        $rules      = [];
+        $attributes = [];
 
-        // Items to reserve out of stock (every row with a quantity), grouped by
-        // the warehouse their item type is routed to.
-        $reserve = [];
-        foreach ($this->actionInputs as $row) {
-            if ((float) ($row['actual_quantity'] ?? 0) > 0) {
-                $reserve[] = [
-                    'item_type_id' => $row['item_type_id'] ?? null,
-                    'item_id'      => $row['item_id'],
-                    'item_unit_id' => $row['item_unit_id'],
-                    'quantity'     => (float) $row['actual_quantity'],
-                    'item_name'    => $row['item_name'] ?? null,
-                ];
+        foreach ($this->actionInputs as $i => $row) {
+            if (!empty($row['handoff'])) {
+                continue;
             }
+
+            $rules["actionInputs.{$i}.actual_quantity"]      = ($hasRecipe[$row['role'] ?? 'lead'] ? 'required' : 'nullable') . '|numeric|min:0';
+            $attributes["actionInputs.{$i}.actual_quantity"] = 'used quantity';
         }
 
-        $grouped = $this->groupRowsBySourceWarehouse($event, $reserve);
+        $this->validate($rules, [], $attributes);
+
+        // Items to reserve out of stock (every row with a quantity), grouped by
+        // the warehouse their item type is routed to — each event through its
+        // own lane. A pair is checked as one: an item both events use is
+        // summed against the warehouse it comes from.
+        $grouped = [];
+
+        foreach ($events as $role => $roleEvent) {
+            $reserve = [];
+
+            foreach ($this->inputRowsFor($role) as $row) {
+                if ((float) ($row['actual_quantity'] ?? 0) > 0) {
+                    $reserve[] = [
+                        'item_type_id' => $row['item_type_id'] ?? null,
+                        'item_id'      => $row['item_id'],
+                        'item_unit_id' => $row['item_unit_id'],
+                        'quantity'     => (float) $row['actual_quantity'],
+                        'item_name'    => $row['item_name'] ?? null,
+                    ];
+                }
+            }
+
+            foreach ($this->groupRowsBySourceWarehouse($roleEvent, $reserve) as $warehouseId => $rows) {
+                $grouped[$warehouseId] = array_merge($grouped[$warehouseId] ?? [], $rows);
+            }
+        }
 
         // Block the start if any consumed item is not available in the
         // warehouse it comes from, before touching the event or its holds.
@@ -2043,20 +2287,22 @@ class PlanBoard extends Component
 
         DB::beginTransaction();
         try {
-            $log = $this->applyStatusChange($event, 'start', [
-                'notes'       => $this->actionNotes,
-                'happened_at' => $this->parsedActionTime(),
-            ]);
+            foreach ($events as $role => $roleEvent) {
+                $log = $this->applyStatusChange($roleEvent, 'start', [
+                    'notes'       => $this->actionNotes,
+                    'happened_at' => $this->parsedActionTime(),
+                ]);
 
-            foreach ($this->actionInputs as $row) {
-                $quantity = $row['actual_quantity'] ?? null;
+                foreach ($this->inputRowsFor($role) as $row) {
+                    $quantity = $row['actual_quantity'] ?? null;
 
-                // For non-recipe events, skip items with no entered quantity.
-                if (!$hasRecipe && ($quantity === null || $quantity === '' || (float) $quantity <= 0)) {
-                    continue;
+                    // For non-recipe events, skip items with no entered quantity.
+                    if (!$hasRecipe[$role] && ($quantity === null || $quantity === '' || (float) $quantity <= 0)) {
+                        continue;
+                    }
+
+                    $this->storeQuantity($roleEvent, $log, 'input', $row, $this->outWarehouseId($roleEvent, $row['item_type_id'] ?? null));
                 }
-
-                $this->storeQuantity($event, $log, 'input', $row, $this->outWarehouseId($event, $row['item_type_id'] ?? null));
             }
 
             // Hold the consumed items in process. The pre-check above guards
@@ -2075,6 +2321,34 @@ class PlanBoard extends Component
         }
 
         $this->closeActionModal();
+    }
+
+    /**
+     * The events a start/end modal acts on, by role: the event itself, plus
+     * its companion when the modal was opened for a pair.
+     *
+     * @return array<string, Event>
+     */
+    protected function actionEvents(Event $event): array
+    {
+        $companion = !empty($this->eventAction['companion']) ? $this->companionOf($event) : null;
+
+        return array_filter(['lead' => $event, 'companion' => $companion]);
+    }
+
+    /** One role's start rows, bar what passes straight from the lead. */
+    protected function inputRowsFor(string $role): array
+    {
+        return array_filter(
+            $this->actionInputs,
+            fn(array $row) => ($row['role'] ?? 'lead') === $role && empty($row['handoff'])
+        );
+    }
+
+    /** One role's rows of an end-modal table, keeping their indexes. */
+    protected function rowsOfRole(array $rows, string $role): array
+    {
+        return array_filter($rows, fn(array $row) => ($row['role'] ?? 'lead') === $role);
     }
 
     protected function submitTerminate(Event $event): void
@@ -2101,53 +2375,19 @@ class PlanBoard extends Component
             ]
         );
 
-        $inWarehouseId = $this->inWarehouseId($event);
-        $endedAt       = $this->parsedActionTime();
+        $endedAt = $this->parsedActionTime();
 
         DB::beginTransaction();
         try {
-            $log = $this->applyStatusChange($event, 'terminate', [
-                'notes'       => $this->actionNotes,
-                'happened_at' => $endedAt,
-            ]);
+            // A pair ends as one: both events' operations go to the inventory
+            // in a single batch, so either both end or neither does.
+            $ops = [];
 
-            $produced = collect();
-
-            // Produced items are added straight in, so they're confirmed now.
-            foreach ($this->actionOutputs as $row) {
-                $produced->push($this->storeQuantity($event, $log, 'output', $row, $inWarehouseId, $endedAt));
-            }
-
-            foreach ($this->actionSideProducts as $row) {
-                $produced->push($this->storeQuantity($event, $log, 'side_product', $row, $inWarehouseId, $endedAt));
-            }
-
-            // Consumed inputs (held in process at start): in process → out of
-            // the warehouse each was held in — item types can be routed to
-            // different stores. Produced item + side products: added into the
-            // single finished-goods store.
-            //
-            // Event types whose start quantities can't be verified take the
-            // reconciled route instead: only what was really used is consumed,
-            // and the leftover is filed as its own Stock In / Waste document.
-            $ops = $this->actionReconciliation
-                ? $this->settleLeftovers($event, $endedAt)
-                : $this->confirmOutOpsByWarehouse(
-                    $this->reservedInputQuantities($event),
-                    $this->outWarehouseId($event)
-                );
-
-            if ($inWarehouseId) {
-                $ops = array_merge($ops, $this->stockInOps($inWarehouseId, $produced));
+            foreach ($this->actionEvents($event) as $role => $roleEvent) {
+                $ops = array_merge($ops, $this->endEvent($roleEvent, $role, $endedAt));
             }
 
             $this->inventory->applyOrFail($ops);
-
-            // Mark the consumed inputs as confirmed out for the activity report.
-            EventQuantity::where('event_id', $event->id)
-                ->where('source', 'input')
-                ->whereNull('confirmed_at')
-                ->update(['confirmed_at' => $endedAt]);
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -2161,6 +2401,68 @@ class PlanBoard extends Component
         }
 
         $this->closeActionModal();
+    }
+
+    /**
+     * End one event of what's being ended (the event, or each half of a pair):
+     * writes its log and quantities, and returns its inventory operations for
+     * the caller to apply as its last step.
+     */
+    protected function endEvent(Event $event, string $role, Carbon $endedAt): array
+    {
+        $inWarehouseId = $this->inWarehouseId($event);
+
+        $log = $this->applyStatusChange($event, 'terminate', [
+            'notes'       => $this->actionNotes,
+            'happened_at' => $endedAt,
+        ]);
+
+        $produced = collect();
+
+        // Produced items are added straight in, so they're confirmed now — bar
+        // a lead's pre-finished good, which went straight to its companion:
+        // its quantity is recorded against no warehouse and never stocked.
+        foreach ($this->rowsOfRole($this->actionOutputs, $role) as $row) {
+            $handoff  = !empty($row['handoff']);
+            $quantity = $this->storeQuantity($event, $log, 'output', $row, $handoff ? null : $inWarehouseId, $endedAt);
+
+            if (!$handoff) {
+                $produced->push($quantity);
+            }
+        }
+
+        foreach ($this->rowsOfRole($this->actionSideProducts, $role) as $row) {
+            $produced->push($this->storeQuantity($event, $log, 'side_product', $row, $inWarehouseId, $endedAt));
+        }
+
+        // Consumed inputs (held in process at start): in process → out of
+        // the warehouse each was held in — item types can be routed to
+        // different stores. Produced item + side products: added into the
+        // single finished-goods store.
+        //
+        // Event types whose start quantities can't be verified take the
+        // reconciled route instead: only what was really used is consumed,
+        // and the leftover is filed as its own Stock In / Waste document.
+        $reconciliation = $this->rowsOfRole($this->actionReconciliation, $role);
+
+        $ops = $reconciliation
+            ? $this->settleLeftovers($event, $endedAt, $reconciliation)
+            : $this->confirmOutOpsByWarehouse(
+                $this->reservedInputQuantities($event),
+                $this->outWarehouseId($event)
+            );
+
+        if ($inWarehouseId) {
+            $ops = array_merge($ops, $this->stockInOps($inWarehouseId, $produced));
+        }
+
+        // Mark the consumed inputs as confirmed out for the activity report.
+        EventQuantity::where('event_id', $event->id)
+            ->where('source', 'input')
+            ->whereNull('confirmed_at')
+            ->update(['confirmed_at' => $endedAt]);
+
+        return $ops;
     }
 
     /**
@@ -2231,12 +2533,12 @@ class PlanBoard extends Component
      * Either way the total confirmed out of the warehouse equals what was held,
      * so the on-hand a successful end requires is unchanged from before.
      */
-    protected function settleLeftovers(Event $event, Carbon $endedAt): array
+    protected function settleLeftovers(Event $event, Carbon $endedAt, array $rows): array
     {
         $ops       = [];
         $documents = [];   // "warehouseId:action" => one document per group
 
-        foreach ($this->actionReconciliation as $row) {
+        foreach ($rows as $row) {
             $quantity = EventQuantity::find($row['event_quantity_id'] ?? null);
 
             // The modal's rows are client state: only settle quantities that
@@ -2526,6 +2828,10 @@ class PlanBoard extends Component
         $isCarryOver     = (int) $event->plan_id !== (int) $this->plan->id;
         $crossesMidnight = $this->carryOverService->crossesMidnight($event->from_time, $event->to_time);
 
+        // The other half of a linked pair, either way round.
+        $lead   = $this->leadOf($event);
+        $linked = $lead ?: Event::with('eventType')->where('linked_event_id', $event->id)->first();
+
         // How many days after its start day the event ends (0 = same day),
         // for the "+N day(s)" hint next to the end time.
         $toDayOffset = $crossesMidnight
@@ -2557,6 +2863,13 @@ class PlanBoard extends Component
                 default            => null,
             },
             'placeable_name'       => $placeableName,
+            'linked'               => $linked ? [
+                'id'        => $linked->id,
+                'type_name' => $linked->eventType?->name ?? 'No type',
+                'color'     => $linked->eventType?->color ?? '#818cf8',
+                'is_lead'   => (bool) $lead,
+                'placed'    => (bool) $linked->placeable_id,
+            ] : null,
             'description'          => $event->description,
             'status'               => $event->status
                 ? (self::EVENT_STATUS_LABELS[$event->status] ?? ucfirst($event->status))
@@ -2568,7 +2881,26 @@ class PlanBoard extends Component
 
     public function deleteEvent(int $eventId): void
     {
-        Event::where('plan_id', $this->plan->id)->where('id', $eventId)->delete();
+        $event = Event::with('eventType')->where('plan_id', $this->plan->id)->find($eventId);
+
+        if (!$event) {
+            return;
+        }
+
+        // A companion exists because of its lead — it goes when that goes.
+        if ($lead = $this->leadOf($event)) {
+            $this->dispatch('swal:error', [
+                'title' => 'Runs with another event',
+                'text'  => "This {$event->eventType?->name} event runs together with {$lead->eventType?->name} #{$lead->id}. Delete that event to remove both.",
+            ]);
+
+            return;
+        }
+
+        DB::transaction(function () use ($event) {
+            Event::where('linked_event_id', $event->id)->delete();
+            $event->delete();
+        });
 
         $this->selectedEvent = null;
         $this->dispatch('closeEventDetailsModal');

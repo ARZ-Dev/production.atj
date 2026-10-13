@@ -14,6 +14,14 @@
               $showPerBatch (bool, default false) — add a "Per Batch" column
               and spell out "per batch × batches" under the total, for
               produced quantities that scale with the event's batch count.
+              $keyPrefix (string, default $model) — wire:key prefix, for a
+              modal that draws one $model as several tables (a linked pair).
+              $handoffMode ('skip' | 'record', default 'skip') + $handoffNote —
+              how rows flagged `handoff` (the pre-finished good passed straight
+              between a linked pair) are drawn: 'skip' shows the row without an
+              input (a companion's start — never entered, checked or reserved);
+              'record' keeps the input (a lead's end — recorded, never stocked).
+              Either way $handoffNote is printed under the item name.
 
     The quantity input binds deferred (plain wire:model), so nothing is sent
     while the operator types and an in-flight response can never write a stale
@@ -26,6 +34,9 @@
     $showOriginal  = $showOriginal ?? true;
     $showAvailable = $showAvailable ?? false;
     $showPerBatch  = $showPerBatch ?? false;
+    $keyPrefix     = $keyPrefix ?? $model;
+    $handoffMode   = $handoffMode ?? 'skip';
+    $handoffNote   = $handoffNote ?? null;
 
     $colSpan = 3
         + ($showAvailable ? 1 : 0)
@@ -60,7 +71,7 @@
             </tr>
         </thead>
         @foreach($groups as $groupName => $groupRows)
-        <tbody wire:key="{{ $model }}-group-{{ $loop->index }}">
+        <tbody wire:key="{{ $keyPrefix }}-group-{{ $loop->index }}">
             <tr class="aqt-group-row">
                 <td colspan="{{ $colSpan }}" class="aqt-group-title">
                     <i class="bi bi-tag-fill me-1"></i>{{ $groupName }}
@@ -68,13 +79,24 @@
                 </td>
             </tr>
             @foreach($groupRows as $i => $row)
-            <tr wire:key="{{ $model }}-row-{{ $i }}">
-                <td>{{ $row['item_name'] ?? '—' }}</td>
+            @php
+                $handoff     = !empty($row['handoff']);
+                $skipHandoff = $handoff && $handoffMode === 'skip';
+            @endphp
+            <tr wire:key="{{ $model }}-row-{{ $i }}" class="{{ $handoff ? 'aqt-row--handoff' : '' }}">
+                <td>
+                    {{ $row['item_name'] ?? '—' }}
+                    @if($handoff && $handoffNote)
+                    <div class="aqt-handoff-note"><i class="bi bi-arrow-left-right"></i> {{ $handoffNote }}</div>
+                    @endif
+                </td>
                 <td>{{ $row['unit_name'] ?? '—' }}</td>
                 @if($showAvailable)
                 @php $available = $row['available_quantity'] ?? null; @endphp
                 <td>
-                    @if($available === null)
+                    @if($skipHandoff)
+                    <span class="aqt-stock aqt-stock--unknown" title="Passed straight between the two events — not held in any warehouse.">Not stocked</span>
+                    @elseif($available === null)
                     <span class="aqt-stock aqt-stock--unknown"
                         title="{{ $row['warehouse_id'] ? 'Stock could not be read from the inventory service.' : 'No source warehouse is configured for this item type.' }}">—</span>
                     @else
@@ -106,6 +128,10 @@
                 </td>
                 @endif
                 <td>
+                    @if($skipHandoff)
+                    {{-- Not entered: nothing is taken from stock for it. --}}
+                    <input type="text" class="form-control form-control-sm" value="—" disabled>
+                    @else
                     <input type="number" step="any" min="0"
                         class="form-control form-control-sm @error("{$model}.{$i}.actual_quantity") is-invalid @enderror"
                         wire:model="{{ $model }}.{{ $i }}.actual_quantity" placeholder="0"
@@ -113,12 +139,13 @@
                     @error("{$model}.{$i}.actual_quantity")
                     <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
+                    @endif
                 </td>
                 @if($showOriginal)
                 <td>
                     <div class="input-group input-group-sm">
                         <input type="text" class="form-control" data-qty-percent
-                            value="{{ ($row['percentage'] ?? null) !== null ? $row['percentage'] + 0 : '' }}" disabled>
+                            value="{{ !$skipHandoff && ($row['percentage'] ?? null) !== null ? $row['percentage'] + 0 : '' }}" disabled>
                         <span class="input-group-text">%</span>
                     </div>
                 </td>
