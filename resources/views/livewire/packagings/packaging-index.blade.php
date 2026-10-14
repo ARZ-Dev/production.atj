@@ -66,6 +66,11 @@
                                     </td>
                                     <td>
                                         @hasPermission('production.packaging-edit')
+                                        <a href="{{ route('packagings.capacity', $packaging->id) }}"
+                                            class="btn btn-light-success icon-btn-sm"
+                                            data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="Manage Capacity">
+                                            <i class="bi bi-speedometer2"></i>
+                                        </a>
                                         <a href="{{ route('packagings.edit', $packaging->id) }}"
                                             class="btn btn-light-primary icon-btn-sm"
                                             data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="Edit">
