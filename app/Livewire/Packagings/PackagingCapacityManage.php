@@ -14,6 +14,8 @@ class PackagingCapacityManage extends Component
     public int    $packagingId;
     #[Locked]
     public string $packagingName = '';
+    #[Locked]
+    public int    $storedCount = 0;   // capacities on file when the page opened
 
     #[Locked]
     public array $item_type_ids = [];   // set only through setItemTypes()
@@ -59,6 +61,7 @@ class PackagingCapacityManage extends Component
             $typeIds[] = $unitTypes[$capacity->item_unit_id] ?? $capacity->item_type_id;
         }
 
+        $this->storedCount   = $packaging->capacities->count();
         $this->item_type_ids = $this->knownTypeIds($typeIds);
         $this->fillBlankCapacities();
     }

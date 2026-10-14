@@ -68,6 +68,13 @@
                 </div>
 
                 @if(empty($groups))
+                @if($storedCount > 0 && $catalogLoaded)
+                {{-- Save is always available, so say what it does with nothing ticked. --}}
+                <div class="alert alert-warning d-flex align-items-start gap-2">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>No item types are selected — saving now clears all {{ $storedCount }} {{ \Illuminate\Support\Str::plural('capacity', $storedCount) }} set for this packaging.</div>
+                </div>
+                @endif
                 <div class="pv-empty">
                     <i class="bi bi-box-seam"></i>
                     <p class="mb-0 text-muted">Select one or more item types above to list their items and units.</p>

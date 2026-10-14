@@ -6,219 +6,266 @@
     </div>
     @endif
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="card-title mb-0">
-                            Manage Capacity — {{ $modelName }}
-                        </h5>
-                        <small class="text-muted text-capitalize">{{ $modelType }}</small>
+    <form wire:submit.prevent="save">
+
+        {{-- Capacity Card --}}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <div>
+                    <h5 class="mb-0">Capacity — {{ $modelName }}</h5>
+                    <small class="text-muted">Output per hour this {{ $modelType }} can produce — one figure per item, entered in any of its units.</small>
+                </div>
+                <a href="{{ $modelType === 'preparation' ? route('preparations') : route('lines') }}"
+                    class="btn btn-light-light text-muted">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+            </div>
+            <div class="card-body">
+
+                @if(!$catalogLoaded)
+                <div class="alert alert-warning d-flex align-items-start gap-2">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>Items couldn't be loaded from the auth service. Capacities can't be edited until it's reachable — reload the page to try again.</div>
+                </div>
+                @endif
+
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-lg-8">
+                        <label for="cap_item_type_ids" class="form-label">Item Types</label>
+                        <div wire:ignore>
+                            <select id="cap_item_type_ids" multiple
+                                class="selectpicker w-100"
+                                title="Select the item types to set capacities for…"
+                                data-style="btn-default"
+                                data-live-search="true"
+                                data-actions-box="true"
+                                data-selected-text-format="count > 3"
+                                data-size="8">
+                                @foreach($itemTypes as $type)
+                                <option value="{{ $type['id'] }}"
+                                    data-subtext="{{ $type['item_count'] }} {{ \Illuminate\Support\Str::plural('item', $type['item_count']) }}"
+                                    @selected(in_array($type['id'], $item_type_ids, true))>
+                                    {{ $type['name'] }}
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @error('item_type_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                     </div>
-                    <a href="{{ $modelType === 'preparation' ? route('preparations') : route('lines') }}"
-                        class="btn btn-light-secondary">
-                        <i class="bi bi-arrow-left me-1"></i> Back
-                    </a>
+
+                    <div class="col-lg-4" wire:ignore>
+                        <label for="cap_item_filter" class="form-label">Find Item</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="search" id="cap_item_filter" class="form-control"
+                                placeholder="Filter by item name or code…" autocomplete="off">
+                        </div>
+                    </div>
                 </div>
 
-                <div class="card-body">
-
-                    {{-- Add Item Type --}}
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Add Item Type</label>
-                        @if(empty($this->availableItemTypes()))
-                        <p class="text-muted small mb-0">All item types have been added.</p>
-                        @else
-                        <div class="d-flex flex-wrap gap-2">
-                            @foreach($this->availableItemTypes() as $type)
-                            <button type="button" wire:click="addItemType({{ $type['id'] }})"
-                                class="btn btn-outline-primary btn-sm">
-                                <i class="bi bi-plus-lg me-1"></i> {{ $type['name'] }}
-                            </button>
-                            @endforeach
-                        </div>
-                        @endif
-                    </div>
-
-                    {{-- Item type sections --}}
-                    @if(empty($sections) && empty($removedTypeIds))
-                    <div class="alert alert-secondary">
-                        <i class="bi bi-arrow-up-circle me-2"></i>
-                        Add an item type above to set capacity values.
-                    </div>
-                    @else
-                    <form wire:submit.prevent="save">
-                        {{-- Every section removed: Save must stay reachable, or the removal is never stored. --}}
-                        @if(empty($sections))
-                        <div class="alert alert-warning">
-                            <i class="bi bi-exclamation-triangle me-2"></i>
-                            Every item type has been removed. Save to clear all capacities for this {{ $modelType }}, or add an item type back above.
-                        </div>
-                        @endif
-
-                        @foreach($sections as $typeId => $section)
-                        <div class="card mb-3" wire:key="cap-section-{{ $typeId }}">
-                            <div class="card-header d-flex justify-content-between align-items-center py-2">
-                                <h6 class="fw-semibold mb-0 text-capitalize">{{ $section['item_type_name'] }}</h6>
-                                <button type="button" class="btn btn-light-danger icon-btn-sm" wire:click="removeItemType({{ $typeId }})" title="Remove">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-                            <div class="card-body">
-
-                            @if(!empty($section['items']))
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th style="width:25%">Item</th>
-                                            <th style="width:75%">Output / Hr — enter in any unit</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($section['items'] as $item)
-                                        @php
-                                            $units      = $itemUnits[$item['id']] ?? [];
-                                            $row        = $section['capacityRows'][$item['id']] ?? ['unit_id' => null, 'value' => ''];
-                                            $basicValue = $row['value'] !== '' ? (float) $row['value'] : null;
-                                        @endphp
-                                        <tr class="cap-item-row" wire:key="cap-row-{{ $typeId }}-{{ $item['id'] }}"
-                                            data-units="{{ json_encode($units) }}">
-                                            <td class="align-middle">{{ $item['name'] }}</td>
-                                            <td>
-                                                <div class="d-flex flex-wrap gap-2">
-                                                    @foreach($units as $unit)
-                                                    @php
-                                                        $isBasic = !empty($unit['basic']);
-                                                        // formula = qty of basic units needed to make 1 of this unit
-                                                        // (basic unit's own formula is 1). basic -> unit: divide.
-                                                        $formula = (float) ($unit['formula'] ?? 1) ?: 1;
-                                                        $display = $basicValue === null ? '' : $basicValue / $formula;
-                                                    @endphp
-                                                    <div style="min-width:120px;">
-                                                        <input
-                                                            type="number"
-                                                            step="0.0001"
-                                                            min="0"
-                                                            class="form-control form-control-sm cap-unit-value"
-                                                            data-unit-id="{{ $unit['id'] }}"
-                                                            data-basic="{{ $isBasic ? 1 : 0 }}"
-                                                            data-formula="{{ $formula }}"
-                                                            value="{{ $display === '' ? '' : round($display, 4) }}"
-                                                            placeholder="0.0000"
-                                                        />
-                                                        <small class="text-muted">{{ $unit['symbol'] ?? $unit['name'] }}{{ $isBasic ? ' (basic)' : '' }}</small>
-                                                    </div>
-                                                    @endforeach
-                                                </div>
-                                                <input type="hidden" class="cap-basic-value"
-                                                    wire:model="sections.{{ $typeId }}.capacityRows.{{ $item['id'] }}.value">
-                                                <input type="hidden" class="cap-unit-id-value"
-                                                    wire:model="sections.{{ $typeId }}.capacityRows.{{ $item['id'] }}.unit_id">
-                                                @error('sections.'.$typeId.'.capacityRows.'.$item['id'].'.value')
-                                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                                @enderror
-                                            </td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                            @else
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle me-2"></i>
-                                No items found for this type.
-                            </div>
-                            @endif
-                            </div>
-                        </div>
+                @if(empty($groups))
+                @if($storedCount > 0 && $catalogLoaded)
+                {{-- Save is always available, so say what it does with nothing ticked. --}}
+                <div class="alert alert-warning d-flex align-items-start gap-2">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>No item types are selected — saving now clears all {{ $storedCount }} {{ \Illuminate\Support\Str::plural('capacity', $storedCount) }} set for this {{ $modelType }}.</div>
+                </div>
+                @endif
+                <div class="pv-empty">
+                    <i class="bi bi-speedometer2"></i>
+                    <p class="mb-0 text-muted">Select one or more item types above to list their items and units.</p>
+                </div>
+                @else
+                <div class="table-responsive border rounded">
+                    <table class="table table-sm align-middle mb-0 aqt-table pk-cap-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th style="width: 34%;">Unit</th>
+                                <th style="width: 190px;">Capacity / Hour</th>
+                            </tr>
+                        </thead>
+                        @foreach($groups as $typeId => $group)
+                        <tbody class="pk-group" wire:key="cap-group-{{ $typeId }}">
+                            <tr class="aqt-group-row">
+                                <td colspan="3" class="aqt-group-title">
+                                    <i class="bi bi-tag-fill me-1"></i>{{ $group['name'] }}
+                                    <span class="aqt-group-count">{{ count($group['items']) }}</span>
+                                </td>
+                            </tr>
+                            @forelse($group['items'] as $item)
+                                @php
+                                    $units  = $item['units'];
+                                    $basic  = collect($units)->firstWhere('basic', true);
+                                    $search = trim($item['name'] . ' ' . ($item['code'] ?? ''));
+                                    $stored = $capacities[$item['id']] ?? '';
+                                    $hasErr = $errors->has('capacities.' . $item['id']);
+                                @endphp
+                                @if(empty($units))
+                                <tr class="pk-unit-row" data-pk-name="{{ $search }}" wire:key="cap-item-{{ $item['id'] }}-no-units">
+                                    <td class="pk-item">
+                                        <div class="pk-item-name">{{ $item['name'] }}</div>
+                                        @if($item['code'])<div class="pk-item-code">{{ $item['code'] }}</div>@endif
+                                    </td>
+                                    <td colspan="2" class="text-muted small">
+                                        <i class="bi bi-info-circle me-1"></i>No units are defined for this item.
+                                    </td>
+                                </tr>
+                                @else
+                                @foreach($units as $unit)
+                                @php
+                                    // formula = basic units in 1 of this unit (the basic unit's own is 1),
+                                    // so the stored basic figure ÷ formula is this unit's rate.
+                                    $formula = $unit['formula'] > 0 ? $unit['formula'] : 1;
+                                    $display = $stored === '' || !is_numeric($stored) ? '' : format_quantity(round((float) $stored / $formula, 4));
+                                @endphp
+                                <tr class="pk-unit-row {{ $loop->last ? '' : 'pk-unit-row--more' }}"
+                                    data-pk-name="{{ $search }}" wire:key="cap-unit-{{ $unit['id'] }}">
+                                    @if($loop->first)
+                                    <td class="pk-item" rowspan="{{ count($units) }}">
+                                        <div class="pk-item-name">{{ $item['name'] }}</div>
+                                        @if($item['code'])<div class="pk-item-code">{{ $item['code'] }}</div>@endif
+                                        {{-- The only bound fields: the basic figure and the unit it was entered in. --}}
+                                        <input type="hidden" class="cap-basic" data-cap-item="{{ $item['id'] }}"
+                                            wire:model="capacities.{{ $item['id'] }}">
+                                        <input type="hidden" class="cap-unit" data-cap-item="{{ $item['id'] }}"
+                                            wire:model="capacityUnits.{{ $item['id'] }}">
+                                        @error('capacities.' . $item['id'])
+                                            <div class="text-danger small mt-1">{{ $message }}</div>
+                                        @enderror
+                                    </td>
+                                    @endif
+                                    <td>
+                                        {{ $unit['name'] }}
+                                        @if($unit['symbol'] !== '' && strcasecmp($unit['symbol'], $unit['name']) !== 0)
+                                            <span class="text-muted">({{ $unit['symbol'] }})</span>
+                                        @endif
+                                        @if($unit['basic'])
+                                            <span class="pk-unit-basic">basic</span>
+                                        @elseif($basic && $unit['formula'] > 0)
+                                            <div class="pk-unit-math">
+                                                1 {{ $unit['symbol'] ?: $unit['name'] }} = {{ format_quantity($unit['formula']) }} {{ $basic['symbol'] ?: $basic['name'] }}
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <input type="text" inputmode="decimal"
+                                            class="form-control form-control-sm pk-cap-input cap-unit-input {{ $hasErr ? 'is-invalid' : '' }}"
+                                            data-cap-item="{{ $item['id'] }}"
+                                            data-unit-id="{{ $unit['id'] }}"
+                                            data-formula="{{ $formula }}"
+                                            value="{{ $display }}"
+                                            placeholder="—">
+                                    </td>
+                                </tr>
+                                @endforeach
+                                @endif
+                            @empty
+                            <tr>
+                                <td colspan="3" class="text-muted small">
+                                    <i class="bi bi-info-circle me-1"></i>No active items in this item type.
+                                </td>
+                            </tr>
+                            @endforelse
+                        </tbody>
                         @endforeach
-
-                        <div class="d-flex justify-content-end mt-3">
-                            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
-                                <span wire:loading wire:target="save" class="spinner-border spinner-border-sm me-1"></span>
-                                <i class="bi bi-check-circle me-1"></i> Save Capacities
-                            </button>
-                        </div>
-                    </form>
-                    @endif
-
+                    </table>
                 </div>
+                <div class="form-text">
+                    Type the capacity in any unit — the item's other units follow. Leave it blank (or 0) if this {{ $modelType }} doesn't produce the item; only items with a capacity are saved.
+                </div>
+                @endif
+
             </div>
         </div>
-    </div>
+
+        {{-- Submit --}}
+        <div class="text-end mb-2">
+            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="save"
+                @disabled(!$catalogLoaded)>
+                <span wire:loading wire:target="save" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-check-lg me-1" wire:loading.remove wire:target="save"></i>
+                Save Capacities
+            </button>
+        </div>
+
+    </form>
 
     @script
     <script>
-    (() => {
-        // ── Capacity unit conversion ──────────────────────────────────────────
-        // formula = qty of basic units needed to make 1 of that unit (the basic
-        // unit's own formula is 1). All units for an item are always shown and
-        // editable. Whichever input the user types into becomes the source:
-        // basic_capacity   = entered value * source unit's formula
-        // display(unit)    = basic_capacity / unit's formula
-        const recalcCapacityRow = (row, sourceInput) => {
-            const units = JSON.parse(row.dataset.units || '[]');
-            if (!units.length) return;
+        $('#cap_item_type_ids').selectpicker();
 
-            const hiddenValue  = row.querySelector('.cap-basic-value');
-            const hiddenUnitId = row.querySelector('.cap-unit-id-value');
-            const inputs       = row.querySelectorAll('.cap-unit-value');
-
-            const sourceId   = parseInt(sourceInput.dataset.unitId);
-            const sourceUnit = units.find(u => u.id === sourceId);
-            if (!sourceUnit) return;
-
-            const entered = parseFloat(sourceInput.value);
-
-            let basic;
-            if (isNaN(entered)) {
-                basic = parseFloat(hiddenValue.value) || 0;
-            } else {
-                const formula = parseFloat(sourceUnit.formula || 1) || 1;
-                basic = entered * formula;
-            }
-
-            inputs.forEach(input => {
-                if (input === sourceInput) return;
-
-                const unitId = parseInt(input.dataset.unitId);
-                const unit   = units.find(u => u.id === unitId);
-                if (!unit) return;
-
-                const formula = parseFloat(unit.formula || 1) || 1;
-                const display = basic / formula;
-                input.value = isFinite(display) ? Math.round(display * 10000) / 10000 : '';
-            });
-
-            if (parseFloat(hiddenValue.value) !== basic) {
-                hiddenValue.value = basic;
-                hiddenValue.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            if (parseInt(hiddenUnitId.value) !== sourceId) {
-                hiddenUnitId.value = sourceId;
-                hiddenUnitId.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-        };
-
-        const initCapacityRows = (root) => {
-            root.querySelectorAll('.cap-item-row').forEach(row => {
-                if (row.dataset.capInit) return;
-                row.dataset.capInit = '1';
-
-                row.querySelectorAll('.cap-unit-value').forEach(input => {
-                    input.addEventListener('input', () => recalcCapacityRow(row, input));
+        // ── Capacity inputs: Cleave thousands formatting ─────────────────────
+        // The guard is a JS expando rather than a data attribute: morph would strip
+        // an attribute the server didn't render, and Cleave would then stack.
+        const initCapacityInputs = (root) => {
+            if (!root || root.nodeType !== 1) return;
+            const inputs = root.matches('.cap-unit-input') ? [root] : root.querySelectorAll('.cap-unit-input');
+            inputs.forEach(el => {
+                if (el._capCleave) return;
+                el._capCleave = new Cleave(el, {
+                    numeral: true,
+                    numeralThousandsGroupStyle: 'thousand',
+                    numeralPositiveOnly: true,
+                    numeralDecimalScale: 4,
                 });
             });
         };
+        initCapacityInputs(document.body);
+        Livewire.hook('morph.added', ({ el }) => initCapacityInputs(el));
 
-        initCapacityRows(document);
+        // ── Linked units ─────────────────────────────────────────────────────
+        // One figure per item, kept in its basic unit. Whichever unit is typed in
+        // becomes the source: basic = entered × its formula, and every other unit
+        // shows basic ÷ its formula. Only the hidden basic value and the source
+        // unit are bound (deferred), so nothing round-trips while typing.
+        const roundTo = (value, digits) => Math.round(value * 10 ** digits) / 10 ** digits;
+        const rawOf   = (el) => el._capCleave ? el._capCleave.getRawValue() : el.value.replace(/,/g, '');
+        const writeTo = (el, value) => el._capCleave ? el._capCleave.setRawValue(value) : (el.value = value);
+        const setBound = (selector, value) => {
+            const el = document.querySelector(selector);
+            if (!el || el.value === value) return;
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        };
 
-        Livewire.hook('morph.added', ({ el }) => {
-            if (el.nodeType === 1) initCapacityRows(el);
+        $(document).on('input', '.cap-unit-input', function () {
+            const itemId  = this.dataset.capItem;
+            const raw     = rawOf(this).trim();
+            const entered = raw === '' ? NaN : parseFloat(raw);
+            const basic   = isNaN(entered) ? null : entered * (parseFloat(this.dataset.formula) || 1);
+
+            document.querySelectorAll(`.cap-unit-input[data-cap-item="${itemId}"]`).forEach(other => {
+                if (other === this) return;
+                const formula = parseFloat(other.dataset.formula) || 1;
+                writeTo(other, basic === null ? '' : String(roundTo(basic / formula, 4)));
+            });
+
+            setBound(`.cap-basic[data-cap-item="${itemId}"]`, basic === null ? '' : String(roundTo(basic, 6)));
+            setBound(`.cap-unit[data-cap-item="${itemId}"]`, this.dataset.unitId);
         });
-    })();
+
+        // ── Item filter ──────────────────────────────────────────────────────
+        // Applied as a stylesheet rule rather than inline styles, so a Livewire
+        // re-render (which would strip inline display:none) can't undo it.
+        const filterStyle = document.createElement('style');
+        document.head.appendChild(filterStyle);
+        $(document).on('input', '#cap_item_filter', function () {
+            const q = this.value.trim();
+            if (q === '') {
+                filterStyle.textContent = '';
+                return;
+            }
+            const needle = '"' + q.replace(/["\\]/g, '\\$&') + '"';
+            filterStyle.textContent =
+                `.pk-cap-table tr.pk-unit-row:not([data-pk-name*=${needle} i]) { display: none; }` +
+                `.pk-cap-table tbody.pk-group:not(:has(tr.pk-unit-row[data-pk-name*=${needle} i])) { display: none; }`;
+        });
+
+        // ── Selectpicker → Livewire ──────────────────────────────────────────
+        $(document).on('change', '#cap_item_type_ids', function () {
+            $wire.call('setItemTypes', ($(this).val() || []).map(Number));
+        });
     </script>
     @endscript
 </div>
