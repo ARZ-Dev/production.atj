@@ -132,7 +132,11 @@ class CapacityManage extends Component
             return;
         }
 
-        $this->removedTypeIds[] = $typeId;
+        // Only a type with stored capacities has anything to delete. Recording one
+        // added and removed in this visit would keep Save on screen for a no-op.
+        if ($this->resolveModel()->capacities()->where('item_type_id', $typeId)->exists()) {
+            $this->removedTypeIds[] = $typeId;
+        }
 
         unset($this->sections[$typeId]);
     }
@@ -151,9 +155,13 @@ class CapacityManage extends Component
         return $rules;
     }
 
-    public function save(): void
+    public function save()
     {
-        $this->validate();
+        // With every section removed there is nothing to validate, and Livewire
+        // throws on an empty rule set rather than passing.
+        if ($this->rules()) {
+            $this->validate();
+        }
 
         $model = $this->resolveModel();
 
@@ -186,9 +194,12 @@ class CapacityManage extends Component
             }
         }
 
-        $this->removedTypeIds = [];
+        // A full reload, so every unit input comes back from what was stored —
+        // the visible per-unit fields are driven by JS, not by wire:model.
+        $route = $this->modelType === 'preparation' ? 'preparations.capacity' : 'lines.capacity';
 
-        session()->flash('success', 'Capacity saved successfully.');
+        return redirect()->route($route, $this->modelId)
+            ->with('success', 'Capacity saved successfully.');
     }
 
     public function render()

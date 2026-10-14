@@ -42,13 +42,21 @@
                     </div>
 
                     {{-- Item type sections --}}
-                    @if(empty($sections))
+                    @if(empty($sections) && empty($removedTypeIds))
                     <div class="alert alert-secondary">
                         <i class="bi bi-arrow-up-circle me-2"></i>
                         Add an item type above to set capacity values.
                     </div>
                     @else
                     <form wire:submit.prevent="save">
+                        {{-- Every section removed: Save must stay reachable, or the removal is never stored. --}}
+                        @if(empty($sections))
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Every item type has been removed. Save to clear all capacities for this {{ $modelType }}, or add an item type back above.
+                        </div>
+                        @endif
+
                         @foreach($sections as $typeId => $section)
                         <div class="card mb-3" wire:key="cap-section-{{ $typeId }}">
                             <div class="card-header d-flex justify-content-between align-items-center py-2">
