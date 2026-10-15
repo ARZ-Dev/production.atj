@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Transfer;
 
+use App\Livewire\Concerns\PreventsDuplicateSubmission;
 use App\Models\Transfer;
 use App\Services\ApiService;
 use App\Services\InventoryService;
@@ -13,7 +14,7 @@ use Livewire\Component;
 
 class TransferCreate extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, PreventsDuplicateSubmission;
 
     // Which transfer and which screen (edit / view / approve load / approve
     // receive) — set in mount() and never by the client.
@@ -402,12 +403,22 @@ class TransferCreate extends Component
                     'warehouse_to_id'   => $this->warehouse_to_id,
                 ]);
             } else {
+                // One form, one document: a repeated Submit (a click queued during
+                // the first request, or one made while the list was loading) finds
+                // the transfer the first one created.
+                if ($this->alreadySubmitted(Transfer::class)) {
+                    DB::rollBack();
+
+                    return to_route('item-transfers')->with('success', 'Transfer created successfully!');
+                }
+
                 $transfer = Transfer::create([
                     'is_internal'       => $this->is_internal,
                     'department_id'     => $this->department_id,
                     'warehouse_from_id' => $this->warehouse_from_id,
                     'warehouse_to_id'   => $this->warehouse_to_id,
                     'status'            => 'pending',
+                    'submission_key'    => $this->submissionKey,
                 ]);
             }
 
@@ -461,6 +472,11 @@ class TransferCreate extends Component
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            if ($this->isDuplicateSubmission($e)) {
+                return to_route('item-transfers')->with('success', 'Transfer created successfully!');
+            }
+
             $this->dispatch('swal:error', [
                 'title' => 'Error',
                 'text'  => 'An error occurred: ' . $e->getMessage(),
