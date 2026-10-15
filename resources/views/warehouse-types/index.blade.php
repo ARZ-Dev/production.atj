@@ -108,7 +108,7 @@
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = "{{ route('warehouse-types.destroy', '%typeId%') }}".replace('%typeId%', typeId);
+                submitDelete("{{ route('warehouse-types.destroy', '%typeId%') }}".replace('%typeId%', typeId));
             }
         });
     });

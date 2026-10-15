@@ -42,17 +42,21 @@ class TransferIndex extends Component
     {
         authorizeRequest('production.itemTransfer-delete');
 
-        $transfer = Transfer::findOrFail($id);
-
-        if ($transfer->status !== 'pending') {
-            return $this->dispatch('swal:error', [
-                'title' => 'Error',
-                'text'  => 'Cannot delete a transfer that has already been processed!',
-            ]);
-        }
-
         DB::beginTransaction();
         try {
+            // Locked and re-read inside the transaction, so a load approved in
+            // another tab can't slip in between this check and the release.
+            $transfer = Transfer::lockForUpdate()->findOrFail($id);
+
+            if ($transfer->status !== 'pending') {
+                DB::rollBack();
+
+                return $this->dispatch('swal:error', [
+                    'title' => 'Error',
+                    'text'  => 'Cannot delete a transfer that has already been processed!',
+                ]);
+            }
+
             $ops = [];
 
             // Release the reservation on both warehouses (transfer is still pending)

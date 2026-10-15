@@ -35,6 +35,8 @@ class RecipeIndex extends Component
 
     public function activate($id)
     {
+        authorizeRequest('production.recipe-update-status');
+
         $recipe = Recipe::find($id);
         if ($recipe) {
             $recipe->status = true;
@@ -47,7 +49,8 @@ class RecipeIndex extends Component
 
     public function deactivate($id)
     {
-        // dd($id);
+        authorizeRequest('production.recipe-update-status');
+
         $recipe = Recipe::find($id);
         if ($recipe) {
             $recipe->status = false;

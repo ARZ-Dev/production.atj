@@ -131,7 +131,17 @@ class EventCreate extends Component
             'scheduled_label'       => $this->scheduledLabel($event),
             'description'           => $event->description ?? '',
             'companion'             => $this->companionRowFromEvent($event),
+            // Started: stock was reserved from its type/recipe/batch and End
+            // settles against them, so only the description stays editable.
+            // Display/handler hint only — submit() re-reads the status.
+            'started'               => (bool) $event->status,
         ];
+    }
+
+    /** The row belongs to an event that has started (see buildRowFromEvent()). */
+    private function rowStarted(int $index): bool
+    {
+        return !empty($this->events[$index]['started']);
     }
 
     /**
@@ -287,6 +297,7 @@ class EventCreate extends Component
             'scheduled_label'       => null,
             'description'           => '',
             'companion'             => null,
+            'started'               => false,
         ];
     }
 
@@ -375,6 +386,11 @@ class EventCreate extends Component
 
     public function onEventTypeChanged(int $index, $eventTypeId): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         $eventTypeId = $eventTypeId !== '' ? (int) $eventTypeId : null;
         $eventType   = $eventTypeId ? EventType::find($eventTypeId) : null;
         $hasRecipe   = (bool) ($eventType?->has_recipe);
@@ -462,6 +478,11 @@ class EventCreate extends Component
 
     public function onCompanionItemTypeChanged(int $index, $itemTypeId): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         if (empty($this->events[$index]['companion'])) {
             return;
         }
@@ -490,6 +511,11 @@ class EventCreate extends Component
 
     public function onCompanionItemChanged(int $index, $itemId): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         if (empty($this->events[$index]['companion'])) {
             return;
         }
@@ -501,6 +527,11 @@ class EventCreate extends Component
 
     public function onCompanionRecipeChanged(int $index, $recipeId): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         if (empty($this->events[$index]['companion'])) {
             return;
         }
@@ -562,6 +593,11 @@ class EventCreate extends Component
 
     public function onItemTypeChanged(int $index, $itemTypeId): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         $itemTypeId = $itemTypeId !== '' ? (int) $itemTypeId : null;
 
         $this->events[$index]['item_type_id'] = $itemTypeId;
@@ -598,6 +634,11 @@ class EventCreate extends Component
 
     public function onItemChanged(int $index, $itemId): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         $itemId = $itemId !== '' ? (int) $itemId : null;
 
         $this->events[$index]['item_id']        = $itemId;
@@ -623,6 +664,11 @@ class EventCreate extends Component
 
     public function onRecipeChanged(int $index, $recipeId): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         $recipeId = $recipeId !== '' ? (int) $recipeId : null;
 
         $this->events[$index]['recipe_id'] = $recipeId;
@@ -638,6 +684,11 @@ class EventCreate extends Component
 
     public function onBatchCountChanged(int $index, $batchCount): void
     {
+        // A started event keeps its type, item, recipe and batch count.
+        if ($this->rowStarted($index)) {
+            return;
+        }
+
         $this->events[$index]['batch_count'] = $batchCount;
 
         $this->recalculateDuration($index);
@@ -796,6 +847,22 @@ class EventCreate extends Component
             array_filter(array_column($this->events, 'event_type_id'))
         )->pluck('name', 'id');
 
+        // A started event's stock was reserved from its type, recipe and batch
+        // count, and End settles against them — so only its description is
+        // saved. Read from the database: the rows' own "started" flag is just a
+        // hint for the form.
+        $startedIds = Event::whereIn('id', array_filter(array_column($this->events, 'id')))
+            ->whereNotNull('status')
+            ->pluck('id')
+            ->all();
+
+        if ($this->removedEventIds
+            && Event::whereIn('id', $this->removedEventIds)->whereNotNull('status')->exists()) {
+            session()->flash('error', "A started event can't be removed — its stock movements are tied to it.");
+
+            return;
+        }
+
         \DB::beginTransaction();
         try {
 
@@ -808,6 +875,14 @@ class EventCreate extends Component
             $createdPlans = collect();
 
             foreach ($this->events as $event) {
+                if (!empty($event['id']) && in_array((int) $event['id'], $startedIds, true)) {
+                    Event::where('id', $event['id'])
+                        ->where('plan_id', $this->planId)
+                        ->update(['description' => $event['description'] ?: null]);
+
+                    continue;
+                }
+
                 $hasRecipe = !empty($event['event_type_has_recipe']);
 
                 $data = [

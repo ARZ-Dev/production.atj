@@ -74,7 +74,7 @@
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = "{{ route('users.destroy', '%userId%') }}".replace('%userId%', userId);
+                submitDelete("{{ route('users.destroy', '%userId%') }}".replace('%userId%', userId));
             }
         });
     });

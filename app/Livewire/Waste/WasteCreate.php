@@ -7,6 +7,8 @@ use App\Services\ApiService;
 use App\Services\InventoryService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Utils\Constants;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -15,8 +17,11 @@ class WasteCreate extends Component
 {
     use AuthorizesRequests, WithFileUploads;
 
+    #[Locked]
     public bool $editing  = false;
+    #[Locked]
     public $id;
+    #[Locked]
     public $viewStatus;
     public $waste;
     public $notes;
@@ -40,7 +45,11 @@ class WasteCreate extends Component
     {
         $this->viewStatus = $viewStatus;
 
-        authorizeRequest($viewStatus == 1 ? 'production.itemWaste-view' : 'production.rawMaterialWaste-create');
+        authorizeRequest(match (true) {
+            $viewStatus == Constants::VIEW_STATUS => 'production.itemWaste-view',
+            (bool) $id                            => 'production.itemWaste-edit',
+            default                               => 'production.itemWaste-create',
+        });
 
         $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
@@ -49,6 +58,14 @@ class WasteCreate extends Component
             $this->editing = true;
 
             $waste              = Waste::with('reportItems')->findOrFail($id);
+
+            // Once approved, its stock has moved — re-saving would reserve it all
+            // over again. The index hides Edit; this covers the URL.
+            abort_if(
+                $viewStatus != Constants::VIEW_STATUS && $waste->status !== 'pending',
+                403,
+                'Only a pending Waste can be edited.'
+            );
             $this->waste        = $waste;
             $this->warehouse_id = $waste->warehouse_id;
             $this->notes        = $waste->notes;
@@ -143,6 +160,9 @@ class WasteCreate extends Component
 
     public function submit()
     {
+        // The view screen is gated by the -view permission only; it never saves.
+        abort_if($this->viewStatus == Constants::VIEW_STATUS, 403);
+
         $this->sanitizeQuantities();
 
         $this->validate([
@@ -164,7 +184,12 @@ class WasteCreate extends Component
         DB::beginTransaction();
         try {
             if ($this->editing) {
-                $waste = Waste::findOrFail($this->id);
+                $waste = Waste::lockForUpdate()->findOrFail($this->id);
+
+                if ($waste->status !== 'pending') {
+                    throw new \RuntimeException('This Waste has already been approved and can no longer be edited.');
+                }
+
                 $waste->update([
                     'warehouse_id' => $this->warehouse_id,
                     'notes'        => $this->notes,

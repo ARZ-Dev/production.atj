@@ -43,10 +43,10 @@ class StockOutIndex extends Component
     {
         authorizeRequest('production.itemStockOut-delete');
 
-        $stockOut = StockOut::findOrFail($id);
-
         DB::beginTransaction();
         try {
+            $stockOut = StockOut::lockForUpdate()->findOrFail($id);
+
             $ops = [];
 
             // Release the reservation if it was never approved
@@ -80,14 +80,17 @@ class StockOutIndex extends Component
     {
         authorizeRequest('production.itemStockOut-approve');
 
-        $stockOut = StockOut::findOrFail($id);
-
-        if ($stockOut->status === 'approved') {
-            return to_route('item-stock-outs')->with('error', 'Stock Out is already approved.');
-        }
-
         DB::beginTransaction();
         try {
+            // Locked and re-read inside the transaction, so a double click or a
+            // second tab can't confirm the same document twice.
+            $stockOut = StockOut::lockForUpdate()->findOrFail($id);
+
+            if ($stockOut->status !== 'pending') {
+                DB::rollBack();
+                return to_route('item-stock-outs')->with('error', 'Stock Out is already approved.');
+            }
+
             $ops = [];
 
             // Release the reservation and deduct actual stock. The parent validates

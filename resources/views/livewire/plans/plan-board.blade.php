@@ -288,11 +288,18 @@
                 <div class="modal-footer">
                     @hasPermission('production.event-create')
                     @if($selectedEvent && !$selectedEvent['is_carry_over'])
+                    @if($selectedEvent['started'])
+                    {{-- A started event's stock is tied to it — see PlanBoard::deleteEvent(). --}}
+                    <span class="text-muted small me-auto">
+                        <i class="bi bi-lock me-1"></i>Started events can't be deleted.
+                    </span>
+                    @else
                     <button type="button" class="btn btn-danger me-auto"
                         wire:click="deleteEvent({{ $selectedEvent['id'] }})"
                         wire:confirm="Delete this event? This cannot be undone.">
                         <i class="bi bi-trash me-1"></i> Delete
                     </button>
+                    @endif
                     <button type="button" id="editEventBtn" class="btn btn-primary" data-event-id="{{ $selectedEvent['id'] }}">
                         <i class="bi bi-pencil-square me-1"></i> Edit
                     </button>

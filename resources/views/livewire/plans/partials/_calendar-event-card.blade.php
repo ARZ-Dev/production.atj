@@ -11,6 +11,8 @@
     }
 
     $isCarryOver = (bool) ($event->is_carry_over ?? false);
+    // Moving cards is editing the plan — only for users who may (the server checks too).
+    $canMove = !$isCarryOver && (authUser()?->hasPermission('production.event-create') ?? false);
     // Placed event running past midnight — it continues on a later day's
     // board (carry-over cards are the tail end, not a continuation).
     $continuesNextDay = !$isCarryOver && $event->placeable_id && $event->from_time && $event->to_time
@@ -28,7 +30,7 @@
     }
 @endphp
 <div class="pbc-card {{ $isCarryOver ? 'pbc-card--carry' : '' }} {{ $continuesNextDay ? 'pbc-card--continues' : '' }}"
-    draggable="{{ $isCarryOver ? 'false' : 'true' }}" data-event-id="{{ $event->id }}" wire:key="pbc-event-{{ $event->id }}"
+    draggable="{{ $canMove ? 'true' : 'false' }}" data-event-id="{{ $event->id }}" wire:key="pbc-event-{{ $event->id }}"
     wire:click="showEventDetails({{ $event->id }})"
     style="left: calc(var(--pbc-hour-w) * {{ $fromHour }}); width: calc(var(--pbc-hour-w) * {{ $spanHours }} - 4px); top: {{ $track * 48 + 4 }}px; background-color: {{ $color }}; color: #fff;"
     title="{{ $event->eventType->name ?? 'No type' }}{{ $timeLabel }}{{ $pairedWith ? ' · runs together with ' . ($pairedWith->eventType->name ?? 'event') . ' #' . $pairedWith->id : '' }}">

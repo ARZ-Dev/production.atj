@@ -5,12 +5,14 @@ namespace App\Livewire\ItemRequests;
 use App\Models\ItemRequest;
 use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ItemRequestCreate extends Component
 {
     use AuthorizesRequests;
 
+    #[Locked]
     public $id;
     public $code;
     public $notes;
@@ -33,7 +35,7 @@ class ItemRequestCreate extends Component
 
     public function mount(ApiService $api, $id = null): void
     {
-        authorizeRequest($id ? 'production.item-request-edit' : 'production.item-request-create');
+        authorizeRequest($id ? 'production.itemRequest-edit' : 'production.itemRequest-create');
 
         $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
@@ -44,6 +46,11 @@ class ItemRequestCreate extends Component
 
         if ($id) {
             $request            = ItemRequest::with('inputs')->findOrFail($id);
+
+            // Only a pending request is editable — the index hides Edit for the
+            // rest, but the URL is still reachable.
+            abort_if($request->status !== 'pending', 403, 'Only a pending request can be edited.');
+
             $this->id           = $request->id;
             $this->code         = $request->code;
             $this->notes        = $request->notes;
@@ -133,6 +140,11 @@ class ItemRequestCreate extends Component
 
         if ($this->id) {
             $request = ItemRequest::findOrFail($this->id);
+
+            if ($request->status !== 'pending') {
+                return redirect()->route('item-requests')->with('error', 'Only a pending request can be edited.');
+            }
+
             $request->update([
                 'notes'        => $this->notes,
                 'warehouse_id' => $this->warehouse_id,
@@ -144,8 +156,11 @@ class ItemRequestCreate extends Component
                 'status'       => 'pending',
                 'notes'        => $this->notes,
                 'warehouse_id' => $this->warehouse_id,
-                'requested_by' => auth()->id(),
-                'requested_at' => now(),
+                // Users live in the auth service, so Laravel's own auth() is
+                // always empty here — record the auth-service user instead.
+                'requested_by'      => authUser()?->id,
+                'requested_by_name' => authUser()?->name,
+                'requested_at'      => now(),
             ]);
             $message = 'Request created successfully.';
         }

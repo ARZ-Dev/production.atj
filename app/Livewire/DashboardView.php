@@ -11,6 +11,7 @@ use App\Models\StockOut;
 use App\Models\Transfer;
 use App\Models\Waste;
 use App\Services\ApiService;
+use App\Utils\Constants;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -666,7 +667,7 @@ class DashboardView extends Component
                     'where'     => $key === 'transfer'
                         ? $this->warehouseName($doc->warehouse_from_id) . ' → ' . $this->warehouseName($doc->warehouse_to_id)
                         : $this->warehouseName($doc->warehouse_id),
-                    'url'       => route($def['view'], ['id' => $doc->id, 'viewStatus' => 'view']),
+                    'url'       => route($def['view'], ['id' => $doc->id, 'viewStatus' => Constants::VIEW_STATUS]),
                 ]);
             }
         }

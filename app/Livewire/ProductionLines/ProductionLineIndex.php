@@ -2,6 +2,7 @@
 
 namespace App\Livewire\ProductionLines;
 
+use App\Models\Event;
 use App\Models\Line;
 use App\Models\Preparation;
 use App\Models\ProductionLine;
@@ -160,6 +161,15 @@ class ProductionLineIndex extends Component
     public function delete(int $id)
     {
         authorizeRequest('production.production-line-delete');
+
+        $onLane = Event::notEnded()->where('production_line_id', $id)->count();
+
+        if ($message = Event::laneInUseMessage($onLane, 'this production line')) {
+            $this->dispatch('swal:error', ['title' => 'Production line in use', 'text' => $message]);
+
+            return;
+        }
+
         ProductionLine::findOrFail($id)->delete();
 
         return redirect()->route('production-lines')->with('success', 'Production Line deleted.');

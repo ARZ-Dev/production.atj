@@ -7,6 +7,8 @@ use App\Services\ApiService;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use App\Utils\Constants;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -15,8 +17,11 @@ class StockInCreate extends Component
 {
     use AuthorizesRequests, WithFileUploads;
 
+    #[Locked]
     public bool $editing  = false;
+    #[Locked]
     public $id;
+    #[Locked]
     public $viewStatus;
     public $stockIn;
     public $notes;
@@ -40,7 +45,11 @@ class StockInCreate extends Component
     {
         $this->viewStatus = $viewStatus;
 
-        authorizeRequest($viewStatus == 1 ? 'production.itemStockIn-view' : 'production.stockIn-create');
+        authorizeRequest(match (true) {
+            $viewStatus == Constants::VIEW_STATUS => 'production.itemStockIn-view',
+            (bool) $id                            => 'production.itemStockIn-edit',
+            default                               => 'production.itemStockIn-create',
+        });
 
         $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
@@ -49,6 +58,14 @@ class StockInCreate extends Component
             $this->editing = true;
 
             $stockIn            = StockIn::with('reportItems')->findOrFail($id);
+
+            // Once approved, its stock has moved — re-saving would reserve it all
+            // over again. The index hides Edit; this covers the URL.
+            abort_if(
+                $viewStatus != Constants::VIEW_STATUS && $stockIn->status !== 'pending',
+                403,
+                'Only a pending Stock In can be edited.'
+            );
             $this->stockIn = $stockIn;
             $this->warehouse_id = $stockIn->warehouse_id;
             $this->notes        = $stockIn->notes;
@@ -143,6 +160,9 @@ class StockInCreate extends Component
 
     public function submit()
     {
+        // The view screen is gated by the -view permission only; it never saves.
+        abort_if($this->viewStatus == Constants::VIEW_STATUS, 403);
+
         $this->sanitizeQuantities();
 
         $this->validate([
@@ -164,7 +184,12 @@ class StockInCreate extends Component
         DB::beginTransaction();
         try {
             if ($this->editing) {
-                $stockIn = StockIn::findOrFail($this->id);
+                $stockIn = StockIn::lockForUpdate()->findOrFail($this->id);
+
+                if ($stockIn->status !== 'pending') {
+                    throw new \RuntimeException('This Stock In has already been approved and can no longer be edited.');
+                }
+
                 $stockIn->update([
                     'warehouse_id' => $this->warehouse_id,
                     'notes'        => $this->notes,

@@ -4,7 +4,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Item Request List</h5>
-                    @hasPermission('itemRequest-create')
+                    @hasPermission('production.itemRequest-create')
                     <a href="{{ route('item-requests.create') }}" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add New Request
                     </a>
@@ -49,11 +49,11 @@
                                     <span class="badge {{ $statusClass }}">{{ ucfirst($request->status) }}</span>
                                 </td>
                                 <td>{{ $request->inputs->count() }}</td>
-                                <td>{{ $request->requested_by?->name ?? 'N/A' }}</td>
+                                <td>{{ $request->requested_by_name ?? 'N/A' }}</td>
                                 <td>{{ $request->requested_at ?? 'N/A' }}</td>
                                 <td>{{ $request->notes ?? 'N/A' }}</td>
                                 <td>
-                                    @hasPermission('itemRequest-status')
+                                    @hasPermission('production.itemRequest-approve')
                                     @if ($request->status === 'pending')
                                     <button type="button" class="btn btn-light-success icon-btn-sm update-status-button"
                                         data-id="{{ $request->id }}" data-status="approved" data-bs-toggle="tooltip"
@@ -77,7 +77,7 @@
                                     @endif
                                     @endhasPermission
                                     @if ($request->status === 'pending')
-                                    @hasPermission('itemRequest-edit')
+                                    @hasPermission('production.itemRequest-edit')
                                     <a href="{{ route('item-requests.edit', $request->id) }}"
                                         class="btn btn-light-primary icon-btn-sm" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"
@@ -89,7 +89,7 @@
                                     @endif
                                     @if ($request->status !== 'completed')
 
-                                    @hasPermission('itemRequest-delete')
+                                    @hasPermission('production.itemRequest-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $request->id }}" data-bs-toggle="tooltip"
                                         data-bs-custom-class="tooltip-white" data-bs-placement="top"

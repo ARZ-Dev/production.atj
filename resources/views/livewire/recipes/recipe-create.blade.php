@@ -1,12 +1,15 @@
 <div>
     <form wire:submit.prevent="submit">
+        {{-- View mode: every input is read-only (selectpickers also carry their
+             own @disabled — bootstrap-select ignores a disabled fieldset). --}}
+        <fieldset class="border-0 p-0 m-0" @disabled($viewing)>
         <div class="row">
             <div class="col-xl">
 
                 {{-- ── Card 1: Recipe Header ──────────────────────────────────────── --}}
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">{{ $editing ? 'Edit' : 'Add' }} Recipe</h5>
+                        <h5 class="mb-0">{{ $viewing ? 'View' : ($editing ? 'Edit' : 'Add') }} Recipe</h5>
                         <a href="{{ route('recipes') }}" class="btn btn-light-light text-muted">
                             <i class="bi bi-arrow-left me-1"></i>Back
                         </a>
@@ -32,7 +35,7 @@
                                     Recipe Type <span class="text-danger">*</span>
                                 </label>
                                 <div wire:ignore>
-                                    <select id="recipe_type" wire:model="recipe_type_id" class="selectpicker w-100"
+                                    <select @disabled($viewing) id="recipe_type" wire:model="recipe_type_id" class="selectpicker w-100"
                                         title="Select Type" data-style="btn-default" data-icon-base="ti"
                                         data-tick-icon="ti-check text-white">
                                         @foreach($recipeTypes as $rt)
@@ -55,7 +58,7 @@
                                     Output Item Type <span class="text-danger">*</span>
                                 </label>
                                 <div wire:ignore>
-                                    <select id="output_item_type" wire:model="output_item_type_id"
+                                    <select @disabled($viewing) id="output_item_type" wire:model="output_item_type_id"
                                         class="selectpicker w-100" title="Select Item Type" data-style="btn-default"
                                         data-live-search="true" data-icon-base="ti" data-size="5"
                                         data-tick-icon="ti-check text-white">
@@ -76,7 +79,7 @@
                                     Output Item <span class="text-danger">*</span>
                                 </label>
                                 <div wire:ignore>
-                                    <select id="header_item" wire:model="item_id" class="selectpicker w-100"
+                                    <select @disabled($viewing) id="header_item" wire:model="item_id" class="selectpicker w-100"
                                         title="Select Item" data-style="btn-default" data-live-search="true"
                                         data-icon-base="ti" data-size="5" data-tick-icon="ti-check text-white">
                                         @foreach($headerItems as $item)
@@ -96,7 +99,7 @@
                                 <label class="form-label" for="header_unit">
                                     Output Unit <span class="text-danger">*</span>
                                 </label>
-                                <select id="header_unit" wire:model="item_unit_id" class="selectpicker w-100"
+                                <select @disabled($viewing) id="header_unit" wire:model="item_unit_id" class="selectpicker w-100"
                                     title="Select Unit" data-style="btn-default" data-live-search="true"
                                     data-icon-base="ti" data-size="5" data-tick-icon="ti-check text-white">
                                     @foreach($headerUnits as $unit)
@@ -211,7 +214,7 @@
                                 <div class="ir-cell">
                                     <span class="ir-cell-label">Item</span>
                                     <div wire:ignore>
-                                        <select id="section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        <select @disabled($viewing) id="section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
                                                 wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.item_id"
                                             class="selectpicker w-100 section-item-select section-items-{{ $sectionIndex }}" title="Select Item"
                                             data-style="btn-default" data-live-search="true" data-icon-base="ti"
@@ -233,7 +236,7 @@
                                 {{-- Unit --}}
                                 <div class="ir-cell">
                                     <span class="ir-cell-label">Unit</span>
-                                    <select id="section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                    <select @disabled($viewing) id="section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
                                         class="selectpicker w-100" title="Select Unit" data-style="btn-default"
                                         data-live-search="true" data-icon-base="ti" data-size="5"
                                         data-tick-icon="ti-check text-white"
@@ -286,9 +289,11 @@
                             @endforelse
 
                             {{-- Add (bottom) --}}
+                            @unless($viewing)
                             <button type="button" class="ir-add" wire:click="addRowToSection({{ $sectionIndex }})">
                                 <i class="bi bi-plus-lg"></i> Add {{ $section['title'] }}
                             </button>
+                            @endunless
                         </div>
                     </div>
                 </div>
@@ -332,7 +337,7 @@
                                 <div class="ir-cell">
                                     <span class="ir-cell-label">Item</span>
                                     <div wire:ignore>
-                                        <select id="side_section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                        <select @disabled($viewing) id="side_section_item_{{ $sectionIndex }}_{{ $rowIndex }}"
                                             class="selectpicker w-100 side-section-item-select" title="Select Item"
                                             data-style="btn-default" data-live-search="true" data-icon-base="ti"
                                             data-size="5" data-tick-icon="ti-check text-white"
@@ -353,7 +358,7 @@
                                 {{-- Unit --}}
                                 <div class="ir-cell">
                                     <span class="ir-cell-label">Unit</span>
-                                    <select id="side_section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
+                                    <select @disabled($viewing) id="side_section_unit_{{ $sectionIndex }}_{{ $rowIndex }}"
                                         class="selectpicker w-100" title="Select Unit" data-style="btn-default"
                                         data-live-search="true" data-icon-base="ti" data-size="5"
                                         data-tick-icon="ti-check text-white"
@@ -406,16 +411,18 @@
                             @endforelse
 
                             {{-- Add (bottom) --}}
+                            @unless($viewing)
                             <button type="button" class="ir-add" wire:click="addRowToSideSection({{ $sectionIndex }})">
                                 <i class="bi bi-plus-lg"></i> Add {{ $section['title'] }}
                             </button>
+                            @endunless
                         </div>
                     </div>
                 </div>
                 @endforeach
 
                 {{-- Submit --}}
-                @if($recipe_type_id)
+                @if($recipe_type_id && !$viewing)
                 <div class="col-12 text-end mb-2">
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-lg me-1"></i>
@@ -426,6 +433,7 @@
 
             </div>
         </div>
+        </fieldset>
     </form>
 
     @script

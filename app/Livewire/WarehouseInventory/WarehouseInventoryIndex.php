@@ -44,7 +44,7 @@ class WarehouseInventoryIndex extends Component
 
     public function mount(ApiService $api): void
     {
-        authorizeRequest('production.rawMaterialWarehouseInventory-list');
+        authorizeRequest('production.itemWarehouseInventory-list');
 
         $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 

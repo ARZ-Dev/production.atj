@@ -46,10 +46,10 @@ class StockInIndex extends Component
     {
         authorizeRequest('production.itemStockIn-delete');
 
-        $stockIn = StockIn::findOrFail($id);
-
         DB::beginTransaction();
         try {
+            $stockIn = StockIn::lockForUpdate()->findOrFail($id);
+
             $ops = [];
 
             // Release the reservation if it was never approved
@@ -83,14 +83,17 @@ class StockInIndex extends Component
     {
         authorizeRequest('production.itemStockIn-approve');
 
-        $stockIn = StockIn::findOrFail($id);
-
-        if ($stockIn->status === 'approved') {
-            return to_route('item-stock-ins')->with('error', 'Stock In is already approved.');
-        }
-
         DB::beginTransaction();
         try {
+            // Locked and re-read inside the transaction, so a double click or a
+            // second tab can't confirm the same document twice.
+            $stockIn = StockIn::lockForUpdate()->findOrFail($id);
+
+            if ($stockIn->status !== 'pending') {
+                DB::rollBack();
+                return to_route('item-stock-ins')->with('error', 'Stock In is already approved.');
+            }
+
             $ops = [];
 
             // Move the reserved incoming quantity into actual stock

@@ -34,6 +34,10 @@ class AuthCallbackController extends Controller
                 ->with('error', 'Invalid or expired login token. Please try again.');
         }
 
+        // New session id on sign-in, so a session id planted before login
+        // (session fixation) never becomes an authenticated one.
+        $request->session()->regenerate();
+
         // Store access token in session
         session([
             'auth_access_token' => $result['access_token'],

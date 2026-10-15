@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Plans;
 
+use App\Models\Event;
 use App\Models\MonthPlan;
 use App\Models\Plan;
 use App\Services\ApiService;
@@ -39,6 +40,8 @@ class PlanIndex extends Component
 
     public function mount(): void
     {
+        authorizeRequest('production.plan-list');
+
         $this->currentYear  = now()->year;
         $this->currentMonth = now()->month;
 
@@ -83,6 +86,8 @@ class PlanIndex extends Component
 
     public function createMonthPlan(): void
     {
+        authorizeRequest('production.plan-create');
+
         if (!$this->factory_id) {
             $this->addError('factory_id', 'Select a factory first.');
 
@@ -232,6 +237,8 @@ class PlanIndex extends Component
 
     public function submit(): void
     {
+        authorizeRequest($this->editing ? 'production.plan-edit' : 'production.plan-create');
+
         $this->validate();
 
         $monthPlan = $this->currentMonthPlan()->first();
@@ -264,18 +271,57 @@ class PlanIndex extends Component
     #[On('delete')]
     public function delete(int $id): void
     {
-        Plan::findOrFail($id)->delete();
+        authorizeRequest('production.plan-delete');
+
+        $plan = Plan::findOrFail($id);
+
+        if ($started = $this->startedEventCount([$plan->id])) {
+            $this->refuseDeletion($started, 'this plan');
+
+            return;
+        }
+
+        $plan->delete();
         session()->flash('success', 'Plan deleted.');
     }
 
     #[On('deleteMonthPlan')]
     public function deleteMonthPlan(int $id): void
     {
+        authorizeRequest('production.plan-delete');
+
         $monthPlan = MonthPlan::findOrFail($id);
+
+        if ($started = $this->startedEventCount($monthPlan->plans()->pluck('id')->all())) {
+            $this->refuseDeletion($started, 'this monthly plan');
+
+            return;
+        }
+
         $monthPlan->plans()->delete();
         $monthPlan->delete();
 
         session()->flash('success', 'Monthly plan and its plans were deleted.');
+    }
+
+    /**
+     * Started events on the given plans. Deleting their plan would leave
+     * their stock held in process (or their movement record orphaned) — the
+     * same reason the board won't delete or unplace a started event.
+     */
+    private function startedEventCount(array $planIds): int
+    {
+        return $planIds
+            ? Event::whereIn('plan_id', $planIds)->whereNotNull('status')->count()
+            : 0;
+    }
+
+    private function refuseDeletion(int $started, string $what): void
+    {
+        $this->dispatch('swal:error', [
+            'title' => 'Plan has started events',
+            'text'  => "{$started} event" . ($started === 1 ? ' has' : 's have') . " already started on {$what}, so it can't be deleted — their stock movements are tied to it.",
+        ]);
     }
 
     private function monthLabel(): string

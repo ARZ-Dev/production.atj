@@ -55,6 +55,14 @@ class CapacityManage extends Component
         $this->modelType = $modelType;
         $this->modelId   = $id;
 
+        // A capacity is part of the preparation / line's setup — the same gate
+        // as editing it (packaging's capacity page uses packaging-edit).
+        authorizeRequest(match ($modelType) {
+            'preparation' => 'production.preparation-edit',
+            'line'        => 'production.line-edit',
+            default       => abort(404),
+        });
+
         $model           = $this->resolveModel();
         $this->modelName = $model->name;
         $this->loadCatalog();

@@ -7,6 +7,8 @@ use App\Services\ApiService;
 use App\Services\InventoryService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Utils\Constants;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -15,8 +17,11 @@ class StockOutCreate extends Component
 {
     use AuthorizesRequests, WithFileUploads;
 
+    #[Locked]
     public bool $editing  = false;
+    #[Locked]
     public $id;
+    #[Locked]
     public $viewStatus;
     public $stockOut;
     public $notes;
@@ -40,7 +45,11 @@ class StockOutCreate extends Component
     {
         $this->viewStatus = $viewStatus;
 
-        authorizeRequest($viewStatus == 1 ? 'production.itemStockOut-view' : 'production.stockOut-create');
+        authorizeRequest(match (true) {
+            $viewStatus == Constants::VIEW_STATUS => 'production.itemStockOut-view',
+            (bool) $id                            => 'production.itemStockOut-edit',
+            default                               => 'production.itemStockOut-create',
+        });
 
         $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
@@ -49,6 +58,14 @@ class StockOutCreate extends Component
             $this->editing = true;
 
             $stockOut           = StockOut::with('reportItems')->findOrFail($id);
+
+            // Once approved, its stock has moved — re-saving would reserve it all
+            // over again. The index hides Edit; this covers the URL.
+            abort_if(
+                $viewStatus != Constants::VIEW_STATUS && $stockOut->status !== 'pending',
+                403,
+                'Only a pending Stock Out can be edited.'
+            );
             $this->stockOut     = $stockOut;
             $this->warehouse_id = $stockOut->warehouse_id;
             $this->notes        = $stockOut->notes;
@@ -143,6 +160,9 @@ class StockOutCreate extends Component
 
     public function submit()
     {
+        // The view screen is gated by the -view permission only; it never saves.
+        abort_if($this->viewStatus == Constants::VIEW_STATUS, 403);
+
         $this->sanitizeQuantities();
 
         $this->validate([
@@ -164,7 +184,12 @@ class StockOutCreate extends Component
         DB::beginTransaction();
         try {
             if ($this->editing) {
-                $stockOut = StockOut::findOrFail($this->id);
+                $stockOut = StockOut::lockForUpdate()->findOrFail($this->id);
+
+                if ($stockOut->status !== 'pending') {
+                    throw new \RuntimeException('This Stock Out has already been approved and can no longer be edited.');
+                }
+
                 $stockOut->update([
                     'warehouse_id' => $this->warehouse_id,
                     'notes'        => $this->notes,

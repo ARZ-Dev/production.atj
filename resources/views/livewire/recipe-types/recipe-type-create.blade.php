@@ -6,7 +6,7 @@
                 {{-- Main Info Card --}}
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">{{ $editing ? 'Edit' : 'Add' }} Recipe Type</h5>
+                        <h5 class="mb-0">{{ $viewing ? 'View' : ($editing ? 'Edit' : 'Add') }} Recipe Type</h5>
                         <a href="{{ route('recipe-types') }}" class="btn btn-light-light text-muted">
                             <i class="bi bi-arrow-left me-1"></i>Back
                         </a>
@@ -18,7 +18,7 @@
                                 <label for="name" class="form-label">
                                     Name <span class="text-danger">*</span>
                                 </label>
-                                <input type="text" id="name" class="form-control" wire:model.defer="name" placeholder="Recipe Type Name ...">
+                                <input type="text" id="name" class="form-control" wire:model.defer="name" @disabled($viewing) placeholder="Recipe Type Name ...">
                                 @error('name')
                                     <div class="text-danger small mt-1">{{ $message }}</div>
                                 @enderror
@@ -30,7 +30,7 @@
                                     <label for="output_item_type_ids" class="form-label">
                                         Output Item Types <span class="text-danger">*</span>
                                     </label>
-                                    <select id="output_item_type_ids" multiple
+                                    <select id="output_item_type_ids" multiple @disabled($viewing)
                                             class="selectpicker w-100"
                                             title="Select Output Item Types"
                                             data-style="btn-default"
@@ -57,7 +57,7 @@
                                     <label for="item_type_ids" class="form-label">
                                        Used Item Types <span class="text-danger">*</span>
                                     </label>
-                                    <select id="item_type_ids" multiple
+                                    <select id="item_type_ids" multiple @disabled($viewing)
                                             class="selectpicker w-100"
                                             title="Select Item Types"
                                             data-style="btn-default"
@@ -84,7 +84,7 @@
                                     <label for="side_item_type_ids" class="form-label">
                                         Side Product Item Types
                                     </label>
-                                    <select id="side_item_type_ids" multiple
+                                    <select id="side_item_type_ids" multiple @disabled($viewing)
                                             class="selectpicker w-100"
                                             title="Select Side Product Item Types"
                                             data-style="btn-default"
@@ -111,11 +111,13 @@
                 </div>
 
                 {{-- Submit --}}
+                @unless($viewing)
                 <div class="col-12 text-end mb-2">
                     <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-check me-1"></i> Submit
+                        <i class="bi bi-check-lg me-1"></i> Submit
                     </button>
                 </div>
+                @endunless
 
             </div>
         </div>

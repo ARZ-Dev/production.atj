@@ -43,10 +43,10 @@ class WasteIndex extends Component
     {
         authorizeRequest('production.itemWaste-delete');
 
-        $waste = Waste::findOrFail($id);
-
         DB::beginTransaction();
         try {
+            $waste = Waste::lockForUpdate()->findOrFail($id);
+
             $ops = [];
 
             // Release the reservation if it was never approved
@@ -80,14 +80,17 @@ class WasteIndex extends Component
     {
         authorizeRequest('production.itemWaste-approve');
 
-        $waste = Waste::findOrFail($id);
-
-        if ($waste->status === 'approved') {
-            return to_route('item-wastes')->with('error', 'Waste is already approved.');
-        }
-
         DB::beginTransaction();
         try {
+            // Locked and re-read inside the transaction, so a double click or a
+            // second tab can't confirm the same document twice.
+            $waste = Waste::lockForUpdate()->findOrFail($id);
+
+            if ($waste->status !== 'pending') {
+                DB::rollBack();
+                return to_route('item-wastes')->with('error', 'Waste is already approved.');
+            }
+
             $ops = [];
 
             // Release the reservation and deduct actual stock. The parent validates
