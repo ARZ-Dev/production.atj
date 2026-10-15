@@ -55,11 +55,11 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     Route::resource('/roles', \App\Http\Controllers\RoleController::class)->except(['show', 'update', 'destroy']);
     Route::post('/roles/{id}', [\App\Http\Controllers\RoleController::class, 'update'])->name('roles.update');
-    Route::get('/roles/delete/{id}', [\App\Http\Controllers\RoleController::class, 'destroy'])->name('roles.destroy');
+    Route::delete('/roles/{id}', [\App\Http\Controllers\RoleController::class, 'destroy'])->name('roles.destroy');
 
     Route::resource('/users', \App\Http\Controllers\UserController::class)->except(['show', 'update', 'destroy']);
     Route::post('/users/{id}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
-    Route::get('/users/delete/{id}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
+    Route::delete('/users/{id}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
     Route::get('/users/departments/{id}/warehouses', [\App\Http\Controllers\UserController::class, 'getWarehouses'])->name('users.warehouses');
     Route::get('/users/warehouses/{id}/item-types', [\App\Http\Controllers\UserController::class, 'getItemTypes'])->name('users.item-types');
     Route::get('/users/departments/{id}/users', [\App\Http\Controllers\UserController::class, 'getDepartmentUsers'])->name('users.department-users');
@@ -74,7 +74,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     Route::resource('/warehouse-types', \App\Http\Controllers\WarehouseTypeController::class)->except(['show', 'update', 'destroy']);
     Route::post('/warehouse-types/{id}', [\App\Http\Controllers\WarehouseTypeController::class, 'update'])->name('warehouse-types.update');
-    Route::get('/warehouse-types/delete/{id}', [\App\Http\Controllers\WarehouseTypeController::class, 'destroy'])->name('warehouse-types.destroy');
+    Route::delete('/warehouse-types/{id}', [\App\Http\Controllers\WarehouseTypeController::class, 'destroy'])->name('warehouse-types.destroy');
 
 
     // |--------------------------------------------------------------------------
@@ -83,7 +83,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     Route::resource('/warehouses', \App\Http\Controllers\WarehouseController::class)->except(['show', 'update', 'destroy']);
     Route::post('/warehouses/{id}', [\App\Http\Controllers\WarehouseController::class, 'update'])->name('warehouses.update');
-    Route::get('/warehouses/delete/{id}', [\App\Http\Controllers\WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+    Route::delete('/warehouses/{id}', [\App\Http\Controllers\WarehouseController::class, 'destroy'])->name('warehouses.destroy');
 
     // |--------------------------------------------------------------------------
     // | Suppliers
@@ -91,7 +91,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     Route::resource('/suppliers', \App\Http\Controllers\SupplierController::class)->except(['show', 'update', 'destroy']);
     Route::post('/suppliers/{id}', [\App\Http\Controllers\SupplierController::class, 'update'])->name('suppliers.update');
-    Route::get('/suppliers/delete/{id}', [\App\Http\Controllers\SupplierController::class, 'destroy'])->name('suppliers.destroy');
+    Route::delete('/suppliers/{id}', [\App\Http\Controllers\SupplierController::class, 'destroy'])->name('suppliers.destroy');
 
     // |--------------------------------------------------------------------------
     // | Item Types
@@ -99,7 +99,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     Route::resource('/item-types', \App\Http\Controllers\ItemTypeController::class)->except(['show', 'update', 'destroy']);
     Route::post('/item-types/{id}', [\App\Http\Controllers\ItemTypeController::class, 'update'])->name('item-types.update');
-    Route::get('/item-types/delete/{id}', [\App\Http\Controllers\ItemTypeController::class, 'destroy'])->name('item-types.destroy');
+    Route::delete('/item-types/{id}', [\App\Http\Controllers\ItemTypeController::class, 'destroy'])->name('item-types.destroy');
 
     // |--------------------------------------------------------------------------
     // | Items
@@ -107,7 +107,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
 
     Route::resource('/items', \App\Http\Controllers\ItemController::class)->except(['show', 'update', 'destroy']);
     Route::post('/items/{id}', [\App\Http\Controllers\ItemController::class, 'update'])->name('items.update');
-    Route::get('/items/delete/{id}', [\App\Http\Controllers\ItemController::class, 'destroy'])->name('items.destroy');
+    Route::delete('/items/{id}', [\App\Http\Controllers\ItemController::class, 'destroy'])->name('items.destroy');
     Route::get('/get-item-sub-types/{typeId}', [\App\Http\Controllers\ItemController::class, 'getSubTypes'])->name('items.get-sub-types');
 
 
@@ -121,9 +121,6 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/edit/{id}', ItemRequestCreate::class)->name('item-requests.edit');
     });
 
-    Route::resource('/suppliers', \App\Http\Controllers\SupplierController::class)->except(['show', 'update', 'destroy']);
-    Route::post('/suppliers/{id}', [\App\Http\Controllers\SupplierController::class, 'update'])->name('suppliers.update');
-    Route::get('/suppliers/delete/{id}', [\App\Http\Controllers\SupplierController::class, 'destroy'])->name('suppliers.destroy');
 
     // |--------------------------------------------------------------------------
     // | Locations
@@ -186,8 +183,8 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/create', TransferCreate::class)->name('item-transfers.create');
         Route::get('/edit/{id}', TransferCreate::class)->name('item-transfers.edit');
         Route::get('/view/{id}/{viewStatus}', TransferCreate::class)->name('item-transfers.view');
-        Route::get('/approve-load/{id}', TransferCreate::class)->name('item-transfers.approve-load');
-        Route::get('/approve-receive/{id}', TransferCreate::class)->name('item-transfers.approve-receive');
+        Route::get('/approve-load/{id}', TransferCreate::class)->defaults('screen', 'approve-load')->name('item-transfers.approve-load');
+        Route::get('/approve-receive/{id}', TransferCreate::class)->defaults('screen', 'approve-receive')->name('item-transfers.approve-receive');
     });
 
     // |--------------------------------------------------------------------------
@@ -198,7 +195,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/', RecipeTypeIndex::class)->name('recipe-types');
         Route::get('/create', RecipeTypeCreate::class)->name('recipe-types.create');
         Route::get('/edit/{id}', RecipeTypeCreate::class)->name('recipe-types.edit');
-        Route::get('/view/{id}', RecipeTypeCreate::class)->name('recipe-types.view');
+        Route::get('/view/{id}', RecipeTypeCreate::class)->defaults('mode', 'view')->name('recipe-types.view');
 
     });
 
@@ -212,7 +209,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/', RecipeIndex::class)->name('recipes');
         Route::get('/create', RecipeCreate::class)->name('recipes.create');
         Route::get('/edit/{id}', RecipeCreate::class)->name('recipes.edit');
-        Route::get('/view/{id}', RecipeCreate::class)->name('recipes.view');
+        Route::get('/view/{id}', RecipeCreate::class)->defaults('mode', 'view')->name('recipes.view');
 
     });
 

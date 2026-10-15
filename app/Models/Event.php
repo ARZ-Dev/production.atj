@@ -80,4 +80,30 @@ class Event extends Model
     {
         return $this->belongsTo(Event::class, 'linked_event_id');
     }
+
+    /**
+     * Events still in play on a live plan — planned or running, not ended.
+     * Deleting the lane (or production line) one of these sits on would drop
+     * it off the board without unplacing it, and strand any stock it holds.
+     */
+    public function scopeNotEnded($query)
+    {
+        return $query
+            ->where(fn($q) => $q->whereNull('status')->orWhere('status', '!=', 'terminated'))
+            ->whereHas('plan');
+    }
+
+    /**
+     * Refusal message when $count events still sit on a lane about to be
+     * deleted, or null when there are none.
+     */
+    public static function laneInUseMessage(int $count, string $what): ?string
+    {
+        if (!$count) {
+            return null;
+        }
+
+        return "{$count} event" . ($count === 1 ? ' is' : 's are') . " still on {$what} (planned or running). "
+            . 'Unplace or end ' . ($count === 1 ? 'it' : 'them') . ' first.';
+    }
 }

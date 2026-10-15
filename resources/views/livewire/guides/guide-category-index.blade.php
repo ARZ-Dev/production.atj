@@ -11,9 +11,11 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Guide Categories</h5>
+                    @hasPermission('production.guide-create')
                     <button type="button" class="btn btn-primary" wire:click="create">
                         <i class="bi bi-plus-lg me-1"></i> Add Guide Category
                     </button>
+                    @endhasPermission
                 </div>
 
                 <div class="card-body" wire:ignore>
@@ -35,19 +37,23 @@
                                 <td>{{ $category->name_pr }}</td>
                                 <td><span class="badge bg-light-primary">{{ $category->guides_count }}</span></td>
                                 <td>
+                                    @hasPermission('production.guide-edit')
                                     <button type="button" wire:click="edit({{ $category->id }})"
                                         class="btn btn-light-primary icon-btn-sm"
                                         data-bs-toggle="tooltip" data-bs-custom-class="tooltip-white"
                                         data-bs-placement="top" data-bs-title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
+                                    @endhasPermission
 
+                                    @hasPermission('production.guide-delete')
                                     <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                         data-id="{{ $category->id }}"
                                         data-bs-toggle="tooltip" data-bs-custom-class="tooltip-white"
                                         data-bs-placement="top" data-bs-title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                    @endhasPermission
                                 </td>
                             </tr>
                             @endforeach

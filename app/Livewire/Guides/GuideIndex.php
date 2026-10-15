@@ -19,6 +19,8 @@ class GuideIndex extends Component
 
     public function mount()
     {
+        authorizeRequest('production.guide-list');
+
         $this->categories = GuideCategory::orderBy('name_en')->get();
         $this->loadGuides();
     }
@@ -69,6 +71,8 @@ class GuideIndex extends Component
 
     public function submit()
     {
+        authorizeRequest($this->editing ? 'production.guide-edit' : 'production.guide-create');
+
         $this->validate();
 
         $data = [
@@ -90,6 +94,8 @@ class GuideIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
+        authorizeRequest('production.guide-delete');
+
         Guide::findOrFail($id)->delete();
 
         return redirect()->route('guides')->with('success', 'Guide deleted successfully.');

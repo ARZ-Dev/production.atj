@@ -5,19 +5,25 @@ namespace App\Livewire\RecipeTypes;
 use App\Models\RecipeType;
 use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class RecipeTypeCreate extends Component
 {
     use AuthorizesRequests;
 
+    #[Locked]
     public $id = null;
+    // Opened from recipe-types.view: read-only, and save refuses.
+    #[Locked]
+    public bool $viewing = false;
     public $name;
     public $item_type_ids = [];
     public $side_item_type_ids = [];
     public $output_item_type_ids = [];
     public $itemTypes = [];
 
+    #[Locked]
     public bool $editing = false;
 
     protected ApiService $api;
@@ -27,9 +33,16 @@ class RecipeTypeCreate extends Component
         $this->api = $api;
     }
 
-    public function mount($id = null)
+    /** $mode is 'view' on the recipe-types.view route (a route default). */
+    public function mount($id = null, ?string $mode = null)
     {
-        authorizeRequest('production.recipeType-create');
+        $this->viewing = $mode === 'view';
+
+        authorizeRequest(match (true) {
+            $this->viewing => 'production.recipeType-view',
+            (bool) $id     => 'production.recipeType-edit',
+            default        => 'production.recipeType-create',
+        });
 
         $this->itemTypes = $this->api->get('/v1/item-types')['data'] ?? [];
 
@@ -62,6 +75,8 @@ class RecipeTypeCreate extends Component
 
     public function save()
     {
+        abort_if($this->viewing, 403, 'This recipe type is open for viewing only.');
+
         $this->validate();
 
         $data = [

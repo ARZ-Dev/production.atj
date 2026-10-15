@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Preparations;
 
+use App\Models\Event;
 use App\Livewire\Concerns\BuildsItemTypeRouting;
 use App\Models\EventType;
 use App\Models\Preparation;
@@ -205,6 +206,15 @@ class PreparationIndex extends Component
     public function delete(int $id)
     {
         authorizeRequest('production.preparation-delete');
+
+        $onLane = Event::notEnded()->where('placeable_type', Preparation::class)->where('placeable_id', $id)->count();
+
+        if ($message = Event::laneInUseMessage($onLane, 'this preparation')) {
+            $this->dispatch('swal:error', ['title' => 'Preparation in use', 'text' => $message]);
+
+            return;
+        }
+
         Preparation::findOrFail($id)->delete();
 
         return redirect()->route('preparations')->with('success', 'Preparation deleted successfully.');

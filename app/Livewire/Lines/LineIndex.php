@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lines;
 
+use App\Models\Event;
 use App\Livewire\Concerns\BuildsItemTypeRouting;
 use App\Models\EventType;
 use App\Models\Line;
@@ -205,6 +206,15 @@ class LineIndex extends Component
     public function delete(int $id)
     {
         authorizeRequest('production.line-delete');
+
+        $onLane = Event::notEnded()->where('placeable_type', Line::class)->where('placeable_id', $id)->count();
+
+        if ($message = Event::laneInUseMessage($onLane, 'this line')) {
+            $this->dispatch('swal:error', ['title' => 'Line in use', 'text' => $message]);
+
+            return;
+        }
+
         Line::findOrFail($id)->delete();
 
         return redirect()->route('lines')->with('success', 'Line deleted successfully.');

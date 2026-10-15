@@ -118,6 +118,30 @@ function triggerCleavePhone()
     }
 }
 
+// Send a DELETE to a Laravel route as a real form post (CSRF token + method
+// spoofing). Delete routes don't answer plain GET links, so a link on another
+// site can't trigger one.
+function submitDelete(url)
+{
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const form  = document.createElement('form');
+
+    form.method        = 'POST';
+    form.action        = url;
+    form.style.display = 'none';
+
+    [['_token', token], ['_method', 'DELETE']].forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type  = 'hidden';
+        input.name  = name;
+        input.value = value;
+        form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+}
+
 // // Call the function to initialize features
 // document.addEventListener("DOMContentLoaded", initializeAppFeatures);
 

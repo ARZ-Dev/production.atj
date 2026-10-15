@@ -70,7 +70,7 @@
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = "{{ route('item-types.destroy', '%typeId%') }}".replace('%typeId%', typeId);
+                submitDelete("{{ route('item-types.destroy', '%typeId%') }}".replace('%typeId%', typeId));
             }
         });
     });

@@ -7,6 +7,7 @@ use App\Services\ApiService;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -14,9 +15,15 @@ class TransferCreate extends Component
 {
     use AuthorizesRequests;
 
+    // Which transfer and which screen (edit / view / approve load / approve
+    // receive) — set in mount() and never by the client.
+    #[Locked]
     public bool $editing       = false;
+    #[Locked]
     public $id;
+    #[Locked]
     public $viewStatus;
+    #[Locked]
     public $confirmStatus      = 0;
     public $transfer;
 
@@ -46,14 +53,13 @@ class TransferCreate extends Component
         $this->inventory = $inventory;
     }
 
-    public function mount(ApiService $api, $id = null, $viewStatus = null)
+    /** $screen is 'approve-load' / 'approve-receive' on those routes (a route default). */
+    public function mount(ApiService $api, $id = null, $viewStatus = null, ?string $screen = null)
     {
-        $routeName = request()->route()->getName();
-
-        if ($routeName === 'item-transfers.approve-load') {
+        if ($screen === 'approve-load') {
             $this->confirmStatus = 1;
             authorizeRequest('production.itemTransfer-approve');
-        } elseif ($routeName === 'item-transfers.approve-receive') {
+        } elseif ($screen === 'approve-receive') {
             $this->confirmStatus = 2;
             authorizeRequest('production.itemTransfer-approve');
         } elseif ($viewStatus == 1) {
@@ -61,7 +67,7 @@ class TransferCreate extends Component
             authorizeRequest('production.itemTransfer-view');
         } else {
             $this->confirmStatus = 0;
-            authorizeRequest('production.itemTransfer-create');
+            authorizeRequest($id ? 'production.itemTransfer-edit' : 'production.itemTransfer-create');
         }
 
         $this->viewStatus = $viewStatus;
@@ -87,6 +93,13 @@ class TransferCreate extends Component
 
             if ($this->confirmStatus == 2 && $transfer->status !== 'loaded') {
                 session()->flash('error', 'Transfer must be in loaded status to approve receive!');
+                return redirect()->route('item-transfers');
+            }
+
+            // Editing is for pending transfers only (the index hides Edit; this
+            // covers the URL). submit() re-checks under a lock.
+            if (!$this->confirmStatus && $viewStatus != 1 && $transfer->status !== 'pending') {
+                session()->flash('error', 'Cannot edit a transfer that has already been processed!');
                 return redirect()->route('item-transfers');
             }
 
@@ -352,6 +365,10 @@ class TransferCreate extends Component
 
     public function submit(): mixed
     {
+        // Only the create/edit screen saves — not the view or approve screens,
+        // which are gated by other permissions.
+        abort_if($this->confirmStatus || $this->viewStatus == 1, 403);
+
         $this->sanitizeQuantities();
 
         $this->validate();
@@ -361,7 +378,7 @@ class TransferCreate extends Component
             $ops = [];
 
             if ($this->editing) {
-                $transfer = Transfer::findOrFail($this->id);
+                $transfer = Transfer::lockForUpdate()->findOrFail($this->id);
 
                 if ($transfer->status !== 'pending') {
                     DB::rollBack();
@@ -457,35 +474,59 @@ class TransferCreate extends Component
 
     public function confirmLoad(): mixed
     {
+        abort_unless($this->confirmStatus == 1, 403);
+        authorizeRequest('production.itemTransfer-approve');
+
         $this->sanitizeQuantities();
 
         $this->validate();
 
-        $transfer = Transfer::with('reportItems')->findOrFail($this->id);
-
         DB::beginTransaction();
         try {
+            // Locked and re-read inside the transaction: a second tab (or user)
+            // loading the same transfer would otherwise deduct the source twice.
+            $transfer = Transfer::with('reportItems')->lockForUpdate()->findOrFail($this->id);
+
+            if ($transfer->status !== 'pending') {
+                DB::rollBack();
+
+                return to_route('item-transfers')->with('error', 'This transfer has already been loaded.');
+            }
+
+            $lines = $transfer->reportItems->keyBy('id');
+            $rows  = collect($this->transferItems)->keyBy('id');
+
+            if ($rows->count() !== $lines->count() || $lines->keys()->diff($rows->keys())->isNotEmpty()) {
+                throw new \RuntimeException('This transfer changed while it was open — reload the page and try again.');
+            }
+
             $ops = [];
 
-            foreach ($this->transferItems as $index => $row) {
-                $item = collect($this->allItems)->firstWhere('id', (int) $row['item_id']);
-                abort_if(!$item, 422, 'Invalid item selected.');
+            foreach ($lines as $line) {
+                // Item, unit and the reserved amount come from the saved line —
+                // only the loaded quantity is taken from the form.
+                $reserved = (float) $line->quantity;
+                $loaded   = (float) $rows[$line->id]['quantity'];
 
-                $unit = collect($this->rowUnits[$index] ?? [])->firstWhere('id', (int) $row['item_unit_id']);
-                abort_if(!$unit, 422, 'Invalid unit selected.');
-
-                $transfer->reportItems()->findOrFail($row['id'])->update([
-                    'warehouse_id'  => $this->warehouse_from_id,
-                    'item_id'       => $item['id'],
-                    'item_unit_id'  => $unit['id'],
-                    'quantity'      => (float) $row['quantity'],
-                ]);
-
-                // Release the source reservation into an actual deduction. The parent
-                // validates availability and rejects the batch if the source is short.
+                // Release what was reserved and deduct what was actually loaded.
+                // The parent validates availability and rejects the batch if the
+                // source is short.
                 $ops[] = InventoryService::confirmOut(
-                    $this->warehouse_from_id, $item['id'], $unit['id'], (float) $row['quantity'], (float) $row['quantity']
+                    $transfer->warehouse_from_id, $line->item_id, $line->item_unit_id, $reserved, $loaded
                 );
+
+                // The destination was reserved for the planned amount: move its
+                // pending-in to what is now on its way, so receive settles it exactly.
+                if (abs($loaded - $reserved) > 0.0000001) {
+                    $ops[] = InventoryService::releaseIn(
+                        $transfer->warehouse_to_id, $line->item_id, $line->item_unit_id, $reserved
+                    );
+                    $ops[] = InventoryService::reserveIn(
+                        $transfer->warehouse_to_id, $line->item_id, $line->item_unit_id, $loaded
+                    );
+                }
+
+                $line->update(['quantity' => $loaded]);
             }
 
             $this->inventory->applyOrFail($ops);
@@ -511,31 +552,43 @@ class TransferCreate extends Component
 
     public function confirmReceive(): mixed
     {
+        abort_unless($this->confirmStatus == 2, 403);
+        authorizeRequest('production.itemTransfer-approve');
+
         $this->sanitizeQuantities();
 
         $this->validate();
 
-        $transfer = Transfer::with('reportItems')->findOrFail($this->id);
-
         DB::beginTransaction();
         try {
-            $ops = [];
+            // Locked and re-read inside the transaction, so the same transfer
+            // can't be received twice.
+            $transfer = Transfer::with('reportItems')->lockForUpdate()->findOrFail($this->id);
 
-            foreach ($this->transferItems as $row) {
+            if ($transfer->status !== 'loaded') {
+                DB::rollBack();
+
+                return to_route('item-transfers')->with('error', 'This transfer has already been received.');
+            }
+
+            $rows = collect($this->transferItems)->keyBy('id');
+            $ops  = [];
+
+            foreach ($transfer->reportItems as $line) {
+                $row = $rows->get($line->id)
+                    ?? throw new \RuntimeException('This transfer changed while it was open — reload the page and try again.');
+
                 $receivedQty = (float) $row['received_quantity'];
-                $loadedQty   = (float) $row['quantity'];
 
-                // Move the destination reservation into actual stock.
-                // The source was already deducted at load, so only the destination changes here;
-                // the received quantity may differ from the loaded (reserved) quantity.
+                // Move the destination reservation into actual stock. The source was
+                // already deducted at load, so only the destination changes here; the
+                // received quantity may differ from the loaded (reserved) one, which
+                // is read from the saved line rather than the form.
                 $ops[] = InventoryService::confirmIn(
-                    $this->warehouse_to_id, (int) $row['item_id'], (int) $row['item_unit_id'], $loadedQty, $receivedQty
+                    $transfer->warehouse_to_id, $line->item_id, $line->item_unit_id, (float) $line->quantity, $receivedQty
                 );
 
-                // Save received_quantity on the report item
-                $transfer->reportItems()
-                    ->where('id', $row['id'])
-                    ->update(['received_quantity' => $receivedQty]);
+                $line->update(['received_quantity' => $receivedQty]);
             }
 
             $this->inventory->applyOrFail($ops);

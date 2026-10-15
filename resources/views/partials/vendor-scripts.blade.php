@@ -67,4 +67,4 @@
 <script src="{{ asset('assets/libs/filepond/filepond.min.js') }}"></script>
  <script src="{{ asset('assets/libs/sortablejs/Sortable.min.js') }}"></script>
 
-<script src="{{ asset('assets/js/app.js') }}"></script>
+<script src="{{ asset('assets/js/app.js') }}?v={{ @filemtime(public_path('assets/js/app.js')) ?: 1 }}"></script>

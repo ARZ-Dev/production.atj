@@ -218,10 +218,11 @@
             }
         });
 
-        // Quantity cleave input → dispatch to Livewire
+        // Quantity cleave input → dispatch to Livewire. Cleave adds thousands
+        // separators ("1,000"), which parseFloat would stop at — strip them first.
         $(document).on('input', '.quantity-input', function () {
             const index    = $(this).data('index');
-            const quantity = parseFloat($(this).val()) || 0;
+            const quantity = parseFloat(String($(this).val()).replace(/,/g, '')) || 0;
             if (index !== undefined) {
                 $wire.dispatch('updateQuantity', {
                     index:    parseInt(index),

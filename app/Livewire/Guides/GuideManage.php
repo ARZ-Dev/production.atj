@@ -31,6 +31,9 @@ class GuideManage extends Component
 
     public function mount($id)
     {
+        // Editing a guide's content; reading it is GuideView, open to everyone.
+        authorizeRequest('production.guide-edit');
+
         $this->guideId = $id;
         Guide::findOrFail($id);
     }

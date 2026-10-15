@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Packagings;
 
+use App\Models\Event;
 use App\Models\Packaging;
 use App\Services\ApiService;
 use Livewire\Attributes\On;
@@ -41,6 +42,15 @@ class PackagingIndex extends Component
     public function delete(int $id)
     {
         authorizeRequest('production.packaging-delete');
+
+        $onLane = Event::notEnded()->where('placeable_type', Packaging::class)->where('placeable_id', $id)->count();
+
+        if ($message = Event::laneInUseMessage($onLane, 'this packaging')) {
+            $this->dispatch('swal:error', ['title' => 'Packaging in use', 'text' => $message]);
+
+            return;
+        }
+
         Packaging::findOrFail($id)->delete();
 
         return redirect()->route('packagings')->with('success', 'Packaging deleted.');

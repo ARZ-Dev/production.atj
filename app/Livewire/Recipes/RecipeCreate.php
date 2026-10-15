@@ -9,6 +9,7 @@ use App\Models\RecipeType;
 use App\Services\ApiService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -17,8 +18,13 @@ class RecipeCreate extends Component
     use AuthorizesRequests;
 
     // ─── State ────────────────────────────────────────────────────────────────
+    #[Locked]
     public bool $editing = false;
+    #[Locked]
     public ?int $id      = null;
+    // Opened from recipes.view: everything renders read-only and submit refuses.
+    #[Locked]
+    public bool $viewing = false;
 
     // ─── Recipe Header Fields ─────────────────────────────────────────────────
     public ?string $name           = null;
@@ -62,9 +68,16 @@ class RecipeCreate extends Component
         $this->api = $api;
     }
 
-    public function mount(ApiService $api, ?int $id = null): void
+    /** $mode is 'view' on the recipes.view route (a route default). */
+    public function mount(ApiService $api, ?int $id = null, ?string $mode = null): void
     {
-        authorizeRequest('production.recipe-create');
+        $this->viewing = $mode === 'view';
+
+        authorizeRequest(match (true) {
+            $this->viewing => 'production.recipe-view',
+            (bool) $id     => 'production.recipe-edit',
+            default        => 'production.recipe-create',
+        });
 
         $this->recipeTypes = RecipeType::orderBy('name')->get()->toArray();
 
@@ -380,6 +393,8 @@ class RecipeCreate extends Component
     // ─── Submit ───────────────────────────────────────────────────────────────
     public function submit(): void
     {
+        abort_if($this->viewing, 403, 'This recipe is open for viewing only.');
+
         $this->sanitizeQuantities();
 
         $rules = [

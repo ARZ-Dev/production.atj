@@ -36,7 +36,7 @@
                                     </td>
                                     <td>
                                         @hasPermission('production.recipe-view')
-                                        <a href="{{ route('recipes.view', [$r->id, \App\Utils\Constants::VIEW_STATUS]) }}"
+                                        <a href="{{ route('recipes.view', $r->id) }}"
                                             class="btn btn-light-info icon-btn-sm" data-bs-toggle="tooltip"
                                             data-bs-custom-class="tooltip-white" data-bs-placement="top"
                                             data-bs-title="View">
@@ -54,7 +54,7 @@
                                         @endhasPermission
 
                                         @hasPermission('production.recipe-update-status')
-                                        @if($r->is_active)
+                                        @if($r->status)
                                         <button type="button" wire:click="deactivate({{ $r->id }})"
                                             class="btn btn-light-danger icon-btn-sm" data-bs-toggle="tooltip"
                                             data-bs-custom-class="tooltip-white" data-bs-placement="top"
@@ -70,7 +70,7 @@
                                         </button>
                                         @endif
                                         @endhasPermission
-                                        @hasPermission('admin.preperationItems.delete')
+                                        @hasPermission('production.recipe-delete')
                                         <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                             data-id="{{ $r->id }}" data-bs-toggle="tooltip"
                                             data-bs-custom-class="tooltip-white" data-bs-placement="top"

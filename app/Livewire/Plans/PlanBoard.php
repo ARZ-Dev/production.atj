@@ -118,6 +118,8 @@ class PlanBoard extends Component
 
     public function mount($id): void
     {
+        authorizeRequest('production.plan-list');
+
         $this->loadPlan($id);
 
         if (!in_array($this->view, ['board', 'list'], true)) {
@@ -661,6 +663,8 @@ class PlanBoard extends Component
 
     public function dropEvent(int $eventId, ?int $productionLineId, string $placeableAlias, int $placeableId, int $slot): void
     {
+        authorizeRequest('production.event-create');
+
         $event = Event::with('eventType')
             ->where('plan_id', $this->plan->id)
             ->findOrFail($eventId);
@@ -761,6 +765,8 @@ class PlanBoard extends Component
 
     public function unplaceEvent(int $eventId): void
     {
+        authorizeRequest('production.event-create');
+
         $event = Event::with('eventType')->where('plan_id', $this->plan->id)->findOrFail($eventId);
 
         // A started event can't be unplaced — its warehouse and reserved stock
@@ -2871,6 +2877,7 @@ class PlanBoard extends Component
                 'placed'    => (bool) $linked->placeable_id,
             ] : null,
             'description'          => $event->description,
+            'started'              => (bool) $event->status,
             'status'               => $event->status
                 ? (self::EVENT_STATUS_LABELS[$event->status] ?? ucfirst($event->status))
                 : 'Planned',
@@ -2881,9 +2888,25 @@ class PlanBoard extends Component
 
     public function deleteEvent(int $eventId): void
     {
+        authorizeRequest('production.event-create');
+
         $event = Event::with('eventType')->where('plan_id', $this->plan->id)->find($eventId);
 
         if (!$event) {
+            return;
+        }
+
+        // A started event holds stock in process (or, once ended, carries the
+        // record of what it moved) — deleting it would strand that hold. The
+        // same rule as unplacing. Its companion started with it, so checking the
+        // lead covers the pair.
+        if ($event->status) {
+            $label = self::EVENT_STATUS_LABELS[$event->status] ?? $event->status;
+            $this->dispatch('swal:error', [
+                'title' => 'Event already started',
+                'text'  => "\"{$event->eventType?->name}\" can't be deleted while it is \"{$label}\" — its stock movements are tied to it.",
+            ]);
+
             return;
         }
 

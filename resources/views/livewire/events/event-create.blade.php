@@ -15,6 +15,7 @@
         @endif
 
         @foreach($events as $index => $event)
+        @php $rowStarted = !empty($event['started']); @endphp
         <div class="ec-card" wire:key="ec-{{ $event['key'] }}">
 
             <div class="ec-card-head">
@@ -22,7 +23,7 @@
 
                 <div wire:ignore class="ec-type-select-wrap @error('events.'.$index.'.event_type_id') is-invalid @enderror">
                     <select id="ec_event_type_{{ $event['key'] }}" data-key="{{ $event['key'] }}"
-                        class="selectpicker ec-event-type-select" data-width="100%"
+                        class="selectpicker ec-event-type-select" data-width="100%" @disabled($rowStarted)
                         data-live-search="true" title="— Select event type —"
                         wire:model="events.{{ $index }}.event_type_id">
                         @foreach($eventTypes as $type)
@@ -62,6 +63,13 @@
             </div>
             @enderror
 
+            @if($rowStarted)
+            <div class="px-3 pt-2 text-muted small">
+                <i class="bi bi-lock me-1"></i>This event has started — its stock was reserved from these
+                settings, so only the description can be changed.
+            </div>
+            @endif
+
             <div class="ec-card-body">
 
                 @php $rowKey = $event['key']; $rowHasRecipe = !empty($event['event_type_has_recipe']); @endphp
@@ -72,7 +80,7 @@
                         <div class="ec-field-label">Item Type <span class="text-danger">*</span></div>
                         <div wire:ignore>
                             <select id="ec_item_type_{{ $rowKey }}" data-key="{{ $rowKey }}"
-                                class="selectpicker ec-item-type-select" data-width="100%"
+                                class="selectpicker ec-item-type-select" data-width="100%" @disabled($rowStarted)
                                 data-live-search="true" title="— Select —"
                                 wire:model="events.{{ $index }}.item_type_id">
                                 @foreach($itemTypesByRow[$index] ?? [] as $type)
@@ -91,7 +99,7 @@
                         <div class="ec-field-label">Item <span class="text-danger">*</span></div>
                         <div wire:ignore>
                             <select id="ec_item_{{ $rowKey }}" data-key="{{ $rowKey }}"
-                                class="selectpicker ec-item-select" data-width="100%"
+                                class="selectpicker ec-item-select" data-width="100%" @disabled($rowStarted)
                                 data-live-search="true" title="— Select —"
                                 wire:model="events.{{ $index }}.item_id">
                                 @foreach($itemsByRow[$index] ?? [] as $item)
@@ -110,7 +118,7 @@
                         <div class="ec-field-label">Recipe <span class="text-danger">*</span></div>
                         <div wire:ignore>
                             <select id="ec_recipe_{{ $rowKey }}" data-key="{{ $rowKey }}"
-                                class="selectpicker ec-recipe-select" data-width="100%"
+                                class="selectpicker ec-recipe-select" data-width="100%" @disabled($rowStarted)
                                 data-live-search="true" title="— Select —"
                                 wire:model="events.{{ $index }}.recipe_id">
                                 @foreach($recipesByRow[$index] ?? [] as $recipe)
@@ -130,6 +138,7 @@
                         <input type="text"
                             class="form-control form-control-sm @error('events.'.$index.'.batch_count') is-invalid @enderror"
                             wire:model.defer="events.{{ $index }}.batch_count"
+                            @disabled($rowStarted)
                             wire:change="onBatchCountChanged({{ $index }}, $event.target.value)"
                             placeholder="e.g. 1">
                         @error('events.' . $index . '.batch_count')
@@ -188,7 +197,7 @@
                             <div class="ec-field-label">Item Type <span class="text-danger">*</span></div>
                             <div wire:ignore>
                                 <select id="ec_c_item_type_{{ $rowKey }}" data-key="{{ $rowKey }}"
-                                    class="selectpicker ec-c-item-type-select" data-width="100%"
+                                    class="selectpicker ec-c-item-type-select" data-width="100%" @disabled($rowStarted)
                                     data-live-search="true" title="— Select —">
                                     @foreach($companionItemTypesByRow[$index] ?? [] as $type)
                                     <option value="{{ $type['id'] }}" @selected((int)($companion['item_type_id'] ?? 0) === $type['id'])>
@@ -206,7 +215,7 @@
                             <div class="ec-field-label">Item <span class="text-danger">*</span></div>
                             <div wire:ignore>
                                 <select id="ec_c_item_{{ $rowKey }}" data-key="{{ $rowKey }}"
-                                    class="selectpicker ec-c-item-select" data-width="100%"
+                                    class="selectpicker ec-c-item-select" data-width="100%" @disabled($rowStarted)
                                     data-live-search="true" title="— Select —">
                                     @foreach($companionItemsByRow[$index] ?? [] as $item)
                                     <option value="{{ $item['id'] }}" @selected((int)($companion['item_id'] ?? 0) === $item['id'])>
@@ -224,7 +233,7 @@
                             <div class="ec-field-label">Recipe <span class="text-danger">*</span></div>
                             <div wire:ignore>
                                 <select id="ec_c_recipe_{{ $rowKey }}" data-key="{{ $rowKey }}"
-                                    class="selectpicker ec-c-recipe-select" data-width="100%"
+                                    class="selectpicker ec-c-recipe-select" data-width="100%" @disabled($rowStarted)
                                     data-live-search="true" title="— Select —">
                                     @foreach($companionRecipesByRow[$index] ?? [] as $recipe)
                                     <option value="{{ $recipe['id'] }}" @selected((int)($companion['recipe_id'] ?? 0) === $recipe['id'])>
@@ -248,6 +257,7 @@
                             <input type="text"
                                 class="form-control form-control-sm @error('events.'.$index.'.companion.batch_count') is-invalid @enderror"
                                 wire:model.defer="events.{{ $index }}.companion.batch_count"
+                                @disabled($rowStarted)
                                 placeholder="e.g. 1">
                             @error('events.' . $index . '.companion.batch_count')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>

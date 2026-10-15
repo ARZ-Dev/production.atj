@@ -18,7 +18,7 @@ class ItemRequestIndex extends Component
 
     public function mount(ApiService $api)
     {
-            authorizeRequest('production.item-request-list');
+        authorizeRequest('production.itemRequest-list');
         $this->requests = ItemRequest::all();
         $warehouses = $api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
         $this->warehouseMap = collect($warehouses)->pluck('name', 'id')->toArray();
@@ -27,8 +27,8 @@ class ItemRequestIndex extends Component
     #[On('delete')]
     public function delete($id)
     {
-        authorizeRequest('production.item-request-delete');
-         
+        authorizeRequest('production.itemRequest-delete');
+
         $request = ItemRequest::findOrFail($id);
         $request->inputs()->delete(); // Soft delete related items
         $request->delete();
@@ -40,6 +40,8 @@ class ItemRequestIndex extends Component
     #[On('updateStatus')]
     public function updateStatus(int $id, string $status)
     {
+        authorizeRequest('production.itemRequest-approve');
+
         $allowed = ['approved', 'rejected', 'completed'];
 
         if (!in_array($status, $allowed)) {

@@ -55,6 +55,57 @@ class ApiService
         }
     }
 
+    /**
+     * POST as multipart/form-data with files attached (e.g. an item image).
+     * $files maps field name → UploadedFile.
+     */
+    public function postMultipart(string $endpoint, array $data = [], array $files = []): array
+    {
+        try {
+            $request = Http::withToken($this->getToken())
+                ->timeout(30)
+                ->asMultipart();
+
+            foreach ($files as $name => $file) {
+                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                    $request = $request->attach($name, fopen($file->getRealPath(), 'r'), $file->getClientOriginalName());
+                }
+            }
+
+            $response = $request->post("{$this->apiUrl}{$endpoint}", $this->multipartFields($data));
+
+            return $this->handleResponse($response);
+        } catch (\Exception $e) {
+            Log::error("Auth API POST (multipart) {$endpoint} failed: " . $e->getMessage());
+            return ['success' => false, 'message' => 'Auth service unavailable.'];
+        }
+    }
+
+    /**
+     * Flatten nested data into multipart fields — units[0][name] and so on —
+     * which the HTTP client can't do for a multipart body itself. Null is sent
+     * as "" (the parent turns empty strings back into null), booleans as 1/0.
+     */
+    private function multipartFields(array $data, string $prefix = ''): array
+    {
+        $fields = [];
+
+        foreach ($data as $key => $value) {
+            $name = $prefix === '' ? (string) $key : "{$prefix}[{$key}]";
+
+            if (is_array($value)) {
+                array_push($fields, ...$this->multipartFields($value, $name));
+            } else {
+                $fields[] = [
+                    'name'     => $name,
+                    'contents' => is_bool($value) ? (string) (int) $value : (string) ($value ?? ''),
+                ];
+            }
+        }
+
+        return $fields;
+    }
+
     public function put(string $endpoint, array $data = []): array
     {
         try {

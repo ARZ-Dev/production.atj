@@ -73,7 +73,7 @@
                                         </a>
                                         @endhasPermission
 
-                                        @hasPermission('admin.recipeTypes.delete')
+                                        @hasPermission('production.recipeType-delete')
                                         <button type="button" class="btn btn-light-danger icon-btn-sm delete-button"
                                             data-id="{{ $type->id }}" data-bs-toggle="tooltip"
                                             data-bs-custom-class="tooltip-white" data-bs-placement="top"

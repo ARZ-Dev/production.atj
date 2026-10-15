@@ -101,7 +101,7 @@
                                 </li>
                                 @endhasAnyPermission
 
-                                @hasAnyPermission(['production.suppliers-list'])
+                                @hasAnyPermission(['production.supplier-list'])
                                 <li class="pe-slide pe-has-sub">
                                     <a href="#collapseSuppliers"
                                         class="pe-nav-link {{ request()->is('admin/suppliers*') ? 'active' : '' }}"
@@ -114,7 +114,7 @@
                                     </a>
 
                                     <ul class="pe-slide-menu collapse" id="collapseSuppliers">
-                                        @hasPermission('production.suppliers-list')
+                                        @hasPermission('production.supplier-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('suppliers.index') }}"
                                                 class="pe-nav-link {{ request()->is('admin/suppliers*') ? " active" : ""
@@ -167,11 +167,11 @@
 
                                 @hasAnyPermission([
                                 'production.itemRequest-list',
-                                'production.StockIn-list',
-                                'production.StockOut-list',
-                                'production.Waste-list',
-                                'production.WarehouseInventory-list',
-                                'production.Transfer-list'
+                                'production.itemStockIn-list',
+                                'production.itemStockOut-list',
+                                'production.itemWaste-list',
+                                'production.itemWarehouseInventory-list',
+                                'production.itemTransfer-list'
                                 ])
                                 <li class="pe-slide pe-has-sub">
                                     @php
@@ -203,7 +203,7 @@
                                         @endhasPermission
 
                                         {{-- Stock In --}}
-                                        @hasPermission('production.StockIn-list')
+                                        @hasPermission('production.itemStockIn-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('item-stock-ins') }}"
                                                 class="pe-nav-link {{ request()->is('admin/item-stock-ins*') ? 'active' : '' }}">
@@ -213,7 +213,7 @@
                                         @endhasPermission
 
                                         {{-- Stock Out --}}
-                                        @hasPermission('production.StockOut-list')
+                                        @hasPermission('production.itemStockOut-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('item-stock-outs') }}"
                                                 class="pe-nav-link {{ request()->is('admin/item-stock-outs*') ? 'active' : '' }}">
@@ -223,7 +223,7 @@
                                         @endhasPermission
 
                                         {{-- Waste --}}
-                                        @hasPermission('production.Waste-list')
+                                        @hasPermission('production.itemWaste-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('item-wastes') }}"
                                                 class="pe-nav-link {{ request()->is('admin/item-wastes*') ? 'active' : '' }}">
@@ -233,7 +233,7 @@
                                         @endhasPermission
 
                                         {{-- Transfer --}}
-                                        @hasPermission('production.rawMaterialTransfer-list')
+                                        @hasPermission('production.itemTransfer-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('item-transfers') }}"
                                                 class="pe-nav-link {{ request()->is('admin/item-transfers*') ? 'active' : '' }}">
@@ -243,7 +243,7 @@
                                         @endhasPermission
 
                                         {{-- Warehouse Inventory --}}
-                                        @hasPermission('production.rawMaterialWarehouseInventory-list')
+                                        @hasPermission('production.itemWarehouseInventory-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('item-warehouse-inventory') }}"
                                                 class="pe-nav-link {{ request()->is('admin/item-warehouse-inventory*') ? 'active' : '' }}">
@@ -343,12 +343,14 @@
                                         @endhasPermission
 
 
+                                        @hasPermission('production.plan-list')
                                         <li class="pe-slide-item">
                                             <a href="{{ route('plans') }}"
                                                 class="pe-nav-link {{ request()->is('admin/plans*') || request()->is('admin/events*') ? 'active' : '' }}">
                                                 Plans
                                             </a>
                                         </li>
+                                        @endhasPermission
 
 
                                     </ul>
@@ -416,6 +418,9 @@
                                 </li>
                                 @endhasAnyPermission
 
+                                {{-- Managing guides; reading them stays open to everyone
+                                     through the header's Guide button (guides.view). --}}
+                                @hasPermission('production.guide-list')
                                 <li class="pe-slide pe-has-sub">
                                     @php
                                     $guideActive = request()->is('admin/guide-categories*')
@@ -450,6 +455,7 @@
 
                                     </ul>
                                 </li>
+                                @endhasPermission
 
                             </ul>
                         </div>
