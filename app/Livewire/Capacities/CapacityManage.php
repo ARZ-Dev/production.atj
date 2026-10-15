@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Capacities;
 
+use App\Livewire\Concerns\OffersOutputWarehouseItemTypes;
 use App\Services\ApiService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
@@ -13,9 +14,14 @@ use Livewire\Component;
  * stored in basic units (that's what RecipeDurationService divides by), entered
  * in whichever unit is convenient. The per-unit inputs are linked in the browser;
  * only the basic value and the unit it was entered in reach the server.
+ *
+ * Only the item types of the warehouse it produces into are offered — see
+ * OffersOutputWarehouseItemTypes.
  */
 class CapacityManage extends Component
 {
+    use OffersOutputWarehouseItemTypes;
+
     #[Locked]
     public string $modelType;   // 'preparation' | 'line'
     #[Locked]
@@ -67,6 +73,13 @@ class CapacityManage extends Component
         $this->modelName = $model->name;
         $this->loadCatalog();
 
+        // A preparation makes semi-finished goods, a line finished ones; both
+        // keep the warehouse they produce into in fg_warehouse_id.
+        $this->catalogLoaded = $this->loadOutputWarehouse($model, $modelType === 'preparation'
+                ? 'semi-finished goods warehouse'
+                : 'finished goods warehouse')
+            && $this->catalogLoaded;
+
         // Group by the item's *current* type, falling back to the stored one,
         // so an item the parent has since moved shows up under its new type.
         $itemTypes = $this->itemTypeIndex();
@@ -78,6 +91,8 @@ class CapacityManage extends Component
             $this->capacityUnits[$capacity->item_id] = $capacity->item_unit_id ? (int) $capacity->item_unit_id : null;
             $typeIds[] = $itemTypes[$capacity->item_id] ?? $capacity->item_type_id;
         }
+
+        $this->offerOutputWarehouseItemTypes($typeIds);
 
         $this->storedCount   = $stored->count();
         $this->item_type_ids = $this->knownTypeIds($typeIds);
@@ -194,8 +209,9 @@ class CapacityManage extends Component
         foreach ($this->itemTypes as $type) {
             if (in_array($type['id'], $this->item_type_ids, true)) {
                 $groups[$type['id']] = [
-                    'name'  => $type['name'],
-                    'items' => $this->catalog[$type['id']] ?? [],
+                    'name'         => $type['name'],
+                    'items'        => $this->catalog[$type['id']] ?? [],
+                    'in_warehouse' => $type['in_warehouse'] ?? true,
                 ];
             }
         }

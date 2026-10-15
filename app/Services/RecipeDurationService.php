@@ -89,8 +89,38 @@ class RecipeDurationService
             return null;
         }
 
+        $rate = $this->packagingRate($packagingId, (int) $event->item_id, $recipe);
+
+        if (!$rate) {
+            return null;
+        }
+
+        $batchCount  = (float) ($event->batch_count ?: 1);
+        $requiredQty = (float) $recipe->quantity_per_batch * $batchCount;
+
+        // Both sides in basic units. When the rate is for the recipe's own
+        // unit the formulas cancel out and this is simply quantity ÷ rate.
+        $basicQty = $requiredQty * $rate['recipe_formula'];
+
+        return (string) round($basicQty / $rate['basic_per_hour'] * 60);
+    }
+
+    /**
+     * How fast a packaging handles an item, for a recipe making it: the rate
+     * set for the recipe's own unit (exact), else the basic unit's, else any
+     * configured unit — each unit's rate is set independently on the packaging.
+     *
+     * Returns the chosen rate as entered (`capacity` per hour in `item_unit_id`)
+     * and converted to basic units per hour, plus the recipe unit's formula so
+     * a caller can bring the recipe's quantities to basic units too. Null when
+     * the packaging has no rate for the item.
+     *
+     * @return array{capacity: float, item_unit_id: int, basic_per_hour: float, recipe_formula: float}|null
+     */
+    public function packagingRate(int $packagingId, int $itemId, Recipe $recipe): ?array
+    {
         $rates = PackagingCapacity::where('packaging_id', $packagingId)
-            ->where('item_id', $event->item_id)
+            ->where('item_id', $itemId)
             ->where('capacity', '>', 0)
             ->get();
 
@@ -98,7 +128,7 @@ class RecipeDurationService
             return null;
         }
 
-        $units       = collect($this->api->get("/v1/items/{$event->item_id}")['data']['units'] ?? []);
+        $units       = collect($this->api->get("/v1/items/{$itemId}")['data']['units'] ?? []);
         $formulaOf   = fn($unitId) => (float) ($units->firstWhere('id', (int) $unitId)['formula'] ?? 1) ?: 1;
         $basicUnitId = $units->firstWhere('basic', true)['id'] ?? null;
 
@@ -106,14 +136,11 @@ class RecipeDurationService
             ?? ($basicUnitId ? $rates->firstWhere('item_unit_id', (int) $basicUnitId) : null)
             ?? $rates->first();
 
-        $batchCount  = (float) ($event->batch_count ?: 1);
-        $requiredQty = (float) $recipe->quantity_per_batch * $batchCount;
-
-        // Both sides in basic units. When the rate is for the recipe's own
-        // unit the formulas cancel out and this is simply quantity ÷ rate.
-        $basicQty     = $requiredQty * $formulaOf($recipe->item_unit_id);
-        $basicPerHour = (float) $rate->capacity * $formulaOf($rate->item_unit_id);
-
-        return (string) round($basicQty / $basicPerHour * 60);
+        return [
+            'capacity'       => (float) $rate->capacity,
+            'item_unit_id'   => (int) $rate->item_unit_id,
+            'basic_per_hour' => (float) $rate->capacity * $formulaOf($rate->item_unit_id),
+            'recipe_formula' => $formulaOf($recipe->item_unit_id),
+        ];
     }
 }
