@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Events;
 
+use App\Livewire\Concerns\PreventsDuplicateSubmission;
 use App\Models\Event;
 use App\Models\EventType;
 use App\Models\Plan;
@@ -16,6 +17,8 @@ use Livewire\Component;
 
 class EventCreate extends Component
 {
+    use PreventsDuplicateSubmission;
+
     public $planId;
     public $plan;
     public $eventTypes = [];
@@ -68,6 +71,8 @@ class EventCreate extends Component
     #[On('openForCreate')]
     public function openForCreate(): void
     {
+        // The popup stays on the board between uses: each opening is a new form.
+        $this->renewSubmissionKey();
         $this->reset('events', 'removedEventIds', ...self::ROW_MAPS);
         $this->editingEventId = null;
         $this->addEventRow();
@@ -77,6 +82,7 @@ class EventCreate extends Component
     #[On('openForEdit')]
     public function openForEdit(int $eventId): void
     {
+        $this->renewSubmissionKey();
         $this->reset('events', 'removedEventIds', ...self::ROW_MAPS);
         $this->editingEventId = $eventId;
 
@@ -817,7 +823,7 @@ class EventCreate extends Component
             : null;
 
         if (!$existing) {
-            Event::create($data);
+            Event::create($data + ['submission_key' => $this->submissionKey]);
 
             return collect();
         }
@@ -841,6 +847,17 @@ class EventCreate extends Component
 
     public function submit(): void
     {
+        // One opening of the popup saves once. A repeated Save — a click queued
+        // while the first ran, or one made while the board reloads — finds the
+        // events the first save created (they carry this key) and just reloads.
+        // A save that only edited existing events created nothing to find, and
+        // repeating it rewrites the same values.
+        if ($this->alreadySubmitted(Event::class)) {
+            $this->redirect(route('plans.view', $this->planId));
+
+            return;
+        }
+
         $this->validate();
 
         $typeNames = EventType::whereIn('id',
@@ -920,7 +937,7 @@ class EventCreate extends Component
                 } else {
                     // New events start unplaced — their time slot is set by
                     // dragging them onto the plan board calendar.
-                    $lead = Event::create($data);
+                    $lead = Event::create($data + ['submission_key' => $this->submissionKey]);
                 }
 
                 if ($lead && !empty($event['companion'])) {

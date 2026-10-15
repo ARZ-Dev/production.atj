@@ -2,15 +2,17 @@
 
 namespace App\Livewire\ItemRequests;
 
+use App\Livewire\Concerns\PreventsDuplicateSubmission;
 use App\Models\ItemRequest;
 use App\Services\ApiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ItemRequestCreate extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, PreventsDuplicateSubmission;
 
     #[Locked]
     public $id;
@@ -138,8 +140,23 @@ class ItemRequestCreate extends Component
             'items.*.item_unit_id'     => 'required|integer',
         ]);
 
+        try {
+            // One transaction, so an invalid row can't leave half a request behind.
+            return DB::transaction(fn() => $this->persist());
+        } catch (\Throwable $e) {
+            // Two submits of this form raced past the check in persist().
+            if ($this->isDuplicateSubmission($e)) {
+                return redirect()->route('item-requests')->with('success', 'Request created successfully.');
+            }
+
+            throw $e;
+        }
+    }
+
+    protected function persist()
+    {
         if ($this->id) {
-            $request = ItemRequest::findOrFail($this->id);
+            $request = ItemRequest::lockForUpdate()->findOrFail($this->id);
 
             if ($request->status !== 'pending') {
                 return redirect()->route('item-requests')->with('error', 'Only a pending request can be edited.');
@@ -151,8 +168,13 @@ class ItemRequestCreate extends Component
             ]);
             $message = 'Request updated successfully.';
         } else {
+            // One form, one request: a repeated Submit finds the one already made.
+            if ($this->alreadySubmitted(ItemRequest::class)) {
+                return redirect()->route('item-requests')->with('success', 'Request created successfully.');
+            }
+
             $request = ItemRequest::create([
-                'code'         => 'REQ-' . time(),
+                'code'         => $this->nextCode(),
                 'status'       => 'pending',
                 'notes'        => $this->notes,
                 'warehouse_id' => $this->warehouse_id,
@@ -161,6 +183,7 @@ class ItemRequestCreate extends Component
                 'requested_by'      => authUser()?->id,
                 'requested_by_name' => authUser()?->name,
                 'requested_at'      => now(),
+                'submission_key'    => $this->submissionKey,
             ]);
             $message = 'Request created successfully.';
         }
@@ -200,6 +223,23 @@ class ItemRequestCreate extends Component
         }
 
         return redirect()->route('item-requests')->with('success', $message);
+    }
+
+    /**
+     * REQ-<unix time>, as before — plus -2, -3 … when another request already
+     * took that second (the column is unique, deleted requests included), which
+     * used to fail the save outright.
+     */
+    private function nextCode(): string
+    {
+        $base = 'REQ-' . time();
+        $code = $base;
+
+        for ($n = 2; ItemRequest::withTrashed()->where('code', $code)->exists(); $n++) {
+            $code = "{$base}-{$n}";
+        }
+
+        return $code;
     }
 
     public function render()

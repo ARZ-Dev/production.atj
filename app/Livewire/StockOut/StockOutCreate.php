@@ -4,6 +4,7 @@ namespace App\Livewire\StockOut;
 
 use App\Models\StockOut;
 use App\Services\ApiService;
+use App\Livewire\Concerns\PreventsDuplicateSubmission;
 use App\Services\InventoryService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -15,7 +16,7 @@ use Livewire\WithFileUploads;
 
 class StockOutCreate extends Component
 {
-    use AuthorizesRequests, WithFileUploads;
+    use AuthorizesRequests, PreventsDuplicateSubmission, WithFileUploads;
 
     #[Locked]
     public bool $editing  = false;
@@ -195,9 +196,19 @@ class StockOutCreate extends Component
                     'notes'        => $this->notes,
                 ]);
             } else {
+                // One form, one document: a repeated Submit (a click queued during
+                // the first request, or one made while the list was loading) finds
+                // the document the first one created.
+                if ($this->alreadySubmitted(StockOut::class)) {
+                    DB::rollBack();
+
+                    return to_route('item-stock-outs')->with('success', 'Stock Out created successfully!');
+                }
+
                 $stockOut = StockOut::create([
-                    'warehouse_id' => $this->warehouse_id,
-                    'notes'        => $this->notes,
+                    'warehouse_id'   => $this->warehouse_id,
+                    'notes'          => $this->notes,
+                    'submission_key' => $this->submissionKey,
                 ]);
             }
 
@@ -259,6 +270,11 @@ class StockOutCreate extends Component
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            if ($this->isDuplicateSubmission($e)) {
+                return to_route('item-stock-outs')->with('success', 'Stock Out created successfully!');
+            }
+
             $this->dispatch('swal:error', [
                 'title' => 'Error',
                 'text'  => 'An error occurred: ' . $e->getMessage(),

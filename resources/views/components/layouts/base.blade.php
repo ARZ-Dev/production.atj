@@ -42,6 +42,22 @@
     @stack('scripts')
     @livewireScripts
     <script>
+        // wire:submit disables a form only while its request runs; the response
+        // that redirects away re-enables it, and the page stays clickable until
+        // the next one arrives — so a second click would send the form again.
+        // Once a component is on its way out, keep its controls disabled. (The
+        // server refuses a repeat anyway — PreventsDuplicateSubmission.)
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('commit', ({ component, succeed }) => {
+                succeed(({ effects }) => {
+                    if (!effects || !effects.redirect) return;
+
+                    component.el.querySelectorAll('button, input, select, textarea')
+                        .forEach(el => { el.disabled = true; });
+                });
+            });
+        });
+
         window.addEventListener('swal:confirm', event => {
             Swal.fire({
                 title: event.detail[0].title,

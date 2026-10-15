@@ -4,6 +4,7 @@ namespace App\Livewire\StockIn;
 
 use App\Models\StockIn;
 use App\Services\ApiService;
+use App\Livewire\Concerns\PreventsDuplicateSubmission;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ use Livewire\WithFileUploads;
 
 class StockInCreate extends Component
 {
-    use AuthorizesRequests, WithFileUploads;
+    use AuthorizesRequests, PreventsDuplicateSubmission, WithFileUploads;
 
     #[Locked]
     public bool $editing  = false;
@@ -195,9 +196,19 @@ class StockInCreate extends Component
                     'notes'        => $this->notes,
                 ]);
             } else {
+                // One form, one document: a repeated Submit (a click queued during
+                // the first request, or one made while the list was loading) finds
+                // the document the first one created.
+                if ($this->alreadySubmitted(StockIn::class)) {
+                    DB::rollBack();
+
+                    return to_route('item-stock-ins')->with('success', 'Stock In created successfully!');
+                }
+
                 $stockIn = StockIn::create([
-                    'warehouse_id' => $this->warehouse_id,
-                    'notes'        => $this->notes,
+                    'warehouse_id'   => $this->warehouse_id,
+                    'notes'          => $this->notes,
+                    'submission_key' => $this->submissionKey,
                 ]);
             }
 
@@ -259,6 +270,11 @@ class StockInCreate extends Component
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            if ($this->isDuplicateSubmission($e)) {
+                return to_route('item-stock-ins')->with('success', 'Stock In created successfully!');
+            }
+
             $this->dispatch('swal:error', [
                 'title' => 'Error',
                 'text'  => 'An error occurred: ' . $e->getMessage(),
