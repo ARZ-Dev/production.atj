@@ -352,6 +352,32 @@
 
 .ec-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
 
+/* Add/edit event popup: busy overlay while a request is in flight.
+   Hidden until wire:loading sets display:flex on it. The pill is sticky so it
+   stays in view however far down the popup the change was made. */
+.ec-root { position: relative; }
+.ec-busy {
+    display: none;
+    position: absolute; inset: -8px; z-index: 30;
+    justify-content: center; align-items: flex-start;
+    border-radius: 10px;
+    background: rgba(255,255,255,.55);
+    cursor: progress;
+    animation: ec-busy-in .15s ease-out;
+}
+.ec-busy-pill {
+    position: sticky; top: 40vh;
+    margin-top: 48px;
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 9px 18px; border-radius: 22px;
+    background: #fff; color: #4f46e5;
+    border: 1px solid rgba(99,102,241,.25);
+    box-shadow: 0 6px 22px rgba(30,41,59,.16);
+    font-size: 13px; font-weight: 700;
+}
+.ec-busy-pill .spinner-border { width: 1rem; height: 1rem; border-width: .15em; }
+@keyframes ec-busy-in { from { opacity: 0; } to { opacity: 1; } }
+
 /* The companion event (executed with the row's type) inside the same card */
 .ec-companion {
     border: 1px solid rgba(20,184,166,.25); border-left: 3px solid #14b8a6;
@@ -369,6 +395,106 @@
 .ec-companion-hint { margin-top: 3px; font-size: 10.5px; color: #8a91a0; }
 .ec-companion-note { font-size: 11px; color: #5f6b7a; line-height: 1.4; }
 .ec-companion-note .bi { color: #14b8a6; margin-right: 3px; }
+.ec-companion-count { font-size: 11px; font-weight: 700; color: #8a91a0; }
+
+/* One companion of several (e.g. one packaging lane of the run) */
+.ec-companion-item {
+    border: 1px solid rgba(20,184,166,.18); border-radius: 8px;
+    padding: 9px 11px; background: #fff;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.ec-companion-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ec-companion-item-title { font-size: 12px; font-weight: 700; }
+.ec-companion-where { font-size: 11px; font-weight: 600; color: #8a91a0; }
+.ec-share-dot {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    color: #fff; font-size: 11px; font-weight: 800; flex-shrink: 0;
+}
+.ec-companion-add {
+    width: 100%; padding: 8px; border-radius: 8px;
+    border: 1.5px dashed rgba(20,184,166,.4); background: transparent;
+    color: #0f766e; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background .15s, border-color .15s;
+}
+.ec-companion-add:hover { background: rgba(20,184,166,.08); border-color: #14b8a6; }
+.ec-companion-add-sub { font-weight: 500; color: #8a91a0; }
+
+/* A companion's slice of the run, under its fields */
+.ec-share { display: flex; flex-wrap: wrap; gap: 6px; }
+.ec-share-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 600;
+    background: rgba(130,130,180,.07); color: #44505f;
+    font-variant-numeric: tabular-nums;
+}
+.ec-share-chip .bi { font-size: 12px; opacity: .7; }
+.ec-share-k {
+    font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+    color: #8a91a0;
+}
+.ec-share-chip--strong {
+    background: color-mix(in srgb, var(--ec-share, #14b8a6) 12%, transparent);
+    box-shadow: inset 3px 0 0 var(--ec-share, #14b8a6);
+    color: #1f2937;
+}
+.ec-share-pct {
+    padding: 0 6px; border-radius: 8px; font-size: 10.5px; font-weight: 800;
+    background: var(--ec-share, #14b8a6); color: #fff;
+}
+.ec-share-chip--muted { background: transparent; color: #8a91a0; font-weight: 500; padding-left: 0; }
+.ec-share-chip--warn { background: rgba(245,158,11,.1); color: #92400e; }
+
+/* What a lead's run makes, and how it's shared between its companions */
+.ec-split {
+    border-radius: 8px; padding: 10px 12px;
+    background: #fff; border: 1px solid rgba(130,130,180,.16);
+    display: flex; flex-direction: column; gap: 9px;
+}
+.ec-split-empty { font-size: 12px; color: #8a91a0; }
+.ec-split-empty .bi { margin-right: 4px; }
+.ec-split-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 6px 12px; }
+.ec-split-stat { display: flex; flex-direction: column; }
+.ec-split-label {
+    font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: #8a91a0;
+}
+.ec-split-value { font-size: 18px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.ec-split-value small { font-size: 12px; font-weight: 700; color: #8a91a0; }
+.ec-split-stat--total .ec-split-value { color: #0f766e; }
+.ec-split-op { font-size: 16px; font-weight: 700; color: rgba(130,130,180,.6); padding-bottom: 2px; }
+.ec-split-item { font-size: 12px; font-weight: 700; padding-bottom: 2px; }
+.ec-split-item .bi { color: #14b8a6; }
+.ec-split-item-sub { font-size: 10.5px; font-weight: 500; color: #8a91a0; }
+.ec-split-mode {
+    margin-left: auto; align-self: center;
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
+    background: rgba(130,130,180,.1); color: #5f6b7a;
+}
+.ec-split-mode--capacity { background: rgba(20,184,166,.12); color: #0f766e; }
+
+.ec-split-bar {
+    display: flex; height: 24px; border-radius: 6px; overflow: hidden;
+    background: rgba(130,130,180,.08);
+}
+.ec-split-bar--over { box-shadow: 0 0 0 2px rgba(220,53,69,.55); }
+.ec-split-seg {
+    display: flex; align-items: center; justify-content: center; min-width: 0;
+    color: #fff; font-size: 10.5px; font-weight: 800; white-space: nowrap; overflow: hidden;
+    border-right: 2px solid #fff;
+}
+.ec-split-seg:last-child { border-right: 0; }
+.ec-split-seg--free {
+    color: #8a91a0;
+    background: repeating-linear-gradient(-45deg, rgba(130,130,180,.1) 0 6px, rgba(130,130,180,.2) 6px 12px);
+}
+.ec-split-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; font-size: 11.5px; }
+.ec-split-status { font-weight: 700; }
+.ec-split-status--ok     { color: #198754; }
+.ec-split-status--warn   { color: #b45309; }
+.ec-split-status--danger { color: #dc3545; }
+.ec-split-note { color: #5f6b7a; }
 
 /* ── Plan Board — shared tray hint ────────────────────────────── */
 .pb-tray-title { font-size: 14px; }

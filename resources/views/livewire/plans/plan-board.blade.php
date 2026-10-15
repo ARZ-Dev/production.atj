@@ -254,23 +254,32 @@
                         </div>
                         @endif
 
-                        @if($selectedEvent['linked'] ?? null)
-                        @php $linkedEvent = $selectedEvent['linked']; @endphp
+                        @if(!empty($selectedEvent['linked']))
                         <div class="col-12">
                             <div class="pvc-body-label">Runs together with</div>
+                            @foreach($selectedEvent['linked'] as $linkedEvent)
                             <div>
                                 <i class="bi bi-link-45deg text-primary"></i>
                                 <span class="d-inline-block rounded-circle mx-1" style="width:10px;height:10px;background-color: {{ $linkedEvent['color'] }}"></span>
                                 {{ $linkedEvent['type_name'] }} #{{ $linkedEvent['id'] }}
-                                @unless($linkedEvent['placed'])
+                                @if($linkedEvent['batches'])
+                                <span class="text-muted" style="font-size: 11px;">· {{ $linkedEvent['batches'] }} batches</span>
+                                @endif
+                                @if($linkedEvent['placed'])
+                                <span class="text-muted" style="font-size: 11px;">· {{ $linkedEvent['where'] }}</span>
+                                @else
                                 <span class="badge bg-primary ms-1">Unplaced</span>
-                                @endunless
+                                @if($linkedEvent['planned'])
+                                <span class="text-muted" style="font-size: 11px;">goes on {{ $linkedEvent['planned'] }} when this is placed</span>
+                                @endif
+                                @endif
                             </div>
+                            @endforeach
                             <div class="text-muted" style="font-size: 11px;">
-                                @if($linkedEvent['is_lead'])
+                                @if($selectedEvent['linked_role'] === 'companion')
                                 Starts and ends with that event, and is edited and deleted with it.
                                 @else
-                                Both start and end together from this event, on the same time window.
+                                They all start and end together from this event, on the same time window.
                                 @endif
                             </div>
                         </div>
@@ -360,37 +369,45 @@
                     @if($eventAction['action'] === 'start')
 
                     @php
-                        // One section per event: just the event, or both halves of a
-                        // linked pair, which start together from this one modal.
-                        $pairCompanion = $eventAction['companion'] ?? null;
-                        $startSections = [[
+                        // One section per event: just the event, or every event of a
+                        // linked group, which start together from this one modal.
+                        $groupCompanions = $eventAction['companions'] ?? [];
+                        $startSections   = [[
                             'role'       => 'lead',
                             'has_recipe' => (bool) ($eventAction['has_recipe'] ?? false),
                             'type_name'  => $eventAction['type_name'],
                             'color'      => $eventAction['color'],
                             'placeable'  => $eventAction['placeable_name'] ?? null,
+                            'batches'    => null,
                         ]];
-                        if ($pairCompanion) {
+                        foreach ($groupCompanions as $groupCompanion) {
                             $startSections[] = [
-                                'role'       => 'companion',
-                                'has_recipe' => (bool) $pairCompanion['has_recipe'],
-                                'type_name'  => $pairCompanion['type_name'],
-                                'color'      => $pairCompanion['color'],
-                                'placeable'  => $pairCompanion['placeable_name'],
+                                'role'       => $groupCompanion['role'],
+                                'has_recipe' => (bool) $groupCompanion['has_recipe'],
+                                'type_name'  => $groupCompanion['type_name'],
+                                'color'      => $groupCompanion['color'],
+                                'placeable'  => $groupCompanion['placeable_name'],
+                                'batches'    => count($groupCompanions) > 1 ? $groupCompanion['batch_count'] : null,
                             ];
                         }
-                        $handoffTypes = collect($actionInputs)->where('handoff', true)->pluck('item_type_name')->filter()->unique()->implode(', ');
+                        $companionNames = collect($groupCompanions)->pluck('type_name')->unique()->implode(', ');
+                        $handoffTypes   = collect($actionInputs)->where('handoff', true)->pluck('item_type_name')->filter()->unique()->implode(', ');
                     @endphp
 
-                    @if($pairCompanion)
+                    @if($groupCompanions)
                     <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
                         <i class="bi bi-link-45deg me-1"></i>
                         This starts <strong>{{ $eventAction['type_name'] }}</strong> and
-                        <strong>{{ $pairCompanion['type_name'] }}</strong> together. The items of both are checked
-                        against stock in one go — if anything is short, neither starts.
+                        @if(count($groupCompanions) > 1)
+                        its <strong>{{ count($groupCompanions) }} {{ $companionNames }}</strong> events
+                        @else
+                        <strong>{{ $companionNames }}</strong>
+                        @endif
+                        together. The items of all of them are checked against stock in one go — if anything is
+                        short, none starts.
                         @if($handoffTypes)
                         <strong>{{ $handoffTypes }}</strong> passes straight from {{ $eventAction['type_name'] }} to
-                        {{ $pairCompanion['type_name'] }} without a warehouse, so it isn't counted.
+                        {{ $companionNames }} without a warehouse, so it isn't counted.
                         @endif
                     </div>
                     @endif
@@ -398,12 +415,15 @@
                     @foreach($startSections as $section)
                     @php $sectionRows = collect($actionInputs)->filter(fn($row) => ($row['role'] ?? 'lead') === $section['role'])->all(); @endphp
 
-                    @if($pairCompanion)
+                    @if($groupCompanions)
                     <div class="aqt-pair-head {{ $loop->first ? '' : 'mt-3' }}">
                         <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background-color: {{ $section['color'] }}"></span>
                         {{ $section['type_name'] }}
                         @if($section['placeable'])
                         <span class="aqt-pair-where">· {{ $section['placeable'] }}</span>
+                        @endif
+                        @if($section['batches'])
+                        <span class="aqt-pair-where">· {{ $section['batches'] + 0 }} {{ $section['batches'] == 1 ? 'batch' : 'batches' }}</span>
                         @endif
                     </div>
                     @endif
@@ -468,10 +488,10 @@
                     @elseif($eventAction['action'] === 'terminate')
 
                     @php
-                        // One section per event: just the event, or both halves of a
-                        // linked pair, which end together from this one modal.
-                        $pairCompanion = $eventAction['companion'] ?? null;
-                        $endSections   = [[
+                        // One section per event: just the event, or every event of a
+                        // linked group, which end together from this one modal.
+                        $groupCompanions = $eventAction['companions'] ?? [];
+                        $endSections     = [[
                             'role'        => 'lead',
                             'has_recipe'  => (bool) ($eventAction['has_recipe'] ?? false),
                             'batch_count' => $eventAction['batch_count'] ?? 1,
@@ -479,24 +499,30 @@
                             'color'       => $eventAction['color'],
                             'placeable'   => $eventAction['placeable_name'] ?? null,
                         ]];
-                        if ($pairCompanion) {
+                        foreach ($groupCompanions as $groupCompanion) {
                             $endSections[] = [
-                                'role'        => 'companion',
-                                'has_recipe'  => (bool) $pairCompanion['has_recipe'],
-                                'batch_count' => $pairCompanion['batch_count'] ?? 1,
-                                'type_name'   => $pairCompanion['type_name'],
-                                'color'       => $pairCompanion['color'],
-                                'placeable'   => $pairCompanion['placeable_name'],
+                                'role'        => $groupCompanion['role'],
+                                'has_recipe'  => (bool) $groupCompanion['has_recipe'],
+                                'batch_count' => $groupCompanion['batch_count'] ?? 1,
+                                'type_name'   => $groupCompanion['type_name'],
+                                'color'       => $groupCompanion['color'],
+                                'placeable'   => $groupCompanion['placeable_name'],
                             ];
                         }
+                        $companionNames = collect($groupCompanions)->pluck('type_name')->unique()->implode(', ');
                         $ofRole = fn(array $rows, string $role) => collect($rows)->filter(fn($row) => ($row['role'] ?? 'lead') === $role)->all();
                     @endphp
 
-                    @if($pairCompanion)
+                    @if($groupCompanions)
                     <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
                         <i class="bi bi-link-45deg me-1"></i>
                         This ends <strong>{{ $eventAction['type_name'] }}</strong> and
-                        <strong>{{ $pairCompanion['type_name'] }}</strong> together, at the end time below.
+                        @if(count($groupCompanions) > 1)
+                        its <strong>{{ count($groupCompanions) }} {{ $companionNames }}</strong> events
+                        @else
+                        <strong>{{ $companionNames }}</strong>
+                        @endif
+                        together, at the end time below.
                     </div>
                     @endif
 
@@ -508,7 +534,7 @@
                         $endBatchCount  = $section['batch_count'];
                     @endphp
 
-                    @if($pairCompanion)
+                    @if($groupCompanions)
                     <div class="aqt-pair-head {{ $loop->first ? '' : 'mt-4' }}">
                         <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background-color: {{ $section['color'] }}"></span>
                         {{ $section['type_name'] }}
@@ -537,7 +563,7 @@
                         'percentLabel' => '% Produced',
                         'showPerBatch' => true,
                         'handoffMode'  => 'record',
-                        'handoffNote'  => $pairCompanion ? 'Goes straight to ' . $pairCompanion['type_name'] . ' — recorded, not stocked' : null,
+                        'handoffNote'  => $groupCompanions ? 'Goes straight to ' . $companionNames . ' — recorded, not stocked' : null,
                     ])
 
                     @if(count($sectionSides))

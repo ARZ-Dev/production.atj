@@ -110,10 +110,10 @@
                             @if($event->batch_count)
                             <span class="text-muted" style="font-size: 11px;">· {{ $event->batch_count }} batches</span>
                             @endif
-                            @php $pairedWith = $event->leadEvent ?? $event->companionEvent; @endphp
-                            @if($pairedWith)
-                            <div class="text-muted" style="font-size: 11px;" title="These two events start and end together">
-                                <i class="bi bi-link-45deg"></i> with {{ $pairedWith->eventType->name ?? 'event' }} #{{ $pairedWith->id }}
+                            @php $pairedWith = $event->leadEvent ? collect([$event->leadEvent]) : $event->companionEvents; @endphp
+                            @if($pairedWith->isNotEmpty())
+                            <div class="text-muted" style="font-size: 11px;" title="These events start and end together">
+                                <i class="bi bi-link-45deg"></i> with {{ $pairedWith->map(fn($e) => ($e->eventType->name ?? 'event') . ' #' . $e->id)->implode(', ') }}
                             </div>
                             @endif
                         </td>
@@ -167,7 +167,7 @@
                             @php
                                 // A companion starts and ends with the event it runs with.
                                 $leadEvent      = $event->leadEvent;
-                                $companionEvent = $event->companionEvent;
+                                $unplacedCompanion = $event->companionEvents->firstWhere('placeable_id', null);
                             @endphp
                             @if($statusKey === '')
                                 @if($leadEvent)
@@ -178,9 +178,9 @@
                                 <span class="text-muted" style="font-size: 11px;" title="Place this event on a preparation, line or packaging to start it">
                                     <i class="bi bi-geo-alt"></i> Place to start
                                 </span>
-                                @elseif($companionEvent && !$companionEvent->placeable_id)
-                                <span class="text-muted" style="font-size: 11px;" title="Both events start together — place {{ $companionEvent->eventType->name ?? 'the linked event' }} #{{ $companionEvent->id }} first">
-                                    <i class="bi bi-geo-alt"></i> Place {{ $companionEvent->eventType->name ?? 'linked event' }} to start
+                                @elseif($unplacedCompanion)
+                                <span class="text-muted" style="font-size: 11px;" title="They all start together — place {{ $unplacedCompanion->eventType->name ?? 'the linked event' }} #{{ $unplacedCompanion->id }} first">
+                                    <i class="bi bi-geo-alt"></i> Place {{ $unplacedCompanion->eventType->name ?? 'linked event' }} #{{ $unplacedCompanion->id }} to start
                                 </span>
                                 @else
                                 <button type="button" class="btn btn-light-success btn-sm"

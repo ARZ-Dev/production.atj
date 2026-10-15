@@ -2,14 +2,22 @@
 
 namespace App\Livewire\Packagings;
 
+use App\Livewire\Concerns\OffersOutputWarehouseItemTypes;
 use App\Models\Packaging;
 use App\Services\ApiService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
+/**
+ * Capacity of a packaging, one independent figure per item unit. Only the item
+ * types of its finished-goods warehouse are offered — see
+ * OffersOutputWarehouseItemTypes.
+ */
 class PackagingCapacityManage extends Component
 {
+    use OffersOutputWarehouseItemTypes;
+
     #[Locked]
     public int    $packagingId;
     #[Locked]
@@ -51,6 +59,9 @@ class PackagingCapacityManage extends Component
         $this->packagingName = $packaging->name;
         $this->loadCatalog();
 
+        $this->catalogLoaded = $this->loadOutputWarehouse($packaging, 'finished goods warehouse')
+            && $this->catalogLoaded;
+
         // Group by the item's *current* type, falling back to the stored one,
         // so an item the parent has since moved shows up under its new type.
         $unitTypes = $this->unitTypeIndex();
@@ -60,6 +71,8 @@ class PackagingCapacityManage extends Component
             $this->capacities[$capacity->item_unit_id] = format_quantity($capacity->capacity);
             $typeIds[] = $unitTypes[$capacity->item_unit_id] ?? $capacity->item_type_id;
         }
+
+        $this->offerOutputWarehouseItemTypes($typeIds);
 
         $this->storedCount   = $packaging->capacities->count();
         $this->item_type_ids = $this->knownTypeIds($typeIds);
@@ -155,8 +168,9 @@ class PackagingCapacityManage extends Component
         foreach ($this->itemTypes as $type) {
             if (in_array($type['id'], $this->item_type_ids, true)) {
                 $groups[$type['id']] = [
-                    'name'  => $type['name'],
-                    'items' => $this->catalog[$type['id']] ?? [],
+                    'name'         => $type['name'],
+                    'items'        => $this->catalog[$type['id']] ?? [],
+                    'in_warehouse' => $type['in_warehouse'] ?? true,
                 ];
             }
         }

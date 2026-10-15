@@ -29,7 +29,7 @@
                 @if(!$catalogLoaded)
                 <div class="alert alert-warning d-flex align-items-start gap-2">
                     <i class="bi bi-exclamation-triangle"></i>
-                    <div>Items couldn't be loaded from the auth service. Capacities can't be edited until it's reachable — reload the page to try again.</div>
+                    <div>Items or the {{ $outputWarehouseLabel }} couldn't be loaded from the auth service. Capacities can't be edited until it's reachable — reload the page to try again.</div>
                 </div>
                 @endif
 
@@ -47,7 +47,7 @@
                                 data-size="8">
                                 @foreach($itemTypes as $type)
                                 <option value="{{ $type['id'] }}"
-                                    data-subtext="{{ $type['item_count'] }} {{ \Illuminate\Support\Str::plural('item', $type['item_count']) }}"
+                                    data-subtext="{{ $type['item_count'] }} {{ \Illuminate\Support\Str::plural('item', $type['item_count']) }}{{ ($type['in_warehouse'] ?? true) ? '' : ' · not held by ' . ($outputWarehouseName ?? 'the warehouse') }}"
                                     @selected(in_array($type['id'], $item_type_ids, true))>
                                     {{ $type['name'] }}
                                 </option>
@@ -55,6 +55,15 @@
                             </select>
                         </div>
                         @error('item_type_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                        @if($outputWarehouseId)
+                        <div class="form-text">
+                            <i class="bi bi-funnel me-1"></i>Showing the item types held by <strong>{{ $outputWarehouseName }}</strong> — the {{ $outputWarehouseLabel }} this packaging produces into.
+                        </div>
+                        @else
+                        <div class="form-text text-warning">
+                            <i class="bi bi-exclamation-triangle me-1"></i>No {{ $outputWarehouseLabel }} is set on this packaging, so there are no item types to offer. Set it on the packaging first.
+                        </div>
+                        @endif
                     </div>
 
                     <div class="col-lg-4" wire:ignore>
@@ -95,6 +104,11 @@
                                 <td colspan="3" class="aqt-group-title">
                                     <i class="bi bi-tag-fill me-1"></i>{{ $group['name'] }}
                                     <span class="aqt-group-count">{{ count($group['items']) }}</span>
+                                    @unless($group['in_warehouse'])
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" title="Kept because capacities are already set for it — untick it and save to clear them">
+                                        Not held by {{ $outputWarehouseName ?? 'the ' . $outputWarehouseLabel }}
+                                    </span>
+                                    @endunless
                                 </td>
                             </tr>
                             @forelse($group['items'] as $item)

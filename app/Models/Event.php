@@ -66,19 +66,26 @@ class Event extends Model
     }
 
     /**
-     * The event running in parallel with this one, created from the event
-     * type's companion setting (e.g. the packaging of this production run).
-     * The pair starts and ends together.
+     * The events running in parallel with this one, created from the event
+     * type's companion setting (e.g. the packaging of this production run —
+     * one per packaging lane its output is split across). The group starts
+     * and ends together.
      */
-    public function companionEvent()
+    public function companionEvents()
     {
-        return $this->hasOne(Event::class, 'linked_event_id');
+        return $this->hasMany(Event::class, 'linked_event_id')->orderBy('id');
     }
 
     /** On a companion event: the event it runs with. */
     public function leadEvent()
     {
         return $this->belongsTo(Event::class, 'linked_event_id');
+    }
+
+    /** On a companion event: the packaging it was planned on in the add-event popup. */
+    public function plannedPackaging()
+    {
+        return $this->belongsTo(Packaging::class, 'planned_packaging_id');
     }
 
     /**
