@@ -3,16 +3,20 @@
 namespace Database\Seeders;
 
 use App\Models\ProductionLine;
+use Database\Seeders\Concerns\ResolvesParentRecords;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class ProductionLineSeeder extends Seeder
 {
+    use ResolvesParentRecords;
+
     /**
      * Run the database seeds.
      *
-     * Department and factory (warehouse) ids are the parent's, named in the
-     * comment on each row. The preparations and lines under each production
-     * line are attached by PreparationSeeder and LineSeeder.
+     * Departments and factories (warehouses) are the parent's, looked up by
+     * name. The preparations and lines under each production line are
+     * attached by PreparationSeeder and LineSeeder.
      */
     public function run(): void
     {
@@ -20,22 +24,30 @@ class ProductionLineSeeder extends Seeder
             [
                 'id' => 1,
                 'name' => 'Cans Tomato Paste Line',
-                'department_id' => 14, // MT Production Department
-                'factory_id' => 1,     // Massa Tomate Factory Warehouse
+                'department' => 'MT Production Department',
+                'factory' => 'Massa Tomate Factory Warehouse',
             ],
             [
                 'id' => 2,
                 'name' => 'Bolacha Production Line PL1',
-                'department_id' => 5,  // Bolacha - Production
-                'factory_id' => 4,     // Bolacha Factory
+                'department' => 'Bolacha - Production',
+                'factory' => 'Bolacha Factory',
             ],
         ];
 
-        foreach ($productionLines as $productionLine) {
-            ProductionLine::withTrashed()->updateOrCreate(
-                ['id' => $productionLine['id']],
-                $productionLine + ['deleted_at' => null]
-            );
-        }
+        $rows = array_map(fn ($line) => [
+            'id' => $line['id'],
+            'name' => $line['name'],
+            'department_id' => $this->departmentId($line['department']),
+            'factory_id' => $this->warehouseId($line['factory']),
+        ], $productionLines);
+
+        $this->failIfParentMissing();
+
+        DB::transaction(function () use ($rows) {
+            foreach ($rows as $row) {
+                ProductionLine::withTrashed()->updateOrCreate(['id' => $row['id']], $row + ['deleted_at' => null]);
+            }
+        });
     }
 }

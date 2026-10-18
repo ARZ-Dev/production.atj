@@ -3,16 +3,20 @@
 namespace Database\Seeders;
 
 use App\Models\Preparation;
+use Database\Seeders\Concerns\ResolvesParentRecords;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class PreparationSeeder extends Seeder
 {
+    use ResolvesParentRecords;
+
     /**
      * Run the database seeds.
      *
-     * Department and warehouse ids are the parent's, named in the comment on
-     * each row. Runs after EventTypeSeeder and ProductionLineSeeder, whose
-     * rows it attaches.
+     * Departments, warehouses and item types are the parent's, looked up by
+     * name. Event types and production lines are this app's own rows, by id —
+     * runs after EventTypeSeeder and ProductionLineSeeder.
      */
     public function run(): void
     {
@@ -20,39 +24,51 @@ class PreparationSeeder extends Seeder
             [
                 'id' => 1,
                 'name' => 'Mixing Area',
-                'department_id' => 14,           // MT Production Department
-                'rm_warehouse_ids' => [2],       // P.S.A MASSA TOMATE
-                'fg_warehouse_id' => 2,          // P.S.A MASSA TOMATE
-                'item_type_warehouses' => [],    // item type id => one of rm_warehouse_ids
+                'department' => 'MT Production Department',
+                'source_warehouses' => ['P.S.A MASSA TOMATE'],
+                'fg_warehouse' => 'P.S.A MASSA TOMATE',
+                'item_type_warehouses' => [],    // item type => one of source_warehouses
                 'event_type_ids' => [1, 2, 4],   // Cleaning, Preparation MT, Prep BOLACHA
                 'production_line_ids' => [],
             ],
             [
                 'id' => 2,
                 'name' => 'Bolacha P1',
-                'department_id' => 5,            // Bolacha - Production
-                'rm_warehouse_ids' => [5],       // RM BOLACHA
-                'fg_warehouse_id' => 7,          // SFG Bolacha
+                'department' => 'Bolacha - Production',
+                'source_warehouses' => ['RM BOLACHA'],
+                'fg_warehouse' => 'SFG Bolacha',
                 'item_type_warehouses' => [],
                 'event_type_ids' => [4],         // Prep BOLACHA
                 'production_line_ids' => [2],    // Bolacha Production Line PL1
             ],
         ];
 
-        foreach ($preparations as $row) {
-            $preparation = Preparation::withTrashed()->updateOrCreate(['id' => $row['id']], [
-                'name' => $row['name'],
-                'department_id' => $row['department_id'],
-                // The scalar column is the default source: always the list's first entry.
-                'rm_warehouse_id' => $row['rm_warehouse_ids'][0] ?? null,
-                'rm_warehouse_ids' => $row['rm_warehouse_ids'],
-                'fg_warehouse_id' => $row['fg_warehouse_id'],
-                'item_type_warehouses' => $row['item_type_warehouses'],
-                'deleted_at' => null,
-            ]);
+        $rows = [];
+        foreach ($preparations as $preparation) {
+            $sourceIds = array_map(fn ($name) => $this->warehouseId($name), $preparation['source_warehouses']);
 
-            $preparation->eventTypes()->sync($row['event_type_ids']);
-            $preparation->productionLines()->sync($row['production_line_ids']);
+            $rows[] = [
+                'record' => [
+                    'name' => $preparation['name'],
+                    'department_id' => $this->departmentId($preparation['department']),
+                    // The scalar column is the default source: always the list's first entry.
+                    'rm_warehouse_id' => $sourceIds[0] ?? null,
+                    'rm_warehouse_ids' => $sourceIds,
+                    'fg_warehouse_id' => $this->warehouseId($preparation['fg_warehouse']),
+                    'item_type_warehouses' => $this->warehouseRouting($preparation['item_type_warehouses']),
+                    'deleted_at' => null,
+                ],
+            ] + $preparation;
         }
+
+        $this->failIfParentMissing();
+
+        DB::transaction(function () use ($rows) {
+            foreach ($rows as $row) {
+                $preparation = Preparation::withTrashed()->updateOrCreate(['id' => $row['id']], $row['record']);
+                $preparation->eventTypes()->sync($row['event_type_ids']);
+                $preparation->productionLines()->sync($row['production_line_ids']);
+            }
+        });
     }
 }

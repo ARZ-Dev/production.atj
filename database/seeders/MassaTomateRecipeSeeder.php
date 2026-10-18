@@ -11,17 +11,15 @@ use RuntimeException;
 
 class MassaTomateRecipeSeeder extends Seeder
 {
+    /**
+     * Seeded by FactoryRecipeTypeSeeder: uses RM Massa Tomate, makes PFG Massa
+     * Tomate (whose items auth-service's MassaTomatePreFinishedGoodItemSeeder
+     * creates).
+     */
     private const RECIPE_TYPE_NAME = 'Production Massa Tomate';
 
     /**
-     * What every recipe makes. Created in the parent by auth-service's
-     * MassaTomatePreFinishedGoodItemSeeder, which has to run first.
-     */
-    private const OUTPUT_ITEM_TYPE_NAME = 'Pre Finished Goods Massa Tomate';
-
-    /**
-     * The raw materials the BOM uses — all "Raw Material Massa Tomate" in the
-     * parent. Items are always matched on their code; the names are here for
+     * The raw materials the BOM uses — all "RM Massa Tomate" in the parent. Items are always matched on their code; the names are here for
      * reading and for error messages only.
      */
     private const RAW_MATERIALS = [
@@ -173,47 +171,28 @@ class MassaTomateRecipeSeeder extends Seeder
     /**
      * Run the database seeds.
      *
-     * Item, unit and item type ids are resolved from the parent's database by
-     * item code, so nothing here depends on the ids a given environment
-     * assigned. Safe to re-run: the recipe type is matched on its name, each
-     * recipe on its type + product, and each input on its item — values are
-     * updated in place and inputs no longer in the BOM are removed.
+     * Item and unit ids are resolved from the parent's database by item code,
+     * so nothing here depends on the ids a given environment assigned. Every
+     * product must be an item type the recipe type makes and every input one
+     * it uses — otherwise the recipe form couldn't show it. Safe to re-run:
+     * each recipe is matched on its type + product and each input on its item;
+     * values are updated in place and inputs no longer in the BOM are removed.
      */
     public function run(): void
     {
-        $parent = DB::connection('auth_service');
+        $recipeType = RecipeType::where('name', self::RECIPE_TYPE_NAME)->first();
 
-        $outputTypeId = $parent->table('item_types')
-            ->whereNull('deleted_at')
-            ->where('name', self::OUTPUT_ITEM_TYPE_NAME)
-            ->value('id');
-
-        if (!$outputTypeId) {
-            throw new RuntimeException('Item type "' . self::OUTPUT_ITEM_TYPE_NAME . '" not found in the parent. '
-                . 'Run auth-service\'s MassaTomatePreFinishedGoodItemSeeder first.');
+        if (!$recipeType) {
+            throw new RuntimeException('Recipe type "' . self::RECIPE_TYPE_NAME . '" not found — run FactoryRecipeTypeSeeder first.');
         }
 
-        $items = $this->parentItems($parent, [...array_keys(self::RECIPES), ...array_keys(self::RAW_MATERIALS)]);
-        $this->assertItemsResolved($items, (int) $outputTypeId);
-
-        $inputTypeIds = collect(self::RAW_MATERIALS)
-            ->keys()
-            ->map(fn ($code) => $items[$code]['item_type_id'])
-            ->unique()->sort()->values()->all();
+        $items = $this->parentItems(DB::connection('auth_service'), [...array_keys(self::RECIPES), ...array_keys(self::RAW_MATERIALS)]);
+        $this->assertItemsResolved($items, $recipeType);
 
         $created = 0;
         $updated = 0;
 
-        DB::transaction(function () use ($items, $outputTypeId, $inputTypeIds, &$created, &$updated) {
-            $recipeType = RecipeType::withTrashed()->firstOrNew(['name' => self::RECIPE_TYPE_NAME]);
-            $recipeType->fill([
-                'item_type_ids' => $inputTypeIds,
-                'side_item_type_ids' => [],
-                'output_item_type_ids' => [(int) $outputTypeId],
-            ]);
-            $recipeType->deleted_at = null;
-            $recipeType->save();
-
+        DB::transaction(function () use ($items, $recipeType, &$created, &$updated) {
             foreach (self::RECIPES as $productCode => $inputs) {
                 $product = $items[$productCode];
                 $total = round(array_sum($inputs), 4);
@@ -226,7 +205,7 @@ class MassaTomateRecipeSeeder extends Seeder
 
                 $recipe->fill([
                     'name' => $product['name'],
-                    'item_type_id' => (int) $outputTypeId,
+                    'item_type_id' => $product['item_type_id'],
                     'item_unit_id' => $product['unit_id'],
                     'batch' => 1,
                     'batch_weight' => $total,
@@ -291,23 +270,28 @@ class MassaTomateRecipeSeeder extends Seeder
 
     /**
      * Refuse to seed anything unless every product and raw material resolved,
-     * and every product is a pre-finished good.
+     * each product is of a type the recipe type makes, and each raw material
+     * of a type it uses.
      */
-    private function assertItemsResolved(array $items, int $outputTypeId): void
+    private function assertItemsResolved(array $items, RecipeType $recipeType): void
     {
+        $makes = array_map('intval', $recipeType->output_item_type_ids ?? []);
+        $uses = array_map('intval', $recipeType->item_type_ids ?? []);
         $problems = [];
 
         foreach (array_keys(self::RECIPES) as $code) {
             if (!isset($items[$code])) {
                 $problems[] = "product {$code} not found (or has no basic unit)";
-            } elseif ($items[$code]['item_type_id'] !== $outputTypeId) {
-                $problems[] = "product {$code} ({$items[$code]['name']}) is not a " . self::OUTPUT_ITEM_TYPE_NAME . ' item';
+            } elseif (!in_array($items[$code]['item_type_id'], $makes, true)) {
+                $problems[] = "product {$code} ({$items[$code]['name']}) is not an item type " . self::RECIPE_TYPE_NAME . ' makes';
             }
         }
 
         foreach (self::RAW_MATERIALS as $code => $name) {
             if (!isset($items[$code])) {
                 $problems[] = "raw material {$code} ({$name}) not found (or has no basic unit)";
+            } elseif (!in_array($items[$code]['item_type_id'], $uses, true)) {
+                $problems[] = "raw material {$code} ({$name}) is not an item type " . self::RECIPE_TYPE_NAME . ' uses';
             }
         }
 

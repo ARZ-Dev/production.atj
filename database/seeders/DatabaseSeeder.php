@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         // would overwrite the Massa Tomate rows on a database already seeded.
         // $this->call(RecipeTypeSeeder::class);
         // $this->call(RecipeSeeder::class);
+        $this->call(FactoryRecipeTypeSeeder::class);
         $this->call(MassaTomateRecipeSeeder::class);
         $this->call(ShiftSeeder::class);
         $this->call(ProductionLineSeeder::class);

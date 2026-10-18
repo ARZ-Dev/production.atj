@@ -3,16 +3,20 @@
 namespace Database\Seeders;
 
 use App\Models\EventType;
+use Database\Seeders\Concerns\ResolvesParentRecords;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 class EventTypeSeeder extends Seeder
 {
+    use ResolvesParentRecords;
+
     /**
      * Run the database seeds.
      *
-     * Item type ids are the parent's (erp_auth.item_types), named in the
-     * comment on each row. Matched on id, so re-running updates in place.
+     * Item types are the parent's, looked up by name. Event types are matched
+     * on their own id, so re-running updates in place.
      */
     public function run(): void
     {
@@ -25,7 +29,7 @@ class EventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => null,
                 'duration' => 40,
-                'item_type_ids' => [15], // RM Bolacha
+                'item_types' => ['RM Bolacha'],
             ],
             [
                 'id' => 2,
@@ -35,7 +39,7 @@ class EventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => null,
                 'duration' => null,
-                'item_type_ids' => [12], // Semi-Finished Goods
+                'item_types' => ['SFG Massa Tomate'],
             ],
             [
                 'id' => 3,
@@ -45,7 +49,7 @@ class EventTypeSeeder extends Seeder
                 'start_items_unverifiable' => true,
                 'companion_event_type_id' => null,
                 'duration' => null,
-                'item_type_ids' => [7], // Fb. Tomate - Ketchup
+                'item_types' => ['Fb. Tomate - Ketchup'],
             ],
             [
                 'id' => 4,
@@ -55,7 +59,7 @@ class EventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => null,
                 'duration' => null,
-                'item_type_ids' => [16], // SFG Bolacha
+                'item_types' => ['SFG Bolacha'],
             ],
             [
                 'id' => 5,
@@ -65,7 +69,7 @@ class EventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => 6, // Bolacha Packaging Test
                 'duration' => null,
-                'item_type_ids' => [17], // PREFG Bolacha
+                'item_types' => ['PFG Bolacha'],
             ],
             [
                 'id' => 6,
@@ -75,20 +79,28 @@ class EventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => null,
                 'duration' => null,
-                'item_type_ids' => [18, 1], // Packaging Bolacha, Fb. Bolacha - Hard
+                'item_types' => ['Packaging Materials Bolacha', 'Fb. Bolacha - Hard'],
             ],
         ];
 
-        foreach ($eventTypes as $eventType) {
-            EventType::withTrashed()->updateOrCreate(
-                ['id' => $eventType['id']],
-                Arr::except($eventType, 'companion_event_type_id') + ['recipe_id' => null, 'deleted_at' => null]
-            );
-        }
+        $rows = array_map(fn ($eventType) => Arr::except($eventType, 'item_types') + [
+            'item_type_ids' => array_map(fn ($name) => $this->itemTypeId($name), $eventType['item_types']),
+        ], $eventTypes);
 
-        // A companion is another row of this list, so link them once every row exists.
-        foreach ($eventTypes as $eventType) {
-            EventType::whereKey($eventType['id'])->update(['companion_event_type_id' => $eventType['companion_event_type_id']]);
-        }
+        $this->failIfParentMissing();
+
+        DB::transaction(function () use ($rows) {
+            foreach ($rows as $row) {
+                EventType::withTrashed()->updateOrCreate(
+                    ['id' => $row['id']],
+                    Arr::except($row, 'companion_event_type_id') + ['recipe_id' => null, 'deleted_at' => null]
+                );
+            }
+
+            // A companion is another row of this list, so link them once every row exists.
+            foreach ($rows as $row) {
+                EventType::whereKey($row['id'])->update(['companion_event_type_id' => $row['companion_event_type_id']]);
+            }
+        });
     }
 }
