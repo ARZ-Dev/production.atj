@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Recipe;
 use App\Models\RecipeType;
-use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -19,30 +18,57 @@ class MassaTomateRecipeSeeder extends Seeder
     private const RECIPE_TYPE_NAME = 'Production Massa Tomate';
 
     /**
-     * The raw materials the BOM uses — all "RM Massa Tomate" in the parent. Items are always matched on their code; the names are here for
-     * reading and for error messages only.
+     * Item ids below are the parent's (erp_auth), as a fresh auth-service
+     * seed assigns them — this app can't read the parent's database on the
+     * server, so they're written out. Keep them in step with auth-service's
+     * item seeders.
+     */
+    private const PRODUCT_ITEM_TYPE_ID = 19; // PFG Massa Tomate
+
+    /**
+     * The products, from auth-service's MassaTomatePreFinishedGoodItemSeeder:
+     * code => [item id, basic unit id (KG), name]. The name is the recipe's.
+     */
+    private const PRODUCTS = [
+        'PFGMT-01' => [131, 160, 'Mamatia'],
+        'PFGMT-02' => [132, 161, 'Dourado'],
+        'PFGMT-03' => [133, 162, 'Yokabel'],
+        'PFGMT-04' => [134, 163, 'Super Chef'],
+        'PFGMT-05' => [135, 164, 'Adal'],
+        'PFGMT-06' => [136, 165, 'Cereal'],
+        'PFGMT-07' => [137, 166, 'Apple'],
+        'PFGMT-08' => [138, 167, 'Kup Dourado'],
+        'PFGMT-09' => [139, 168, 'Sauce of Peeled Tomato'],
+    ];
+
+    private const RAW_MATERIAL_ITEM_TYPE_ID = 11; // RM Massa Tomate
+
+    /**
+     * The raw materials the BOM uses, from auth-service's
+     * MassaTomateRawMaterialItemSeeder: code => [item id, basic unit id
+     * (KG; water LT), name]. The names are here for reading only.
      */
     private const RAW_MATERIALS = [
-        '401000001' => 'MASSA TOMATE CONCETRADO 36-38° BRIX 1X240KG',
-        '401000002' => 'FIBRA DE SOJA',
-        '401000003' => 'AMIDO MODIFICADO',
-        '401000004' => 'MONASCUS COR VERMELHO',
-        '401000005' => 'COLOROCAO CARAMELO',
-        '401000006' => 'SAL DE POTASSIO DE ACIDO SORBICO',
-        '401000007' => 'Calcium chloride',
-        '401000008' => 'SODIUM BENZOATE',
-        '401000009' => 'LUCTAROMA KETCHUP 2011B',
-        '401000020' => 'WATER ( FABRICA MASSA TOMATE ) / LT',
-        '401000023' => 'Xanthan',
-        '401000030' => 'ALLURA RED E 129 / KG',
-        '401000031' => 'RED APPLE FLAVOR / KG',
-        '401000032' => 'GRAPE FLAVOR / KG',
-        '401000035' => 'Tomato Flavor',
-        '401600001' => 'ACETIC ACID 99 %',
-        '990100003' => 'FUBA DE MILHO AMARELA',
-        '990101002' => 'Y- SAL INDUSTRIAL FABRICA',
-        '990101003' => 'Y- ACUCAR CRISTAL INDUSTRIAL',
-        '990101010' => 'Y- ACIDO CITRICO',
+        '401000001' => [37, 65, 'MASSA TOMATE CONCETRADO 36-38° BRIX 1X240KG'],
+        '401000002' => [38, 66, 'FIBRA DE SOJA'],
+        '401000003' => [39, 67, 'AMIDO MODIFICADO'],
+        '401000004' => [40, 68, 'MONASCUS COR VERMELHO'],
+        '401000005' => [41, 69, 'COLOROCAO CARAMELO'],
+        '401000006' => [42, 70, 'SAL DE POTASSIO DE ACIDO SORBICO'],
+        '401000007' => [43, 71, 'Calcium chloride'],
+        '401000008' => [44, 72, 'SODIUM BENZOATE'],
+        '401000009' => [45, 73, 'LUCTAROMA KETCHUP 2011B'],
+        '401000020' => [46, 74, 'WATER ( FABRICA MASSA TOMATE ) / LT'],
+        '401000023' => [47, 75, 'Xanthan'],
+        '401000030' => [48, 76, 'ALLURA RED E 129 / KG'],
+        '401000031' => [49, 77, 'RED APPLE FLAVOR / KG'],
+        '401000032' => [50, 78, 'GRAPE FLAVOR / KG'],
+        '401000035' => [51, 79, 'Tomato Flavor'],
+        '401600001' => [52, 80, 'ACETIC ACID 99 %'],
+        '990100003' => [54, 82, 'FUBA DE MILHO AMARELA'],
+        '990101002' => [56, 84, 'Y- SAL INDUSTRIAL FABRICA'],
+        '990101003' => [57, 85, 'Y- ACUCAR CRISTAL INDUSTRIAL'],
+        '990101010' => [58, 86, 'Y- ACIDO CITRICO'],
     ];
 
     /**
@@ -171,10 +197,9 @@ class MassaTomateRecipeSeeder extends Seeder
     /**
      * Run the database seeds.
      *
-     * Item and unit ids are resolved from the parent's database by item code,
-     * so nothing here depends on the ids a given environment assigned. Every
-     * product must be an item type the recipe type makes and every input one
-     * it uses — otherwise the recipe form couldn't show it. Safe to re-run:
+     * Every code a recipe names must have its ids above, the products must be
+     * an item type the recipe type makes and the inputs one it uses —
+     * otherwise the recipe form couldn't show them. Safe to re-run:
      * each recipe is matched on its type + product and each input on its item;
      * values are updated in place and inputs no longer in the BOM are removed.
      */
@@ -186,8 +211,8 @@ class MassaTomateRecipeSeeder extends Seeder
             throw new RuntimeException('Recipe type "' . self::RECIPE_TYPE_NAME . '" not found — run FactoryRecipeTypeSeeder first.');
         }
 
-        $items = $this->parentItems(DB::connection('auth_service'), [...array_keys(self::RECIPES), ...array_keys(self::RAW_MATERIALS)]);
-        $this->assertItemsResolved($items, $recipeType);
+        $this->assertItemsFit($recipeType);
+        $items = $this->items();
 
         $created = 0;
         $updated = 0;
@@ -245,53 +270,47 @@ class MassaTomateRecipeSeeder extends Seeder
     }
 
     /**
-     * The parent's active items with these codes, each with its basic unit,
-     * keyed by code. Items without a basic unit are left out.
+     * The products and raw materials as code => ['id', 'name', 'item_type_id', 'unit_id'].
      */
-    private function parentItems(ConnectionInterface $parent, array $codes): array
+    private function items(): array
     {
-        return $parent->table('items as i')
-            ->join('item_units as u', function ($join) {
-                $join->on('u.item_id', '=', 'i.id')->where('u.basic', 1)->whereNull('u.deleted_at');
-            })
-            ->whereNull('i.deleted_at')
-            ->whereIn('i.code', array_unique($codes))
-            ->orderBy('u.id')
-            ->get(['i.id', 'i.code', 'i.name', 'i.item_type_id', 'u.id as unit_id'])
-            ->unique('code')
-            ->mapWithKeys(fn ($row) => [$row->code => [
-                'id' => (int) $row->id,
-                'name' => $row->name,
-                'item_type_id' => (int) $row->item_type_id,
-                'unit_id' => (int) $row->unit_id,
-            ]])
-            ->all();
+        $items = [];
+
+        foreach ([[self::PRODUCTS, self::PRODUCT_ITEM_TYPE_ID], [self::RAW_MATERIALS, self::RAW_MATERIAL_ITEM_TYPE_ID]] as [$list, $itemTypeId]) {
+            foreach ($list as $code => [$id, $unitId, $name]) {
+                $items[$code] = ['id' => $id, 'name' => $name, 'item_type_id' => $itemTypeId, 'unit_id' => $unitId];
+            }
+        }
+
+        return $items;
     }
 
     /**
-     * Refuse to seed anything unless every product and raw material resolved,
-     * each product is of a type the recipe type makes, and each raw material
-     * of a type it uses.
+     * Refuse to seed anything unless every product and raw material a recipe
+     * names is listed above, the products are of a type the recipe type
+     * makes, and the raw materials of a type it uses.
      */
-    private function assertItemsResolved(array $items, RecipeType $recipeType): void
+    private function assertItemsFit(RecipeType $recipeType): void
     {
         $makes = array_map('intval', $recipeType->output_item_type_ids ?? []);
         $uses = array_map('intval', $recipeType->item_type_ids ?? []);
         $problems = [];
 
-        foreach (array_keys(self::RECIPES) as $code) {
-            if (!isset($items[$code])) {
-                $problems[] = "product {$code} not found (or has no basic unit)";
-            } elseif (!in_array($items[$code]['item_type_id'], $makes, true)) {
-                $problems[] = "product {$code} ({$items[$code]['name']}) is not an item type " . self::RECIPE_TYPE_NAME . ' makes';
-            }
+        if (!in_array(self::PRODUCT_ITEM_TYPE_ID, $makes, true)) {
+            $problems[] = 'the products\' item type (' . self::PRODUCT_ITEM_TYPE_ID . ') is not one ' . self::RECIPE_TYPE_NAME . ' makes';
+        }
+        if (!in_array(self::RAW_MATERIAL_ITEM_TYPE_ID, $uses, true)) {
+            $problems[] = 'the raw materials\' item type (' . self::RAW_MATERIAL_ITEM_TYPE_ID . ') is not one ' . self::RECIPE_TYPE_NAME . ' uses';
         }
 
-        foreach (self::RAW_MATERIALS as $code => $name) {
-            if (!isset($items[$code])) {
-                $problems[] = "raw material {$code} ({$name}) not found (or has no basic unit)";
-            } elseif (!in_array($items[$code]['item_type_id'], $uses, true)) {
-                $problems[] = "raw material {$code} ({$name}) is not an item type " . self::RECIPE_TYPE_NAME . ' uses';
+        foreach (self::RECIPES as $productCode => $inputs) {
+            if (!isset(self::PRODUCTS[$productCode])) {
+                $problems[] = "product {$productCode} has no ids listed";
+            }
+            foreach (array_keys($inputs) as $rawCode) {
+                if (!isset(self::RAW_MATERIALS[$rawCode])) {
+                    $problems[] = "raw material {$rawCode} (in {$productCode}) has no ids listed";
+                }
             }
         }
 

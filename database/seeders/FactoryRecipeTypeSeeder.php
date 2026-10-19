@@ -3,49 +3,42 @@
 namespace Database\Seeders;
 
 use App\Models\RecipeType;
-use Database\Seeders\Concerns\ResolvesParentRecords;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class FactoryRecipeTypeSeeder extends Seeder
 {
-    use ResolvesParentRecords;
-
     /**
      * Run the database seeds.
      *
-     * The same three steps for each factory, over the parent's item types
-     * (looked up by name): Preparation turns raw materials into semi-finished
-     * goods, Production makes the pre-finished good, Packaging packs it into
-     * a finished good. Massa Tomate's production works straight from raw
-     * materials — its BOM has no semi-finished stage.
+     * The same three steps for each factory, over the parent's item types:
+     * Preparation turns raw materials into semi-finished goods, Production
+     * makes the pre-finished good, Packaging packs it into a finished good.
+     * Massa Tomate's production works straight from raw materials — its BOM
+     * has no semi-finished stage.
+     *
+     * Item type ids are the parent's (erp_auth), as a fresh auth-service
+     * seed assigns them — this app can't read the parent's database on the
+     * server, so they're written out; keep them in step with auth-service's
+     * ItemTypeSeeder.
      *
      * Matched on name, deleted rows included, so re-running updates in place.
      */
     public function run(): void
     {
         $recipeTypes = [
-            ['name' => 'Preparation Massa Tomate', 'uses' => ['RM Massa Tomate'], 'makes' => ['SFG Massa Tomate']],
-            ['name' => 'Production Massa Tomate', 'uses' => ['RM Massa Tomate'], 'makes' => ['PFG Massa Tomate']],
-            ['name' => 'Packaging Massa Tomate', 'uses' => ['PFG Massa Tomate', 'Packaging Materials Massa Tomate'], 'makes' => ['FG Massa Tomate']],
-            ['name' => 'Preparation Bolacha', 'uses' => ['RM Bolacha'], 'makes' => ['SFG Bolacha']],
-            ['name' => 'Production Bolacha', 'uses' => ['SFG Bolacha'], 'makes' => ['PFG Bolacha']],
-            ['name' => 'Packaging Bolacha', 'uses' => ['PFG Bolacha', 'Packaging Materials Bolacha'], 'makes' => ['FG Bolacha']],
+            ['name' => 'Preparation Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [12]],    // RM → SFG Massa Tomate
+            ['name' => 'Production Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [19]],     // RM → PFG Massa Tomate
+            ['name' => 'Packaging Massa Tomate', 'item_type_ids' => [19, 13], 'output_item_type_ids' => [20]],  // PFG + Packaging Materials → FG Massa Tomate
+            ['name' => 'Preparation Bolacha', 'item_type_ids' => [15], 'output_item_type_ids' => [16]],         // RM → SFG Bolacha
+            ['name' => 'Production Bolacha', 'item_type_ids' => [16], 'output_item_type_ids' => [17]],          // SFG → PFG Bolacha
+            ['name' => 'Packaging Bolacha', 'item_type_ids' => [17, 18], 'output_item_type_ids' => [21]],       // PFG + Packaging Materials → FG Bolacha
         ];
 
-        $rows = array_map(fn ($type) => [
-            'name' => $type['name'],
-            'item_type_ids' => array_map(fn ($name) => $this->itemTypeId($name), $type['uses']),
-            'side_item_type_ids' => [],
-            'output_item_type_ids' => array_map(fn ($name) => $this->itemTypeId($name), $type['makes']),
-        ], $recipeTypes);
-
-        $this->failIfParentMissing();
-
-        DB::transaction(function () use ($rows) {
-            foreach ($rows as $row) {
+        DB::transaction(function () use ($recipeTypes) {
+            foreach ($recipeTypes as $row) {
                 $recipeType = RecipeType::withTrashed()->firstOrNew(['name' => $row['name']]);
-                $recipeType->fill($row);
+                $recipeType->fill($row + ['side_item_type_ids' => []]);
                 $recipeType->deleted_at = null;
                 $recipeType->save();
             }
