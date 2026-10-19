@@ -30,15 +30,15 @@ class MassaTomateRecipeSeeder extends Seeder
      * code => [item id, basic unit id (KG), name]. The name is the recipe's.
      */
     private const PRODUCTS = [
-        'PFGMT-01' => [131, 160, 'Mamatia'],
-        'PFGMT-02' => [132, 161, 'Dourado'],
-        'PFGMT-03' => [133, 162, 'Yokabel'],
-        'PFGMT-04' => [134, 163, 'Super Chef'],
-        'PFGMT-05' => [135, 164, 'Adal'],
-        'PFGMT-06' => [136, 165, 'Cereal'],
-        'PFGMT-07' => [137, 166, 'Apple'],
-        'PFGMT-08' => [138, 167, 'Kup Dourado'],
-        'PFGMT-09' => [139, 168, 'Sauce of Peeled Tomato'],
+        'PFGMT-01' => [122, 150, 'Mamatia'],
+        'PFGMT-02' => [123, 151, 'Dourado'],
+        'PFGMT-03' => [124, 152, 'Yokabel'],
+        'PFGMT-04' => [125, 153, 'Super Chef'],
+        'PFGMT-05' => [126, 154, 'Adal'],
+        'PFGMT-06' => [127, 155, 'Cereal'],
+        'PFGMT-07' => [128, 156, 'Apple'],
+        'PFGMT-08' => [129, 157, 'Kup Dourado'],
+        'PFGMT-09' => [130, 158, 'Sauce of Peeled Tomato'],
     ];
 
     private const RAW_MATERIAL_ITEM_TYPE_ID = 11; // RM Massa Tomate

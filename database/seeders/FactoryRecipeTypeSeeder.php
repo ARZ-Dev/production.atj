@@ -27,10 +27,11 @@ class FactoryRecipeTypeSeeder extends Seeder
     public function run(): void
     {
         $recipeTypes = [
-            ['name' => 'Preparation Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [12]],    // RM → SFG Massa Tomate
+            //['name' => 'Preparation Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [12]],    // RM → SFG Massa Tomate
             ['name' => 'Production Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [19]],     // RM → PFG Massa Tomate
             ['name' => 'Packaging Massa Tomate', 'item_type_ids' => [19, 13], 'output_item_type_ids' => [20]],  // PFG + Packaging Materials → FG Massa Tomate
-            ['name' => 'Preparation Bolacha', 'item_type_ids' => [15], 'output_item_type_ids' => [16]],         // RM → SFG Bolacha
+            // RM Bolacha + the RM Massa Tomate items both factories share + SFG (Xarope) → SFG Bolacha
+            ['name' => 'Preparation Bolacha', 'item_type_ids' => [15, 11, 16], 'output_item_type_ids' => [16]],
             ['name' => 'Production Bolacha', 'item_type_ids' => [16], 'output_item_type_ids' => [17]],          // SFG → PFG Bolacha
             ['name' => 'Packaging Bolacha', 'item_type_ids' => [17, 18], 'output_item_type_ids' => [21]],       // PFG + Packaging Materials → FG Bolacha
         ];

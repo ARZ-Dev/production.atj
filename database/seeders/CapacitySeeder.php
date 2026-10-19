@@ -28,23 +28,16 @@ class CapacitySeeder extends Seeder
     {
         $capacities = [
             // Preparation 1 — Mixing Area
-            ['model' => Preparation::class, 'id' => 1, 'item_type_id' => 12, 'item_id' => 122, 'item_unit_id' => 150, 'capacity' => 200],   // test — SFG BOLACA, unit "test"
             ['model' => Preparation::class, 'id' => 1, 'item_type_id' => 12, 'item_id' => 119, 'item_unit_id' => 147, 'capacity' => 3500],  // 402000003 — Tomato Paste Bulk Brix 22-24, KG
             ['model' => Preparation::class, 'id' => 1, 'item_type_id' => 12, 'item_id' => 120, 'item_unit_id' => 148, 'capacity' => 100],   // MTTP — Mama Tia Tomato Paste, KG
-            // Preparation 2 — Bolacha P1
-            ['model' => Preparation::class, 'id' => 2, 'item_type_id' => 16, 'item_id' => 129, 'item_unit_id' => 157, 'capacity' => 200],   // SFGB — Semi-Finished-Good 1 Bolacha, basic
             // Line 1 — Filling Machine
             ['model' => Line::class, 'id' => 1, 'item_type_id' => 7, 'item_id' => 15, 'item_unit_id' => 29, 'capacity' => 1000],      // 403800002 — KETCHUP DOURADO 450 ML, 450ML
-            ['model' => Line::class, 'id' => 1, 'item_type_id' => 1, 'item_id' => 123, 'item_unit_id' => 151, 'capacity' => 2000],    // terst prod — test prod, prod testr
-            ['model' => Line::class, 'id' => 1, 'item_type_id' => 17, 'item_id' => 124, 'item_unit_id' => 152, 'capacity' => 2000],   // PFGB — Pre Finished Good Bolacha, 1 piece
-            // Line 2 — Prod Boalcha L1
-            ['model' => Line::class, 'id' => 2, 'item_type_id' => 17, 'item_id' => 130, 'item_unit_id' => 158, 'capacity' => 6500],   // PFGB2 — Pre-Finished-Good 1 Bolacha, 10g
+            // The others (on Bolacha P1, Line 1, Prod Boalcha L1 and both
+            // packagings) were on the test items auth-service no longer seeds.
         ];
 
-        $packagingCapacities = [
-            ['packaging_id' => 1, 'item_type_id' => 1, 'item_id' => 123, 'item_unit_id' => 151, 'capacity' => 750],   // PK 1 Bolacha — terst prod (test prod), prod testr
-            ['packaging_id' => 2, 'item_type_id' => 1, 'item_id' => 123, 'item_unit_id' => 151, 'capacity' => 2000],  // PK 2 Bolacha — terst prod (test prod), prod testr
-        ];
+        // None yet: the old ones were on a test item.
+        $packagingCapacities = [];
 
         DB::transaction(function () use ($capacities, $packagingCapacities) {
             foreach ($capacities as $row) {
