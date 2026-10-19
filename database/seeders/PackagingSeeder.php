@@ -3,20 +3,19 @@
 namespace Database\Seeders;
 
 use App\Models\Packaging;
-use Database\Seeders\Concerns\ResolvesParentRecords;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class PackagingSeeder extends Seeder
 {
-    use ResolvesParentRecords;
-
     /**
      * Run the database seeds.
      *
-     * Departments, warehouses (the factory included) and item types are the
-     * parent's, looked up by name. Event types are this app's own rows, by
-     * id — runs after EventTypeSeeder.
+     * Department, warehouse (the factory included) and item type ids are the
+     * parent's (erp_auth), as a fresh auth-service seed assigns them — this
+     * app can't read the parent's database on the server, so they're written
+     * out; keep them in step with auth-service's seeders. Event types are
+     * this app's own rows — runs after EventTypeSeeder.
      */
     public function run(): void
     {
@@ -24,51 +23,40 @@ class PackagingSeeder extends Seeder
             [
                 'id' => 1,
                 'name' => 'PK 1 Bolacha',
-                'department' => 'Bolacha - Production',
-                'factory' => 'Bolacha Factory',
-                'source_warehouses' => ['FG BOLACHA', 'RM BOLACHA'],
-                'fg_warehouse' => 'FG BOLACHA',
-                'item_type_warehouses' => [      // item type => one of source_warehouses
-                    'Packaging Materials Bolacha' => 'RM BOLACHA',
+                'department_id' => 5,               // Bolacha - Production
+                'factory_id' => 4,                  // Bolacha Factory
+                'source_warehouse_ids' => [6, 5],   // FG BOLACHA, RM BOLACHA
+                'fg_warehouse_id' => 6,             // FG BOLACHA
+                'item_type_warehouses' => [         // item type id => one of source_warehouse_ids
+                    18 => 5,                        // Packaging Materials Bolacha => RM BOLACHA
                 ],
-                'event_type_ids' => [6],         // Bolacha Packaging Test
+                'event_type_ids' => [6],            // Bolacha Packaging Test
             ],
             [
                 'id' => 2,
                 'name' => 'PK 2 Bolacha',
-                'department' => 'Bolacha - Production',
-                'factory' => 'Bolacha Factory',
-                'source_warehouses' => ['FG BOLACHA', 'RM BOLACHA'],
-                'fg_warehouse' => 'FG BOLACHA',
+                'department_id' => 5,               // Bolacha - Production
+                'factory_id' => 4,                  // Bolacha Factory
+                'source_warehouse_ids' => [6, 5],   // FG BOLACHA, RM BOLACHA
+                'fg_warehouse_id' => 6,             // FG BOLACHA
                 'item_type_warehouses' => [],
-                'event_type_ids' => [6],         // Bolacha Packaging Test
+                'event_type_ids' => [6],            // Bolacha Packaging Test
             ],
         ];
 
-        $rows = [];
-        foreach ($packagings as $packaging) {
-            $sourceIds = array_map(fn ($name) => $this->warehouseId($name), $packaging['source_warehouses']);
-
-            $rows[] = [
-                'record' => [
-                    'name' => $packaging['name'],
-                    'department_id' => $this->departmentId($packaging['department']),
-                    'factory_id' => $this->warehouseId($packaging['factory']),
+        DB::transaction(function () use ($packagings) {
+            foreach ($packagings as $row) {
+                $packaging = Packaging::withTrashed()->updateOrCreate(['id' => $row['id']], [
+                    'name' => $row['name'],
+                    'department_id' => $row['department_id'],
+                    'factory_id' => $row['factory_id'],
                     // The scalar column is the default source: always the list's first entry.
-                    'source_warehouse_id' => $sourceIds[0] ?? null,
-                    'source_warehouse_ids' => $sourceIds,
-                    'fg_warehouse_id' => $this->warehouseId($packaging['fg_warehouse']),
-                    'item_type_warehouses' => $this->warehouseRouting($packaging['item_type_warehouses']),
+                    'source_warehouse_id' => $row['source_warehouse_ids'][0] ?? null,
+                    'source_warehouse_ids' => $row['source_warehouse_ids'],
+                    'fg_warehouse_id' => $row['fg_warehouse_id'],
+                    'item_type_warehouses' => $row['item_type_warehouses'],
                     'deleted_at' => null,
-                ],
-            ] + $packaging;
-        }
-
-        $this->failIfParentMissing();
-
-        DB::transaction(function () use ($rows) {
-            foreach ($rows as $row) {
-                $packaging = Packaging::withTrashed()->updateOrCreate(['id' => $row['id']], $row['record']);
+                ]);
                 $packaging->eventTypes()->sync($row['event_type_ids']);
             }
         });

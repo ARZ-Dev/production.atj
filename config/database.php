@@ -62,24 +62,6 @@ return [
             ]) : [],
         ],
 
-        // The parent service's database (erp_auth). The app itself reaches the
-        // parent over HTTP; only seeders read this, to resolve item ids by code.
-        'auth_service' => [
-            'driver' => 'mysql',
-            'host' => env('AUTH_DB_HOST', env('DB_HOST', '127.0.0.1')),
-            'port' => env('AUTH_DB_PORT', env('DB_PORT', '3306')),
-            'database' => env('AUTH_DB_DATABASE', 'erp_auth'),
-            'username' => env('AUTH_DB_USERNAME', env('DB_USERNAME', 'root')),
-            'password' => env('AUTH_DB_PASSWORD', env('DB_PASSWORD', '')),
-            'unix_socket' => env('DB_SOCKET', ''),
-            'charset' => env('DB_CHARSET', 'utf8mb4'),
-            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-        ],
-
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),
