@@ -183,6 +183,9 @@
                 </div>
 
                 {{-- ── Dynamic Ingredient Sections (one per item_type_id) ──────────── --}}
+                @error('sections')
+                <div class="alert alert-danger mb-4">{{ $message }}</div>
+                @enderror
                 @foreach($sections as $sectionIndex => $section)
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">

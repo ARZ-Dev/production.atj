@@ -390,6 +390,16 @@ class RecipeCreate extends Component
         return str_replace(',', '', (string) $value);
     }
 
+    /**
+     * An ingredient row nothing was entered in — no item and no quantity.
+     * Unlike side products, a quantity typed without an item still counts,
+     * so it is reported rather than silently dropped.
+     */
+    protected function isBlankIngredientRow(array $row): bool
+    {
+        return blank($row['item_id'] ?? null) && blank($row['quantity'] ?? null);
+    }
+
     // ─── Submit ───────────────────────────────────────────────────────────────
     public function submit(): void
     {
@@ -410,11 +420,22 @@ class RecipeCreate extends Component
             'sections'          => 'required|array|min:1',
         ];
 
+        // A recipe needn't use every item type its recipe type lists, so a
+        // section may stay blank: only rows with an item or a quantity entered
+        // are validated and saved. The recipe still needs one ingredient overall.
+        $ingredientRows = 0;
+
         foreach ($this->sections as $sIdx => $section) {
-            $rules["sections.{$sIdx}.rows"]                 = 'required|array|min:1';
-            $rules["sections.{$sIdx}.rows.*.item_id"]      = 'required|integer';
-            $rules["sections.{$sIdx}.rows.*.item_unit_id"] = 'required|integer';
-            $rules["sections.{$sIdx}.rows.*.quantity"]     = 'required|numeric|min:0.0001';
+            foreach ($section['rows'] as $rIdx => $row) {
+                if ($this->isBlankIngredientRow($row)) {
+                    continue;
+                }
+
+                $ingredientRows++;
+                $rules["sections.{$sIdx}.rows.{$rIdx}.item_id"]      = 'required|integer';
+                $rules["sections.{$sIdx}.rows.{$rIdx}.item_unit_id"] = 'required|integer';
+                $rules["sections.{$sIdx}.rows.{$rIdx}.quantity"]     = 'required|numeric|min:0.0001';
+            }
         }
 
         // Side products are optional. Only validate the rows the user actually
@@ -443,11 +464,21 @@ class RecipeCreate extends Component
             'batch.min'                    => 'Batch must be at least 1.',
             'sections.required'            => 'Please select a recipe type first.',
             'sections.min'                 => 'Please select a recipe type first.',
+            'sections.*.rows.*.item_id.required'      => 'Ingredient item is required.',
+            'sections.*.rows.*.item_unit_id.required' => 'Ingredient unit is required.',
+            'sections.*.rows.*.quantity.required'     => 'Ingredient quantity is required.',
+            'sections.*.rows.*.quantity.min'          => 'Quantity must be greater than 0.',
             'sideSections.*.rows.*.item_id.required'      => 'Side product item is required.',
             'sideSections.*.rows.*.item_unit_id.required' => 'Side product unit is required.',
             'sideSections.*.rows.*.quantity.required'     => 'Side product quantity is required.',
             'sideSections.*.rows.*.quantity.min'          => 'Quantity must be greater than 0.',
         ]);
+
+        if ($ingredientRows === 0) {
+            $this->addError('sections', 'Add at least one ingredient.');
+
+            return;
+        }
 
         DB::beginTransaction();
         try {
@@ -473,6 +504,10 @@ class RecipeCreate extends Component
 
             foreach ($this->sections as $sIdx => $section) {
                 foreach ($section['rows'] as $rIdx => $row) {
+                    if ($this->isBlankIngredientRow($row)) {
+                        continue;
+                    }
+
                     $unit = collect($this->sections[$sIdx]['rowUnits'][$rIdx] ?? [])->firstWhere('id', (int) $row['item_unit_id']);
                     abort_if(!$unit, 422, "Invalid unit for {$section['title']} row " . ($rIdx + 1));
 
