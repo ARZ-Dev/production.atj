@@ -13,9 +13,11 @@ class FactoryRecipeTypeSeeder extends Seeder
      *
      * The same three steps for each factory, over the parent's item types:
      * Preparation turns raw materials into semi-finished goods, Production
-     * makes the pre-finished good, Packaging packs it into a finished good.
-     * Massa Tomate's production works straight from raw materials — its BOM
-     * has no semi-finished stage.
+     * makes the product, Packaging packs it. Massa Tomate's production makes
+     * the finished product itself (Fb. Tomate - Massa Tomate) in its basic
+     * unit, and packaging turns that, with the packaging materials, into the
+     * packed one — the same item type on both sides. Bolacha's production
+     * still makes a pre-finished good that packaging turns into FG Bolacha.
      *
      * Item type ids are the parent's (erp_auth), as a fresh auth-service
      * seed assigns them — this app can't read the parent's database on the
@@ -27,9 +29,10 @@ class FactoryRecipeTypeSeeder extends Seeder
     public function run(): void
     {
         $recipeTypes = [
-            //['name' => 'Preparation Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [12]],    // RM → SFG Massa Tomate
-            ['name' => 'Production Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [19]],     // RM → PFG Massa Tomate
-            ['name' => 'Packaging Massa Tomate', 'item_type_ids' => [19, 13], 'output_item_type_ids' => [20]],  // PFG + Packaging Materials → FG Massa Tomate
+            ['name' => 'Preparation Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [12]],   // RM → SFG Massa Tomate
+            ['name' => 'Production Massa Tomate', 'item_type_ids' => [12], 'output_item_type_ids' => [4]],     // SFG → Fb. Tomate - Massa Tomate (basic unit)
+            // Fb. Tomate - Massa Tomate (basic unit) + Packaging Materials → Fb. Tomate - Massa Tomate (packed)
+            ['name' => 'Packaging Massa Tomate', 'item_type_ids' => [4, 13], 'output_item_type_ids' => [4]],
             // RM Bolacha + the RM Massa Tomate items both factories share + SFG (Xarope) → SFG Bolacha
             ['name' => 'Preparation Bolacha', 'item_type_ids' => [15, 11, 16], 'output_item_type_ids' => [16]],
             ['name' => 'Production Bolacha', 'item_type_ids' => [16], 'output_item_type_ids' => [17]],          // SFG → PFG Bolacha

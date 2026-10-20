@@ -11,11 +11,11 @@ use RuntimeException;
 class MassaTomateRecipeSeeder extends Seeder
 {
     /**
-     * Seeded by FactoryRecipeTypeSeeder: uses RM Massa Tomate, makes PFG Massa
-     * Tomate (whose items auth-service's MassaTomatePreFinishedGoodItemSeeder
+     * Seeded by FactoryRecipeTypeSeeder: uses RM Massa Tomate, makes SFG Massa
+     * Tomate (whose items auth-service's MassaTomateBomSemiFinishedGoodItemSeeder
      * creates).
      */
-    private const RECIPE_TYPE_NAME = 'Production Massa Tomate';
+    private const RECIPE_TYPE_NAME = 'Preparation Massa Tomate';
 
     /**
      * Item ids below are the parent's (erp_auth), as a fresh auth-service
@@ -23,22 +23,22 @@ class MassaTomateRecipeSeeder extends Seeder
      * server, so they're written out. Keep them in step with auth-service's
      * item seeders.
      */
-    private const PRODUCT_ITEM_TYPE_ID = 19; // PFG Massa Tomate
+    private const PRODUCT_ITEM_TYPE_ID = 12; // SFG Massa Tomate
 
     /**
-     * The products, from auth-service's MassaTomatePreFinishedGoodItemSeeder:
+     * The products, from auth-service's MassaTomateBomSemiFinishedGoodItemSeeder:
      * code => [item id, basic unit id (KG), name]. The name is the recipe's.
      */
     private const PRODUCTS = [
-        'PFGMT-01' => [122, 150, 'Mamatia'],
-        'PFGMT-02' => [123, 151, 'Dourado'],
-        'PFGMT-03' => [124, 152, 'Yokabel'],
-        'PFGMT-04' => [125, 153, 'Super Chef'],
-        'PFGMT-05' => [126, 154, 'Adal'],
-        'PFGMT-06' => [127, 155, 'Cereal'],
-        'PFGMT-07' => [128, 156, 'Apple'],
-        'PFGMT-08' => [129, 157, 'Kup Dourado'],
-        'PFGMT-09' => [130, 158, 'Sauce of Peeled Tomato'],
+        'SFGMT-01' => [122, 150, 'Mamatia'],
+        'SFGMT-02' => [123, 151, 'Dourado'],
+        'SFGMT-03' => [124, 152, 'Yokabel'],
+        'SFGMT-04' => [125, 153, 'Super Chef'],
+        'SFGMT-05' => [126, 154, 'Adal'],
+        'SFGMT-06' => [127, 155, 'Cereal'],
+        'SFGMT-07' => [128, 156, 'Apple'],
+        'SFGMT-08' => [129, 157, 'Kup Dourado'],
+        'SFGMT-09' => [130, 158, 'Sauce of Peeled Tomato'],
     ];
 
     private const RAW_MATERIAL_ITEM_TYPE_ID = 11; // RM Massa Tomate
@@ -79,7 +79,7 @@ class MassaTomateRecipeSeeder extends Seeder
      * sum of its inputs — the sheet's "total" row.
      */
     private const RECIPES = [
-        'PFGMT-01' => [ // Mamatia
+        'SFGMT-01' => [ // Mamatia
             '401000001' => 476,
             '401000004' => 2.4,
             '401000006' => 1.5,
@@ -91,7 +91,7 @@ class MassaTomateRecipeSeeder extends Seeder
             '990101003' => 250,
             '990101010' => 5.2,
         ],
-        'PFGMT-02' => [ // Dourado
+        'SFGMT-02' => [ // Dourado
             '401000001' => 476,
             '401000002' => 143,
             '401000003' => 67,
@@ -104,7 +104,7 @@ class MassaTomateRecipeSeeder extends Seeder
             '990101003' => 336,
             '990101010' => 5,
         ],
-        'PFGMT-03' => [ // Yokabel
+        'SFGMT-03' => [ // Yokabel
             '401000001' => 476,
             '401000004' => 2.4,
             '401000006' => 1.5,
@@ -116,7 +116,7 @@ class MassaTomateRecipeSeeder extends Seeder
             '990101003' => 250,
             '990101010' => 5.2,
         ],
-        'PFGMT-04' => [ // Super Chef
+        'SFGMT-04' => [ // Super Chef
             '401000001' => 476,
             '401000002' => 117,
             '401000003' => 50,
@@ -129,7 +129,7 @@ class MassaTomateRecipeSeeder extends Seeder
             '990101003' => 226,
             '990101010' => 3.9,
         ],
-        'PFGMT-05' => [ // Adal
+        'SFGMT-05' => [ // Adal
             '401000001' => 476,
             '401000002' => 162,
             '401000003' => 76,
@@ -142,21 +142,21 @@ class MassaTomateRecipeSeeder extends Seeder
             '990101003' => 405,
             '990101010' => 5.7,
         ],
-        'PFGMT-06' => [ // Cereal
+        'SFGMT-06' => [ // Cereal
             '401000005' => 0.03,
             '401000020' => 440,
             '401000032' => 0.07,
             '401600001' => 13.5,
             '990101003' => 2.5,
         ],
-        'PFGMT-07' => [ // Apple
+        'SFGMT-07' => [ // Apple
             '401000005' => 0.09,
             '401000020' => 440,
             '401000031' => 0.07,
             '401600001' => 13.5,
             '990101003' => 2.5,
         ],
-        'PFGMT-08' => [ // Kup Dourado
+        'SFGMT-08' => [ // Kup Dourado
             '401000001' => 56,
             '401000003' => 4.7,
             '401000006' => 0.4,
@@ -170,7 +170,7 @@ class MassaTomateRecipeSeeder extends Seeder
             '990101003' => 75,
             '990101010' => 0.56,
         ],
-        'PFGMT-09' => [ // Sauce of Peeled Tomato
+        'SFGMT-09' => [ // Sauce of Peeled Tomato
             '401000001' => 48.1,
             '401000002' => 2,
             '401000004' => 0.104,
@@ -190,7 +190,7 @@ class MassaTomateRecipeSeeder extends Seeder
      * Carried over from the cell comments on the sheet.
      */
     private const NOTES = [
-        'PFGMT-09' => 'Sauce is around 55% of the finished product\'s weight and fresh tomato the other 45%, '
+        'SFGMT-09' => 'Sauce is around 55% of the finished product\'s weight and fresh tomato the other 45%, '
             . 'with around 30% waste. Fresh tomato is not in this recipe: the BOM gives no quantity for it.',
     ];
 
