@@ -15,7 +15,7 @@ class LineSeeder extends Seeder
      * a fresh auth-service seed assigns them — this app can't read the
      * parent's database on the server, so they're written out; keep them in
      * step with auth-service's seeders. Event types and production lines are
-     * this app's own rows — runs after EventTypeSeeder and ProductionLineSeeder.
+     * this app's own rows — runs after FactoryEventTypeSeeder and ProductionLineSeeder.
      */
     public function run(): void
     {
@@ -27,7 +27,7 @@ class LineSeeder extends Seeder
                 'source_warehouse_ids' => [2],   // P.S.A MASSA TOMATE
                 'fg_warehouse_id' => 2,          // P.S.A MASSA TOMATE
                 'item_type_warehouses' => [],    // item type id => one of source_warehouse_ids
-                'event_type_ids' => [2, 3],      // Preparation MT, Direct Production
+                'event_type_ids' => [2, 3],      // Preparation Massa Tomate, Production Massa Tomate
                 'production_line_ids' => [1],    // Cans Tomato Paste Line
             ],
             [
@@ -37,7 +37,7 @@ class LineSeeder extends Seeder
                 'source_warehouse_ids' => [7],   // SFG Bolacha
                 'fg_warehouse_id' => 6,          // FG BOLACHA
                 'item_type_warehouses' => [],
-                'event_type_ids' => [5],         // PROD BOLACHA
+                'event_type_ids' => [5],         // Production Bolacha
                 'production_line_ids' => [2],    // Bolacha Production Line PL1
             ],
         ];

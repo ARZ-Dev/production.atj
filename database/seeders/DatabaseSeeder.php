@@ -18,13 +18,17 @@ class DatabaseSeeder extends Seeder
         // $this->call(RawMaterialSeeder::class);
 
         // $this->call(MachineTypeSeeder::class);
-        $this->call(EventTypeSeeder::class);
+        // The event types configured by hand before 2026-10-16 — replaced by
+        // FactoryEventTypeSeeder, which reuses their ids.
+        // $this->call(EventTypeSeeder::class);
+        $this->call(FactoryEventTypeSeeder::class);
         // The earlier test recipes: fixed ids (recipe types 1–3, recipes 1–2) that
         // would overwrite the Massa Tomate rows on a database already seeded.
         // $this->call(RecipeTypeSeeder::class);
         // $this->call(RecipeSeeder::class);
         $this->call(FactoryRecipeTypeSeeder::class);
         $this->call(MassaTomateRecipeSeeder::class);
+        $this->call(MassaTomateProductionRecipeSeeder::class);
         $this->call(BolachaRecipeSeeder::class);
         $this->call(ShiftSeeder::class);
         $this->call(ProductionLineSeeder::class);

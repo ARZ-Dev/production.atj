@@ -15,7 +15,7 @@ class PackagingSeeder extends Seeder
      * parent's (erp_auth), as a fresh auth-service seed assigns them — this
      * app can't read the parent's database on the server, so they're written
      * out; keep them in step with auth-service's seeders. Event types are
-     * this app's own rows — runs after EventTypeSeeder.
+     * this app's own rows — runs after FactoryEventTypeSeeder.
      */
     public function run(): void
     {
@@ -30,7 +30,7 @@ class PackagingSeeder extends Seeder
                 'item_type_warehouses' => [         // item type id => one of source_warehouse_ids
                     18 => 5,                        // Packaging Materials Bolacha => RM BOLACHA
                 ],
-                'event_type_ids' => [6],            // Bolacha Packaging Test
+                'event_type_ids' => [6],            // Packaging Bolacha
             ],
             [
                 'id' => 2,
@@ -40,7 +40,7 @@ class PackagingSeeder extends Seeder
                 'source_warehouse_ids' => [6, 5],   // FG BOLACHA, RM BOLACHA
                 'fg_warehouse_id' => 6,             // FG BOLACHA
                 'item_type_warehouses' => [],
-                'event_type_ids' => [6],            // Bolacha Packaging Test
+                'event_type_ids' => [6],            // Packaging Bolacha
             ],
         ];
 
