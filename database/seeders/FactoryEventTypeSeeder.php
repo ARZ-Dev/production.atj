@@ -68,7 +68,7 @@ class FactoryEventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => 7,   // Packaging Massa Tomate
                 'duration' => null,
-                'item_type_ids' => [4],           // Fb. Tomate - Massa Tomate
+                'item_type_ids' => [4, 5, 6, 7],  // Fb. Tomate - Massa Tomate, Pelado, Vinegar, Ketchup
             ],
             [
                 'id' => 7,
@@ -78,7 +78,7 @@ class FactoryEventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => null,
                 'duration' => null,
-                'item_type_ids' => [4, 13],       // Fb. Tomate - Massa Tomate, Packaging Materials Massa Tomate
+                'item_type_ids' => [4, 5, 6, 7, 13], // the same Fb. Tomate types, Packaging Materials Massa Tomate
             ],
 
             // Bolacha

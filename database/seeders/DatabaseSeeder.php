@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
         // $this->call(RecipeSeeder::class);
         $this->call(FactoryRecipeTypeSeeder::class);
         $this->call(MassaTomateRecipeSeeder::class);
+        $this->call(MassaTomateProductionRecipeSeeder::class);
         $this->call(BolachaRecipeSeeder::class);
         $this->call(ShiftSeeder::class);
         $this->call(ProductionLineSeeder::class);
