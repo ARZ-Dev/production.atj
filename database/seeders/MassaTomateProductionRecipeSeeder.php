@@ -17,9 +17,6 @@ class MassaTomateProductionRecipeSeeder extends Seeder
      */
     private const RECIPE_TYPE_NAME = 'Production Massa Tomate';
 
-    /** Every recipe makes this many of its product's basic unit per batch. */
-    private const QUANTITY_PER_BATCH = 100;
-
     /**
      * Item ids below are the parent's (erp_auth), as a fresh auth-service
      * seed assigns them — this app can't read the parent's database on the
@@ -85,43 +82,45 @@ class MassaTomateProductionRecipeSeeder extends Seeder
     /**
      * "SKU's produced for different brands" (SKU's TP.xlsx), every row in
      * sheet order: product code => [what it's made from (the "Recipe"
-     * column), quantity in KG — the sheet's "net weight kg/case"]. Ketchup's
-     * "Dourado" is the ketchup BOM recipe, Kup Dourado, and peeled tomato's
-     * "Same recipe" is Sauce of Peeled Tomato.
+     * column), quantity per batch in the product's basic unit — the first
+     * "case config" column, units per case — and the semi-finished good's
+     * quantity in KG — the sheet's "net weight kg/case"]. So a batch is one
+     * case. Ketchup's "Dourado" is the ketchup BOM recipe, Kup Dourado, and
+     * peeled tomato's "Same recipe" is Sauce of Peeled Tomato.
      */
     private const RECIPES = [
-        '403000001' => ['SFGMT-01', 3.5], // Tomato paste · Mamatia
-        '403000003' => ['SFGMT-01', 9.6], // Tomato paste · Mamatia
-        '403000005' => ['SFGMT-01', 3.35], // Tomato paste · Mamatia
-        '403000007' => ['SFGMT-01', 4.8], // Tomato paste · Mamatia
-        '403000017' => ['SFGMT-01', 6], // Tomato paste · Mamatia
-        '403000018' => ['SFGMT-01', 1.75], // Tomato paste · Mamatia
-        '403000002' => ['SFGMT-02', 3.5], // Tomato paste · Dourado
-        '403000004' => ['SFGMT-02', 9.6], // Tomato paste · Dourado
-        '403000006' => ['SFGMT-02', 3.35], // Tomato paste · Dourado
-        '403000008' => ['SFGMT-02', 4.8], // Tomato paste · Dourado
-        '403000019' => ['SFGMT-03', 9.6], // Tomato paste · Yokabel
-        '403000021' => ['SFGMT-04', 3.5], // Tomato paste · Super Chef
-        '403000022' => ['SFGMT-04', 9.6], // Tomato paste · Super Chef
-        '403000101' => ['SFGMT-05', 3.5], // Tomato paste · Adal
-        '403000102' => ['SFGMT-05', 9.6], // Tomato paste · Adal
-        '403600001' => ['SFGMT-06', 6], // Vinegar · Cereal
-        '403600010' => ['SFGMT-06', 6], // Vinegar · Cereal
-        '403600012' => ['SFGMT-06', 6], // Vinegar · Cereal
-        '403600003' => ['SFGMT-07', 6], // Vinegar · Apple
-        '403600011' => ['SFGMT-07', 6], // Vinegar · Apple
-        '403800002' => ['SFGMT-08', 6], // Ketchup · Dourado
-        '403900001' => ['SFGMT-09', 9.6], // Peeled tomato · Same recipe
-        '403900002' => ['SFGMT-09', 4.8], // Peeled tomato · Same recipe
-        '403900003' => ['SFGMT-09', 2.4], // Peeled tomato · Same recipe
-        '403900004' => ['SFGMT-09', 9.6], // Peeled tomato · Same recipe
+        '403000001' => ['SFGMT-01', 50, 3.5], // Tomato paste · Mamatia
+        '403000003' => ['SFGMT-01', 24, 9.6], // Tomato paste · Mamatia
+        '403000005' => ['SFGMT-01', 50, 3.35], // Tomato paste · Mamatia
+        '403000007' => ['SFGMT-01', 12, 4.8], // Tomato paste · Mamatia
+        '403000017' => ['SFGMT-01', 6, 6], // Tomato paste · Mamatia
+        '403000018' => ['SFGMT-01', 25, 1.75], // Tomato paste · Mamatia
+        '403000002' => ['SFGMT-02', 50, 3.5], // Tomato paste · Dourado
+        '403000004' => ['SFGMT-02', 24, 9.6], // Tomato paste · Dourado
+        '403000006' => ['SFGMT-02', 50, 3.35], // Tomato paste · Dourado
+        '403000008' => ['SFGMT-02', 12, 4.8], // Tomato paste · Dourado
+        '403000019' => ['SFGMT-03', 24, 9.6], // Tomato paste · Yokabel
+        '403000021' => ['SFGMT-04', 50, 3.5], // Tomato paste · Super Chef
+        '403000022' => ['SFGMT-04', 24, 9.6], // Tomato paste · Super Chef
+        '403000101' => ['SFGMT-05', 50, 3.5], // Tomato paste · Adal
+        '403000102' => ['SFGMT-05', 24, 9.6], // Tomato paste · Adal
+        '403600001' => ['SFGMT-06', 12, 6], // Vinegar · Cereal
+        '403600010' => ['SFGMT-06', 12, 6], // Vinegar · Cereal
+        '403600012' => ['SFGMT-06', 12, 6], // Vinegar · Cereal
+        '403600003' => ['SFGMT-07', 12, 6], // Vinegar · Apple
+        '403600011' => ['SFGMT-07', 12, 6], // Vinegar · Apple
+        '403800002' => ['SFGMT-08', 12, 6], // Ketchup · Dourado
+        '403900001' => ['SFGMT-09', 24, 9.6], // Peeled tomato · Same recipe
+        '403900002' => ['SFGMT-09', 12, 4.8], // Peeled tomato · Same recipe
+        '403900003' => ['SFGMT-09', 6, 2.4], // Peeled tomato · Same recipe
+        '403900004' => ['SFGMT-09', 24, 9.6], // Peeled tomato · Same recipe
     ];
 
     /**
      * Run the database seeds.
      *
-     * One recipe per product: its basic unit, QUANTITY_PER_BATCH of it per
-     * batch, one input — its semi-finished good. Every code must have its
+     * One recipe per product: its basic unit, a case of it per batch, one
+     * input — its semi-finished good. Every code must have its
      * ids above, the products must be of an item type the recipe type makes
      * and the inputs one it uses — otherwise the recipe form couldn't show
      * them. Safe to re-run: each recipe is matched on its type + product and
@@ -142,7 +141,7 @@ class MassaTomateProductionRecipeSeeder extends Seeder
         $updated = 0;
 
         DB::transaction(function () use ($recipeType, &$created, &$updated) {
-            foreach (self::RECIPES as $productCode => [$semiFinishedCode, $quantity]) {
+            foreach (self::RECIPES as $productCode => [$semiFinishedCode, $perBatch, $quantity]) {
                 [$itemId, $unitId, $itemTypeId, $name] = self::PRODUCTS[$productCode];
                 [$inputItemId, $inputUnitId] = self::SEMI_FINISHED[$semiFinishedCode];
 
@@ -159,7 +158,7 @@ class MassaTomateProductionRecipeSeeder extends Seeder
                     'batch' => 1,
                     'batch_weight' => null,
                     'batch_volume' => null,
-                    'quantity_per_batch' => self::QUANTITY_PER_BATCH,
+                    'quantity_per_batch' => $perBatch,
                     'status' => 1,
                     'notes' => null,
                 ]);
