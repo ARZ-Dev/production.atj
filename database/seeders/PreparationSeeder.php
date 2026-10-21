@@ -16,19 +16,22 @@ class PreparationSeeder extends Seeder
      * parent's database on the server, so they're written out; keep them in
      * step with auth-service's seeders. Event types and production lines are
      * this app's own rows — runs after FactoryEventTypeSeeder and ProductionLineSeeder.
+     *
+     * Massa Tomate's come from "Equipment and capacity Massa tomate.xlsx"
+     * (sheet FAB MASSA TOMAT): its Mixing row. Capacities are CapacitySeeder's.
      */
     public function run(): void
     {
         $preparations = [
             [
                 'id' => 1,
-                'name' => 'Mixing Area',
+                'name' => 'Mixing',              // Allan (China), 1 line, 3.5 t/h
                 'department_id' => 14,           // MT Production Department
                 'source_warehouse_ids' => [2],   // P.S.A MASSA TOMATE
                 'fg_warehouse_id' => 2,          // P.S.A MASSA TOMATE
                 'item_type_warehouses' => [],    // item type id => one of source_warehouse_ids
-                'event_type_ids' => [1, 2, 4],   // Cleaning, Preparation Massa Tomate, Preparation Bolacha
-                'production_line_ids' => [],
+                'event_type_ids' => [1, 2],      // Cleaning, Preparation Massa Tomate
+                'production_line_ids' => [1],    // Cans Tomato Paste Line
             ],
             [
                 'id' => 2,
