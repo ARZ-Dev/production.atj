@@ -2,8 +2,11 @@
     <div class="pe-app-sidebar-logo px-6 d-flex align-items-center position-relative mt-3 mb-2">
         <!--begin::Brand Image-->
         <a href="{{route('dashboard')}}" class="fs-18 fw-semibold text-center">
-            <img height="60" class="pe-app-sidebar-logo-default d-none" src="{{asset('assets/images/favicon.png')}}">
-            <img height="15" class="pe-app-sidebar-logo-minimize d-none" src="{{asset('assets/images/favicon.png')}}">
+            {{-- app.min.css shows one of the four, by theme and sidebar size --}}
+            <img height="40" class="pe-app-sidebar-logo-default d-none" alt="Fozkudia Industrial" src="{{asset('assets/images/logo-dark.png')}}">
+            <img height="40" class="pe-app-sidebar-logo-light d-none" alt="Fozkudia Industrial" src="{{asset('assets/images/logo-light.png')}}">
+            <img height="30" class="pe-app-sidebar-logo-minimize d-none" alt="Fozkudia Industrial" src="{{asset('assets/images/logo-md.png')}}">
+            <img height="30" class="pe-app-sidebar-logo-minimize-light d-none" alt="Fozkudia Industrial" src="{{asset('assets/images/logo-md-light.png')}}">
         </a>
         <!--end::Brand Image-->
     </div>
