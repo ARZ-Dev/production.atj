@@ -16,18 +16,34 @@ class LineSeeder extends Seeder
      * parent's database on the server, so they're written out; keep them in
      * step with auth-service's seeders. Event types and production lines are
      * this app's own rows — runs after FactoryEventTypeSeeder and ProductionLineSeeder.
+     *
+     * Massa Tomate's come from "Equipment and capacity Massa tomate.xlsx"
+     * (sheet FAB MASSA TOMAT): its two filling rows. The pasteurizing tunnel
+     * between them and the packers is left out — it has no capacity of its
+     * own ("based on pasteurizing time") and nothing is scheduled on it.
+     * Capacities are CapacitySeeder's.
      */
     public function run(): void
     {
         $lines = [
             [
                 'id' => 1,
-                'name' => 'Filling Machine',
+                'name' => 'Filling & Seaming 70g', // Allan (China), 1 machine, 360 cans/min
                 'department_id' => 14,           // MT Production Department
                 'source_warehouse_ids' => [2],   // P.S.A MASSA TOMATE
                 'fg_warehouse_id' => 2,          // P.S.A MASSA TOMATE
                 'item_type_warehouses' => [],    // item type id => one of source_warehouse_ids
-                'event_type_ids' => [2, 3],      // Preparation Massa Tomate, Production Massa Tomate
+                'event_type_ids' => [3],         // Production Massa Tomate
+                'production_line_ids' => [1],    // Cans Tomato Paste Line
+            ],
+            [
+                'id' => 3,
+                'name' => 'Filling & Seaming 400g', // Allan (China), 1 machine, 130 cans/min
+                'department_id' => 14,           // MT Production Department
+                'source_warehouse_ids' => [2],   // P.S.A MASSA TOMATE
+                'fg_warehouse_id' => 2,          // P.S.A MASSA TOMATE
+                'item_type_warehouses' => [],
+                'event_type_ids' => [3],         // Production Massa Tomate
                 'production_line_ids' => [1],    // Cans Tomato Paste Line
             ],
             [
