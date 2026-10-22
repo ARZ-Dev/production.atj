@@ -7,7 +7,7 @@
 
     <title>Fozkudia - Guide</title>
 
-    <link rel="shortcut icon" href="{{ asset('assets/images/k_favicon_32x.png') }}">
+    <link rel="shortcut icon" href="{{ asset('assets/images/k_favicon_32x.png') }}?v={{ @filemtime(public_path('assets/images/k_favicon_32x.png')) ?: 1 }}">
 
     <link href="{{ asset('assets/css/bootstrap.min.css') }}" rel="stylesheet" type="text/css">
     <link href="{{ asset('assets/css/icons.min.css') }}" rel="stylesheet" type="text/css">
