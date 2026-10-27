@@ -17,8 +17,8 @@ class FactoryRecipeTypeSeeder extends Seeder
      * the finished products themselves (Fb. Tomate - Massa Tomate, Pelado,
      * Vinegar, Ketchup) in their basic unit, and packaging turns those, with
      * the packaging materials, into the packed ones — the same item types on
-     * both sides. Bolacha's production still makes a pre-finished good that
-     * packaging turns into FG Bolacha.
+     * both sides. Bolacha's does the same with Fb. Bolacha - Hard, Soft and
+     * Wafer: production makes the packet, packaging the box.
      *
      * Item type ids are the parent's (erp_auth), as a fresh auth-service
      * seed assigns them — this app can't read the parent's database on the
@@ -37,8 +37,11 @@ class FactoryRecipeTypeSeeder extends Seeder
             ['name' => 'Packaging Massa Tomate', 'item_type_ids' => [4, 5, 6, 7, 13], 'output_item_type_ids' => [4, 5, 6, 7]],
             // RM Bolacha + the RM Massa Tomate items both factories share + SFG (Xarope) → SFG Bolacha
             ['name' => 'Preparation Bolacha', 'item_type_ids' => [15, 11, 16], 'output_item_type_ids' => [16]],
-            ['name' => 'Production Bolacha', 'item_type_ids' => [16], 'output_item_type_ids' => [17]],          // SFG → PFG Bolacha
-            ['name' => 'Packaging Bolacha', 'item_type_ids' => [17, 18], 'output_item_type_ids' => [21]],       // PFG + Packaging Materials → FG Bolacha
+            // SFG → Fb. Bolacha - Hard, Soft, Wafer (basic unit: the packet)
+            ['name' => 'Production Bolacha', 'item_type_ids' => [16], 'output_item_type_ids' => [1, 2, 3]],
+            // The same Fb. Bolacha types (packets) + Packaging Materials Bolacha + Massa Tomate's (the
+            // shared tape) → the same types (the box)
+            ['name' => 'Packaging Bolacha', 'item_type_ids' => [1, 2, 3, 18, 13], 'output_item_type_ids' => [1, 2, 3]],
         ];
 
         DB::transaction(function () use ($recipeTypes) {
