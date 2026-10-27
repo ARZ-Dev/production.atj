@@ -100,7 +100,7 @@ class FactoryEventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => 6,   // Packaging Bolacha
                 'duration' => null,
-                'item_type_ids' => [17],          // PFG Bolacha
+                'item_type_ids' => [1, 2, 3],     // Fb. Bolacha - Hard, Soft, Wafer
             ],
             [
                 'id' => 6,
@@ -110,7 +110,7 @@ class FactoryEventTypeSeeder extends Seeder
                 'start_items_unverifiable' => false,
                 'companion_event_type_id' => null,
                 'duration' => null,
-                'item_type_ids' => [21, 18],      // FG Bolacha, Packaging Materials Bolacha
+                'item_type_ids' => [1, 2, 3, 18, 13], // the same Fb. Bolacha types, Packaging Materials Bolacha, Massa Tomate's (tape)
             ],
         ];
 

@@ -33,6 +33,7 @@ class PackagingSeeder extends Seeder
                 'fg_warehouse_id' => 6,             // FG BOLACHA
                 'item_type_warehouses' => [         // item type id => one of source_warehouse_ids
                     18 => 5,                        // Packaging Materials Bolacha => RM BOLACHA
+                    13 => 5,                        // Packaging Materials Massa Tomate (the tape) => RM BOLACHA
                 ],
                 'event_type_ids' => [6],            // Packaging Bolacha
             ],
