@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Capacity;
 use App\Models\Event;
+use App\Models\Line;
 use App\Models\Packaging;
 use App\Models\PackagingCapacity;
 use App\Models\Recipe;
@@ -11,10 +12,12 @@ use App\Models\Recipe;
 class RecipeDurationService
 {
     protected ApiService $api;
+    protected LineRunService $lineRuns;
 
-    public function __construct(ApiService $api)
+    public function __construct(ApiService $api, LineRunService $lineRuns)
     {
-        $this->api = $api;
+        $this->api      = $api;
+        $this->lineRuns = $lineRuns;
     }
 
     /**
@@ -24,6 +27,13 @@ class RecipeDurationService
      */
     public function compute(Event $event, string $placeableClass, int $placeableId): ?string
     {
+        // A line run takes as long as its slowest station needs.
+        if ($placeableClass === Line::class && ($recipe = $this->stagedRecipe($event))) {
+            $line = Line::with('stations')->find($placeableId);
+
+            return $line ? $this->minutes($this->lineRuns->durationMinutes($recipe, $line, $this->batches($event))) : null;
+        }
+
         if ($placeableClass === Packaging::class) {
             return $this->computeForPackaging($event, $placeableId);
         }
@@ -42,7 +52,31 @@ class RecipeDurationService
      */
     public function computeEstimate(Event $event): ?string
     {
+        if ($recipe = $this->stagedRecipe($event)) {
+            return $this->minutes($this->lineRuns->estimateMinutes($recipe, $event->event_type_id ? (int) $event->event_type_id : null, $this->batches($event)));
+        }
+
         return $this->computeUsing($event, Capacity::where('item_id', $event->item_id));
+    }
+
+    /** The event's recipe when it has stages (a line run), else null. */
+    private function stagedRecipe(Event $event): ?Recipe
+    {
+        $recipe = $event->recipe_id ? Recipe::with('stages')->find($event->recipe_id) : null;
+
+        return $recipe && $recipe->stages->isNotEmpty() ? $recipe : null;
+    }
+
+    private function batches(Event $event): float
+    {
+        $count = (float) str_replace(',', '', (string) $event->batch_count);
+
+        return $count > 0 ? $count : 1.0;
+    }
+
+    private function minutes(?int $minutes): ?string
+    {
+        return $minutes !== null ? (string) $minutes : null;
     }
 
     private function computeUsing(Event $event, $capacityQuery): ?string

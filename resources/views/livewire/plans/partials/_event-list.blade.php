@@ -110,10 +110,14 @@
                             @if($event->batch_count)
                             <span class="text-muted" style="font-size: 11px;">· {{ $event->batch_count }} batches</span>
                             @endif
-                            @php $pairedWith = $event->leadEvent ? collect([$event->leadEvent]) : $event->companionEvents; @endphp
-                            @if($pairedWith->isNotEmpty())
-                            <div class="text-muted" style="font-size: 11px;" title="These events start and end together">
-                                <i class="bi bi-link-45deg"></i> with {{ $pairedWith->map(fn($e) => ($e->eventType->name ?? 'event') . ' #' . $e->id)->implode(', ') }}
+                            @php $isRun = $event->eventType?->has_recipe && $event->recipe && $event->recipe->stages->isNotEmpty(); @endphp
+                            @if($isRun)
+                            <div class="text-muted" style="font-size: 11px;" title="One event for the whole line: every station runs at once">
+                                <i class="bi bi-diagram-3"></i> Line run{{ $event->needs_review ? ' · needs review' : '' }}
+                            </div>
+                            @elseif($event->feeds_event_id)
+                            <div class="text-muted" style="font-size: 11px;">
+                                <i class="bi bi-arrow-right-circle"></i> Mix for run #{{ $event->feeds_event_id }}
                             </div>
                             @endif
                         </td>
@@ -153,7 +157,24 @@
                             <span class="text-muted" style="font-size: 11px;" title="Manage this event from the previous day's plan">—</span>
                             @else
                             @hasPermission('production.event-create')
-                            @if($statusKey === 'paused' || ($event->has_open_emergencies ?? false))
+                            @if($isRun && in_array($statusKey, ['in_progress', 'paused'], true))
+                            {{-- A line run: hourly counts, and stops of one machine while the rest runs. --}}
+                            <button type="button" class="btn btn-light-info btn-sm"
+                                wire:click.stop="openHourlyCount({{ $event->id }})"
+                                wire:loading.attr="disabled" wire:target="openHourlyCount"
+                                title="Record the last station's counter against the hour's target">
+                                <i class="bi bi-speedometer2"></i> Count
+                            </button>
+                            <button type="button" class="btn btn-light-primary btn-sm"
+                                wire:click.stop="openPauseActivities({{ $event->id }})"
+                                wire:loading.attr="disabled" wire:target="openPauseActivities"
+                                title="One machine stopped while the rest of the line runs on">
+                                <i class="bi bi-exclamation-octagon"></i> Station stop
+                                @if($event->has_open_emergencies ?? false)
+                                <span class="badge bg-danger ms-1">!</span>
+                                @endif
+                            </button>
+                            @elseif($statusKey === 'paused' || ($event->has_open_emergencies ?? false))
                             <button type="button" class="btn btn-light-primary btn-sm"
                                 wire:click.stop="openPauseActivities({{ $event->id }})"
                                 wire:loading.attr="disabled" wire:target="openPauseActivities"
@@ -164,23 +185,10 @@
                                 @endif
                             </button>
                             @endif
-                            @php
-                                // A companion starts and ends with the event it runs with.
-                                $leadEvent      = $event->leadEvent;
-                                $unplacedCompanion = $event->companionEvents->firstWhere('placeable_id', null);
-                            @endphp
                             @if($statusKey === '')
-                                @if($leadEvent)
-                                <span class="text-muted" style="font-size: 11px;" title="Starts together with {{ $leadEvent->eventType->name ?? 'that event' }} #{{ $leadEvent->id }}">
-                                    <i class="bi bi-link-45deg"></i> Starts with #{{ $leadEvent->id }}
-                                </span>
-                                @elseif(!$event->placeable_id)
+                                @if(!$event->placeable_id)
                                 <span class="text-muted" style="font-size: 11px;" title="Place this event on a preparation, line or packaging to start it">
                                     <i class="bi bi-geo-alt"></i> Place to start
-                                </span>
-                                @elseif($unplacedCompanion)
-                                <span class="text-muted" style="font-size: 11px;" title="They all start together — place {{ $unplacedCompanion->eventType->name ?? 'the linked event' }} #{{ $unplacedCompanion->id }} first">
-                                    <i class="bi bi-geo-alt"></i> Place {{ $unplacedCompanion->eventType->name ?? 'linked event' }} #{{ $unplacedCompanion->id }} to start
                                 </span>
                                 @else
                                 <button type="button" class="btn btn-light-success btn-sm"
@@ -195,30 +203,22 @@
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-pause-fill"></i> Pause
                             </button>
-                            @if($leadEvent)
-                            <span class="text-muted" style="font-size: 11px;"><i class="bi bi-link-45deg"></i> Ends with #{{ $leadEvent->id }}</span>
-                            @else
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-stop-fill"></i> End
                             </button>
-                            @endif
                             @elseif($statusKey === 'paused')
                             <button type="button" class="btn btn-light-success btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'resume')"
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-play-fill"></i> Resume
                             </button>
-                            @if($leadEvent)
-                            <span class="text-muted" style="font-size: 11px;"><i class="bi bi-link-45deg"></i> Ends with #{{ $leadEvent->id }}</span>
-                            @else
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-stop-fill"></i> End
                             </button>
-                            @endif
                             @else
                             <span class="text-muted" style="font-size: 11px;">—</span>
                             @endif

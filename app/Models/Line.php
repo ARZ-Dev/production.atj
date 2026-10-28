@@ -29,6 +29,12 @@ class Line extends Model
         return $this->morphMany(Capacity::class, 'capacityable');
     }
 
+    /** Its machines in the order the product passes them. */
+    public function stations()
+    {
+        return $this->hasMany(LineStation::class)->orderBy('sequence')->orderBy('id');
+    }
+
     public function eventTypes()
     {
         return $this->belongsToMany(EventType::class, 'event_type_line');

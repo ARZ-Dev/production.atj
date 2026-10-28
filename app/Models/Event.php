@@ -65,27 +65,22 @@ class Event extends Model
         return $this->hasMany(EventPauseActivity::class);
     }
 
-    /**
-     * The events running in parallel with this one, created from the event
-     * type's companion setting (e.g. the packaging of this production run —
-     * one per packaging lane its output is split across). The group starts
-     * and ends together.
-     */
-    public function companionEvents()
+    /** On a preparation event (a mix): the line run it makes dough for. */
+    public function feedsEvent()
     {
-        return $this->hasMany(Event::class, 'linked_event_id')->orderBy('id');
+        return $this->belongsTo(Event::class, 'feeds_event_id');
     }
 
-    /** On a companion event: the event it runs with. */
-    public function leadEvent()
+    /** On a line run: the mixes planned to feed it. */
+    public function feedingEvents()
     {
-        return $this->belongsTo(Event::class, 'linked_event_id');
+        return $this->hasMany(Event::class, 'feeds_event_id')->orderBy('from_time');
     }
 
-    /** On a companion event: the packaging it was planned on in the add-event popup. */
-    public function plannedPackaging()
+    /** On a line run: its hourly counts, oldest first. */
+    public function counts()
     {
-        return $this->belongsTo(Packaging::class, 'planned_packaging_id');
+        return $this->hasMany(EventCount::class)->orderBy('counted_at')->orderBy('id');
     }
 
     /**

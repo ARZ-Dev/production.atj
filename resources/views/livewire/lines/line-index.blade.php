@@ -67,6 +67,11 @@
                                 </td>
                                 <td>
                                     @hasPermission('production.line-edit')
+                                    <a href="{{ route('lines.stations', $line->id) }}"
+                                        class="btn btn-light-info icon-btn-sm"
+                                        title="Stations">
+                                        <i class="bi bi-diagram-3"></i>
+                                    </a>
                                     <a href="{{ route('lines.capacity', $line->id) }}"
                                         class="btn btn-light-success icon-btn-sm"
                                         title="Manage Capacity">

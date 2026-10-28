@@ -24,7 +24,7 @@ class BolachaPackagingRecipeSeeder extends Seeder
      * parent's (erp_auth), as a fresh auth-service seed assigns them; keep
      * them in step with auth-service's item seeders.
      */
-    private const TAPE = [118, 146, 13];
+    public const TAPE = [118, 146, 13];
 
     /**
      * "SKU's produced for different brands" (SKU FAB BOLACHA.xlsx), its
@@ -37,7 +37,7 @@ class BolachaPackagingRecipeSeeder extends Seeder
      * has a few printed rolls and five boxes, none matching most products —
      * so neither is an input yet. "Ribbon + Ink" is only marked "Used".
      */
-    private const RECIPES = [
+    public const RECIPES = [
         '066103017' => [24, 0.001],   // film 0.001 kg/packet, box 0.2 kg
         '066103006' => [24, 0.001],   // film 0.0009 kg/packet, box 0.15 kg
         '066103012' => [24, 0.001],   // film 0.001 kg/packet, box 0.2 kg

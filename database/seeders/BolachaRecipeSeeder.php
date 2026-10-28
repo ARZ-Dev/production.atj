@@ -31,7 +31,7 @@ class BolachaRecipeSeeder extends Seeder
      * (KG), name]. The name is the recipe's. Xarope (999999999) is also an
      * input of other recipes.
      */
-    private const PRODUCTS = [
+    public const PRODUCTS = [
         'SFGBL-01' => [213, 241, 'Maria'],
         'SFGBL-02' => [214, 242, 'Dona Jowna'],
         'SFGBL-03' => [215, 243, 'Maria Samakaka Azul'],
@@ -85,7 +85,7 @@ class BolachaRecipeSeeder extends Seeder
      * shared. RMBL-01 (Corante) is a placeholder code. The names are here for
      * reading only.
      */
-    private const RAW_MATERIALS = [
+    public const RAW_MATERIALS = [
         '990101003' => [57, 85, 11, 'Y- ACUCAR CRISTAL INDUSTRIAL'], // RM Massa Tomate
         '990101014' => [131, 159, 15, 'Y- Bicarbonato de Sodium'],
         '990101002' => [56, 84, 11, 'Y- SAL INDUSTRIAL FABRICA'], // RM Massa Tomate
@@ -133,7 +133,7 @@ class BolachaRecipeSeeder extends Seeder
      * cells are left out. A batch makes the sum of its inputs — the sheet's
      * "Total" row, except Waffi Crème Limao (see its citric acid).
      */
-    private const RECIPES = [
+    public const RECIPES = [
         'SFGBL-01' => [ // Maria
             '990101003' => 30,
             '990101014' => 0.5,

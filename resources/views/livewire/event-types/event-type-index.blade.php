@@ -40,11 +40,6 @@
                                 </td>
                                 <td>
                                     {{ $eventType->name }}
-                                    @if($eventType->companionEventType)
-                                    <div class="text-muted" style="font-size: 11px;">
-                                        <i class="bi bi-link-45deg"></i> Executed with {{ $eventType->companionEventType->name }}
-                                    </div>
-                                    @endif
                                 </td>
                                 <td>
                                     @if($eventType->has_recipe)
@@ -156,42 +151,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox"
-                                   id="et_has_companion"
-                                   wire:model.live="has_companion"
-                                   @checked($has_companion)>
-                            <label class="form-check-label" for="et_has_companion">
-                                Executed with another event type
-                                <span class="text-muted small d-block">
-                                    Creating an event of this type also creates an event of the type below,
-                                    run at the same time — e.g. packaging alongside production. The two
-                                    start and end together, and the pre-finished goods pass from one to the
-                                    other without going through a warehouse.
-                                </span>
-                            </label>
-                        </div>
-                        @if($has_companion)
-                        <div class="mt-2 ms-4">
-                            <label for="et_companion_event_type_id" class="form-label">
-                                Executed with <span class="text-danger">*</span>
-                            </label>
-                            <select id="et_companion_event_type_id"
-                                    class="form-select @error('companion_event_type_id') is-invalid @enderror"
-                                    wire:model="companion_event_type_id">
-                                <option value="">— Select event type —</option>
-                                @foreach($this->companionOptions() as $option)
-                                <option value="{{ $option->id }}" @selected((int) $companion_event_type_id === $option->id)>
-                                    {{ $option->name }}
-                                </option>
-                                @endforeach
-                            </select>
-                            @error('companion_event_type_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            <div class="form-text">Only event types with a recipe are listed.</div>
-                        </div>
-                        @endif
-                    </div>
                     @endif
 
                     @if(!$has_recipe)

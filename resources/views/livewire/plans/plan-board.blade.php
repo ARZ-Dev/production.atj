@@ -254,33 +254,16 @@
                         </div>
                         @endif
 
-                        @if(!empty($selectedEvent['linked']))
+                        @if(!empty($selectedEvent['run']))
+                        @include('livewire.plans.partials._run-details')
+                        @endif
+
+                        @if(!empty($selectedEvent['feeds']))
                         <div class="col-12">
-                            <div class="pvc-body-label">Runs together with</div>
-                            @foreach($selectedEvent['linked'] as $linkedEvent)
+                            <div class="pvc-body-label">Feeds</div>
                             <div>
-                                <i class="bi bi-link-45deg text-primary"></i>
-                                <span class="d-inline-block rounded-circle mx-1" style="width:10px;height:10px;background-color: {{ $linkedEvent['color'] }}"></span>
-                                {{ $linkedEvent['type_name'] }} #{{ $linkedEvent['id'] }}
-                                @if($linkedEvent['batches'])
-                                <span class="text-muted" style="font-size: 11px;">· {{ $linkedEvent['batches'] }} batches</span>
-                                @endif
-                                @if($linkedEvent['placed'])
-                                <span class="text-muted" style="font-size: 11px;">· {{ $linkedEvent['where'] }}</span>
-                                @else
-                                <span class="badge bg-primary ms-1">Unplaced</span>
-                                @if($linkedEvent['planned'])
-                                <span class="text-muted" style="font-size: 11px;">goes on {{ $linkedEvent['planned'] }} when this is placed</span>
-                                @endif
-                                @endif
-                            </div>
-                            @endforeach
-                            <div class="text-muted" style="font-size: 11px;">
-                                @if($selectedEvent['linked_role'] === 'companion')
-                                Starts and ends with that event, and is edited and deleted with it.
-                                @else
-                                They all start and end together from this event, on the same time window.
-                                @endif
+                                <i class="bi bi-arrow-right-circle text-primary me-1"></i>
+                                {{ $selectedEvent['feeds']['name'] }} run #{{ $selectedEvent['feeds']['id'] }}{{ $selectedEvent['feeds']['from'] ? ' · starts ' . $selectedEvent['feeds']['from'] : '' }}
                             </div>
                         </div>
                         @endif
@@ -354,7 +337,19 @@
                         'resume'     => ['title' => 'Resume Event',     'icon' => 'play-fill',             'btn' => 'btn-success', 'submit' => 'Resume Event'],
                         'terminate'  => ['title' => 'End Event',        'icon' => 'stop-fill',             'btn' => 'btn-danger',  'submit' => 'End Event'],
                         'activities' => ['title' => 'Emergency Events', 'icon' => 'exclamation-triangle',  'btn' => 'btn-primary', 'submit' => 'Save Emergency Events'],
+                        'count'      => ['title' => 'Hourly Count',     'icon' => 'speedometer2',          'btn' => 'btn-primary', 'submit' => 'Save Count'],
                     ][$eventAction['action']];
+
+                    // A line run: one event for the whole line.
+                    if (!empty($eventAction['run'])) {
+                        $actionMeta = array_merge($actionMeta, match ($eventAction['action']) {
+                            'start'      => ['title' => 'Start Run', 'submit' => 'Start Run'],
+                            'terminate'  => ['title' => 'End Run', 'submit' => 'End Run'],
+                            'pause'      => ['title' => 'Stop the Line', 'submit' => 'Stop the Line'],
+                            'activities' => ['title' => 'Station Stops', 'submit' => 'Save Station Stops'],
+                            default      => [],
+                        });
+                    }
                 @endphp
                 <div class="modal-header">
                     <h5 class="modal-title" id="eventActionModalLabel">
@@ -366,67 +361,21 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    @if($eventAction['action'] === 'start')
+                    @if($eventAction['action'] === 'start' && !empty($eventAction['run']))
+
+                    @include('livewire.plans.partials._run-start')
+
+                    @elseif($eventAction['action'] === 'start')
 
                     @php
-                        // One section per event: just the event, or every event of a
-                        // linked group, which start together from this one modal.
-                        $groupCompanions = $eventAction['companions'] ?? [];
-                        $startSections   = [[
+                        $startSections = [[
                             'role'       => 'lead',
                             'has_recipe' => (bool) ($eventAction['has_recipe'] ?? false),
-                            'type_name'  => $eventAction['type_name'],
-                            'color'      => $eventAction['color'],
-                            'placeable'  => $eventAction['placeable_name'] ?? null,
-                            'batches'    => null,
                         ]];
-                        foreach ($groupCompanions as $groupCompanion) {
-                            $startSections[] = [
-                                'role'       => $groupCompanion['role'],
-                                'has_recipe' => (bool) $groupCompanion['has_recipe'],
-                                'type_name'  => $groupCompanion['type_name'],
-                                'color'      => $groupCompanion['color'],
-                                'placeable'  => $groupCompanion['placeable_name'],
-                                'batches'    => count($groupCompanions) > 1 ? $groupCompanion['batch_count'] : null,
-                            ];
-                        }
-                        $companionNames = collect($groupCompanions)->pluck('type_name')->unique()->implode(', ');
-                        $handoffTypes   = collect($actionInputs)->where('handoff', true)->pluck('item_type_name')->filter()->unique()->implode(', ');
                     @endphp
-
-                    @if($groupCompanions)
-                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
-                        <i class="bi bi-link-45deg me-1"></i>
-                        This starts <strong>{{ $eventAction['type_name'] }}</strong> and
-                        @if(count($groupCompanions) > 1)
-                        its <strong>{{ count($groupCompanions) }} {{ $companionNames }}</strong> events
-                        @else
-                        <strong>{{ $companionNames }}</strong>
-                        @endif
-                        together. The items of all of them are checked against stock in one go — if anything is
-                        short, none starts.
-                        @if($handoffTypes)
-                        <strong>{{ $handoffTypes }}</strong> passes straight from {{ $eventAction['type_name'] }} to
-                        {{ $companionNames }} without a warehouse, so it isn't counted.
-                        @endif
-                    </div>
-                    @endif
 
                     @foreach($startSections as $section)
                     @php $sectionRows = collect($actionInputs)->filter(fn($row) => ($row['role'] ?? 'lead') === $section['role'])->all(); @endphp
-
-                    @if($groupCompanions)
-                    <div class="aqt-pair-head {{ $loop->first ? '' : 'mt-3' }}">
-                        <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background-color: {{ $section['color'] }}"></span>
-                        {{ $section['type_name'] }}
-                        @if($section['placeable'])
-                        <span class="aqt-pair-where">· {{ $section['placeable'] }}</span>
-                        @endif
-                        @if($section['batches'])
-                        <span class="aqt-pair-where">· {{ $section['batches'] + 0 }} {{ $section['batches'] == 1 ? 'batch' : 'batches' }}</span>
-                        @endif
-                    </div>
-                    @endif
 
                     @if(count($sectionRows))
                     <p class="text-muted mb-2" style="font-size: 12px;">
@@ -445,8 +394,6 @@
                         'percentLabel'  => '% Difference',
                         'showOriginal'  => true,
                         'showAvailable' => true,
-                        'handoffMode'   => 'skip',
-                        'handoffNote'   => 'Comes straight from ' . $eventAction['type_name'] . ' — not counted',
                     ])
                     @else
                     <div class="alert alert-warning py-2 px-3" style="font-size: 12px;">
@@ -485,46 +432,20 @@
                         </div>
                     </div>
 
+                    @elseif($eventAction['action'] === 'terminate' && !empty($eventAction['run']))
+
+                    @include('livewire.plans.partials._run-end')
+
                     @elseif($eventAction['action'] === 'terminate')
 
                     @php
-                        // One section per event: just the event, or every event of a
-                        // linked group, which end together from this one modal.
-                        $groupCompanions = $eventAction['companions'] ?? [];
-                        $endSections     = [[
+                        $endSections = [[
                             'role'        => 'lead',
                             'has_recipe'  => (bool) ($eventAction['has_recipe'] ?? false),
                             'batch_count' => $eventAction['batch_count'] ?? 1,
-                            'type_name'   => $eventAction['type_name'],
-                            'color'       => $eventAction['color'],
-                            'placeable'   => $eventAction['placeable_name'] ?? null,
                         ]];
-                        foreach ($groupCompanions as $groupCompanion) {
-                            $endSections[] = [
-                                'role'        => $groupCompanion['role'],
-                                'has_recipe'  => (bool) $groupCompanion['has_recipe'],
-                                'batch_count' => $groupCompanion['batch_count'] ?? 1,
-                                'type_name'   => $groupCompanion['type_name'],
-                                'color'       => $groupCompanion['color'],
-                                'placeable'   => $groupCompanion['placeable_name'],
-                            ];
-                        }
-                        $companionNames = collect($groupCompanions)->pluck('type_name')->unique()->implode(', ');
                         $ofRole = fn(array $rows, string $role) => collect($rows)->filter(fn($row) => ($row['role'] ?? 'lead') === $role)->all();
                     @endphp
-
-                    @if($groupCompanions)
-                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
-                        <i class="bi bi-link-45deg me-1"></i>
-                        This ends <strong>{{ $eventAction['type_name'] }}</strong> and
-                        @if(count($groupCompanions) > 1)
-                        its <strong>{{ count($groupCompanions) }} {{ $companionNames }}</strong> events
-                        @else
-                        <strong>{{ $companionNames }}</strong>
-                        @endif
-                        together, at the end time below.
-                    </div>
-                    @endif
 
                     @foreach($endSections as $section)
                     @php
@@ -533,16 +454,6 @@
                         $sectionRecon   = $ofRole($actionReconciliation, $section['role']);
                         $endBatchCount  = $section['batch_count'];
                     @endphp
-
-                    @if($groupCompanions)
-                    <div class="aqt-pair-head {{ $loop->first ? '' : 'mt-4' }}">
-                        <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background-color: {{ $section['color'] }}"></span>
-                        {{ $section['type_name'] }}
-                        @if($section['placeable'])
-                        <span class="aqt-pair-where">· {{ $section['placeable'] }}</span>
-                        @endif
-                    </div>
-                    @endif
 
                     @if($section['has_recipe'])
                     <div class="alert alert-info py-2 px-3 mb-2" style="font-size: 12px;">
@@ -562,8 +473,6 @@
                         'actualLabel'  => 'Produced Qty',
                         'percentLabel' => '% Produced',
                         'showPerBatch' => true,
-                        'handoffMode'  => 'record',
-                        'handoffNote'  => $groupCompanions ? 'Goes straight to ' . $companionNames . ' — recorded, not stocked' : null,
                     ])
 
                     @if(count($sectionSides))
@@ -632,16 +541,33 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                        @if(!empty($eventAction['run']))
+                        <div class="col-md-6">
+                            <label class="form-label">Station that stopped the line <span class="text-danger">*</span></label>
+                            <select class="form-select @error('actionStationId') is-invalid @enderror" wire:model="actionStationId">
+                                <option value="">Select station…</option>
+                                @foreach($eventAction['stations'] as $station)
+                                <option value="{{ $station['id'] }}">{{ $station['name'] }}{{ $station['machine'] ? ' — ' . $station['machine'] : '' }}</option>
+                                @endforeach
+                            </select>
+                            @error('actionStationId')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        @endif
                         <div class="col-12">
                             <label class="form-label">Reason</label>
                             <textarea class="form-control" rows="3" wire:model="actionReason"
-                                placeholder="Why is this event being paused?"></textarea>
+                                placeholder="{{ !empty($eventAction['run']) ? 'What happened? e.g. oven belt drifting' : 'Why is this event being paused?' }}"></textarea>
                         </div>
                         <div class="col-12">
                             <div class="alert alert-info py-2 px-3 mb-0" style="font-size: 12px;">
                                 <i class="bi bi-exclamation-triangle me-1"></i>
+                                @if(!empty($eventAction['run']))
+                                Use this when the <strong>whole line</strong> stops. When one machine stops and the rest
+                                runs on, record a <strong>station stop</strong> instead.
+                                @else
                                 Once paused, use the "Emergency" button on the event to record
                                 emergency events (Cleaning, Maintenance, …).
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -712,9 +638,19 @@
                         </div>
                     </div>
 
+                    @elseif($eventAction['action'] === 'count')
+
+                    @include('livewire.plans.partials._run-count')
+
                     @elseif($eventAction['action'] === 'activities')
 
-                    @if($eventAction['can_add'])
+                    @if($eventAction['can_add'] && !empty($eventAction['run']) && empty($eventAction['paused']))
+                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        The line is running. A station stop is one machine down while the rest runs on —
+                        if the whole line stopped, use <strong>Pause</strong> instead.
+                    </div>
+                    @elseif($eventAction['can_add'])
                     <div class="d-flex align-items-center gap-2 mb-3" style="font-size: 12px;">
                         <span class="badge bg-warning text-dark">Paused</span>
                         <span class="text-muted">since {{ $eventAction['paused_at'] ?? '—' }}</span>
@@ -746,6 +682,9 @@
                                     <tr wire:key="existing-activity-{{ $activity['id'] }}">
                                         <td>
                                             {{ $activity['type_name'] }}
+                                            @if(!empty($activity['station']))
+                                            <span class="badge bg-light-secondary text-secondary ms-1">{{ $activity['station'] }}</span>
+                                            @endif
                                             @if($activity['reason'])
                                             <div class="text-muted" style="font-size: 11px;"><i class="bi bi-chat-left-text me-1"></i>{{ $activity['reason'] }}</div>
                                             @endif
@@ -821,7 +760,7 @@
                     </div>
 
                     @if($eventAction['can_add'])
-                    <div class="fw-bold mb-1" style="font-size: 13px;">Add Emergency Events</div>
+                    <div class="fw-bold mb-1" style="font-size: 13px;">{{ !empty($eventAction['run']) ? 'Add Station Stops' : 'Add Emergency Events' }}</div>
                     <div class="mb-2" style="max-width: 260px;">
                         <label class="form-label mb-1" style="font-size: 12px;">Time <span class="text-danger">*</span></label>
                         <input type="datetime-local" class="form-control form-control-sm @error('actionTime') is-invalid @enderror"
@@ -853,6 +792,29 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
+                            @if(!empty($eventAction['run']))
+                            @php $rowStation = collect($eventAction['stations'])->firstWhere('id', (int) ($row['line_station_id'] ?? 0)); @endphp
+                            <div style="width: 200px;">
+                                <select class="form-select form-select-sm @error("pauseActivityRows.{$i}.line_station_id") is-invalid @enderror"
+                                    wire:model.live="pauseActivityRows.{{ $i }}.line_station_id">
+                                    <option value="">Station…</option>
+                                    @foreach($eventAction['stations'] as $station)
+                                    <option value="{{ $station['id'] }}">{{ $station['name'] }}</option>
+                                    @endforeach
+                                </select>
+                                @error("pauseActivityRows.{$i}.line_station_id")<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            @if($rowStation && $rowStation['machines'] > 1)
+                            <div style="width: 120px;">
+                                <select class="form-select form-select-sm" wire:model="pauseActivityRows.{{ $i }}.machine_number" title="Which of its machines">
+                                    <option value="">Machine…</option>
+                                    @for($m = 1; $m <= $rowStation['machines']; $m++)
+                                    <option value="{{ $m }}">Machine {{ $m }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                            @endif
+                            @endif
                             <div style="width: 140px;">
                                 @php $rowType = collect($pauseEventTypes)->firstWhere('id', (int) ($row['event_type_id'] ?? 0)); @endphp
                                 <input type="text" class="form-control form-control-sm" disabled
@@ -976,6 +938,9 @@
                 </div>
                 <div class="modal-body">
                     @if($eventHistory)
+                    @if(!empty($eventHistory['run']) && ($eventHistory['run']['summary'] || $eventHistory['run']['stages'] || $eventHistory['run']['counts']))
+                    @include('livewire.plans.partials._run-history')
+                    @endif
                     @if(empty($eventHistory['logs']) && empty($eventHistory['other_activities']))
                     <div class="pb-empty-hint">No status changes have been recorded for this event yet.</div>
                     @else
@@ -1002,6 +967,11 @@
                             @if($log['actual_duration'] !== null)
                             <div class="mt-2" style="font-size: 12px;">
                                 <span class="text-muted">Pause duration:</span> {{ $log['actual_duration'] }} min
+                            </div>
+                            @endif
+                            @if(!empty($log['station']))
+                            <div class="mt-1" style="font-size: 12px;">
+                                <span class="text-muted">Station:</span> {{ $log['station'] }}
                             </div>
                             @endif
                             @if(!empty($log['activities']))
@@ -1202,6 +1172,7 @@
 
         $wire.on('dropRejected', ({ message }) => showToast(message));
         $wire.on('carryOverPlanCreated', ({ message }) => showToast(message, 'success', 6000));
+        $wire.on('runNotice', ({ message }) => showToast(message, 'success', 9000));
 
         const initCalendarDrag = () => {
             document.querySelectorAll('.pbc-card[draggable="true"]').forEach(card => {

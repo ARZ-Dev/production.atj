@@ -17,5 +17,10 @@ class RecipeInput extends Model
         return $this->belongsTo(Recipe::class);
     }
 
+    /** On a recipe with stages: the stage that uses this input. */
+    public function stage()
+    {
+        return $this->belongsTo(RecipeStage::class, 'recipe_stage_id');
+    }
 
 }

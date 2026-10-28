@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\EventType;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class FactoryEventTypeSeeder extends Seeder
@@ -12,22 +11,23 @@ class FactoryEventTypeSeeder extends Seeder
     /**
      * Run the database seeds.
      *
-     * One event type per step of each factory — Preparation, Production and
-     * Packaging, named like FactoryRecipeTypeSeeder's recipe types — plus
-     * Cleaning, the one type without a recipe (which is what the emergency
-     * event dropdown lists). Each Production type is executed with its
-     * factory's Packaging type, so a production run and its packaging start
-     * and end together.
+     * One event type per step of each factory — Preparation (a mix, its own
+     * event) and Production (the whole line as one run: its recipes have
+     * stages, one per station) — named like FactoryRecipeTypeSeeder's recipe
+     * types, plus Cleaning, the one type without a recipe (which is what the
+     * emergency event / station stop dropdown lists).
      *
      * Replaces EventTypeSeeder. The ids follow the types they replace —
-     * 2 Preparation MT, 3 Direct Production, 4 Prep BOLACHA, 5 PROD BOLACHA,
-     * 6 Bolacha Packaging Test — so the lanes PreparationSeeder, LineSeeder
-     * and PackagingSeeder allow them on keep the same kind of work; Packaging
-     * Massa Tomate is new (7).
+     * 2 Preparation MT, 3 Direct Production, 4 Prep BOLACHA, 5 PROD BOLACHA —
+     * so the lanes PreparationSeeder and LineSeeder allow them on keep the
+     * same kind of work.
+     *
+     * Packaging Bolacha (6) and Packaging Massa Tomate (7) are retired since
+     * 2026-10-28: packing is a station of the line now, not an event of its
+     * own. They are soft-deleted when present, so their ids aren't reused.
      *
      * `item_type_ids` is what the add-event popup offers to make — the
-     * recipe type's output — and the Packaging types add their packaging
-     * materials, so a packaging's warehouse routing table has a row for them.
+     * recipe type's output.
      *
      * Item type ids are the parent's (erp_auth), as a fresh auth-service
      * seed assigns them — this app can't read the parent's database on the
@@ -44,7 +44,6 @@ class FactoryEventTypeSeeder extends Seeder
                 'color' => '#818cf8',
                 'has_recipe' => false,
                 'start_items_unverifiable' => false,
-                'companion_event_type_id' => null,
                 'duration' => 40,
                 'item_type_ids' => [15],          // RM Bolacha
             ],
@@ -56,7 +55,6 @@ class FactoryEventTypeSeeder extends Seeder
                 'color' => '#f59e0b',
                 'has_recipe' => true,
                 'start_items_unverifiable' => false,
-                'companion_event_type_id' => null,
                 'duration' => null,
                 'item_type_ids' => [12],          // SFG Massa Tomate
             ],
@@ -66,19 +64,8 @@ class FactoryEventTypeSeeder extends Seeder
                 'color' => '#818cf8',
                 'has_recipe' => true,
                 'start_items_unverifiable' => false,
-                'companion_event_type_id' => 7,   // Packaging Massa Tomate
                 'duration' => null,
                 'item_type_ids' => [4, 5, 6, 7],  // Fb. Tomate - Massa Tomate, Pelado, Vinegar, Ketchup
-            ],
-            [
-                'id' => 7,
-                'name' => 'Packaging Massa Tomate',
-                'color' => '#10b981',
-                'has_recipe' => true,
-                'start_items_unverifiable' => false,
-                'companion_event_type_id' => null,
-                'duration' => null,
-                'item_type_ids' => [4, 5, 6, 7, 13], // the same Fb. Tomate types, Packaging Materials Massa Tomate
             ],
 
             // Bolacha
@@ -88,7 +75,6 @@ class FactoryEventTypeSeeder extends Seeder
                 'color' => '#f59e0b',
                 'has_recipe' => true,
                 'start_items_unverifiable' => false,
-                'companion_event_type_id' => null,
                 'duration' => null,
                 'item_type_ids' => [16],          // SFG Bolacha
             ],
@@ -98,34 +84,23 @@ class FactoryEventTypeSeeder extends Seeder
                 'color' => '#818cf8',
                 'has_recipe' => true,
                 'start_items_unverifiable' => false,
-                'companion_event_type_id' => 6,   // Packaging Bolacha
                 'duration' => null,
                 'item_type_ids' => [1, 2, 3],     // Fb. Bolacha - Hard, Soft, Wafer
             ],
-            [
-                'id' => 6,
-                'name' => 'Packaging Bolacha',
-                'color' => '#10b981',
-                'has_recipe' => true,
-                'start_items_unverifiable' => false,
-                'companion_event_type_id' => null,
-                'duration' => null,
-                'item_type_ids' => [1, 2, 3, 18, 13], // the same Fb. Bolacha types, Packaging Materials Bolacha, Massa Tomate's (tape)
-            ],
         ];
 
-        DB::transaction(function () use ($eventTypes) {
+        // Packaging Bolacha, Packaging Massa Tomate — packing is a station now.
+        $retired = [6, 7];
+
+        DB::transaction(function () use ($eventTypes, $retired) {
             foreach ($eventTypes as $row) {
                 EventType::withTrashed()->updateOrCreate(
                     ['id' => $row['id']],
-                    Arr::except($row, 'companion_event_type_id') + ['recipe_id' => null, 'deleted_at' => null]
+                    $row + ['recipe_id' => null, 'deleted_at' => null]
                 );
             }
 
-            // A companion is another row of this list, so link them once every row exists.
-            foreach ($eventTypes as $row) {
-                EventType::whereKey($row['id'])->update(['companion_event_type_id' => $row['companion_event_type_id']]);
-            }
+            EventType::whereIn('id', $retired)->get()->each->delete();
         });
     }
 }

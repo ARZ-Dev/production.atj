@@ -50,4 +50,10 @@ class EventQuantity extends Model
     {
         return $this->belongsTo(RecipeSideProduct::class);
     }
+
+    /** On a line run's figures: the stage the figure belongs to. */
+    public function recipeStage()
+    {
+        return $this->belongsTo(RecipeStage::class);
+    }
 }
