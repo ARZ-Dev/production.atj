@@ -3,15 +3,15 @@
 namespace App\Livewire\Lines;
 
 use App\Models\Line;
-use App\Models\LineStation;
+use App\Models\Station;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * The machines of a line, in the order the product passes them. A recipe
- * with stages runs on the line by matching each stage to the station of the
- * same name; the slowest station sets the line's rate.
+ * The machines of a line, picked from the stations of its department, in the
+ * order the product passes them. A recipe stage runs on the line's stations
+ * of its station type; the slowest stage sets the line's rate.
  */
 class LineStations extends Component
 {
@@ -21,13 +21,20 @@ class LineStations extends Component
     #[Locked]
     public string $lineName = '';
 
+    #[Locked]
+    public ?int $departmentId = null;
+
+    /** What's on the line as saved: offered even if it has moved department since. */
+    #[Locked]
+    public array $savedIds = [];
+
     /**
-     * Keyed by a stable key ("s<id>" for saved stations, random for new ones)
-     * so removing a row never shifts another row's wire:model paths.
+     * Keyed by a stable key ("s<id>" for saved rows, random for new ones) so
+     * removing a row never shifts another row's wire:model paths.
      *
-     * @var array<string, array{id: ?int, name: string, machine: ?string, machine_count: mixed, rate: mixed, rate_period: string, rate_unit: ?string}>
+     * @var array<string, array{station_id: mixed}>
      */
-    public array $stations = [];
+    public array $rows = [];
 
     public function mount(int $id): void
     {
@@ -35,48 +42,34 @@ class LineStations extends Component
 
         $line = Line::with('stations')->findOrFail($id);
 
-        $this->lineId   = $line->id;
-        $this->lineName = $line->name;
+        $this->lineId       = $line->id;
+        $this->lineName     = $line->name;
+        $this->departmentId = $line->department_id ? (int) $line->department_id : null;
+        $this->savedIds     = $line->stations->pluck('id')->all();
 
         foreach ($line->stations as $station) {
-            $this->stations['s' . $station->id] = [
-                'id'            => $station->id,
-                'name'          => $station->name,
-                'machine'       => $station->machine,
-                'machine_count' => $station->machine_count,
-                'rate'          => $station->rate !== null ? $this->plain($station->rate) : null,
-                'rate_period'   => $station->rate_period ?: 'hour',
-                'rate_unit'     => $station->rate_unit,
-            ];
+            $this->rows['s' . $station->id] = ['station_id' => (string) $station->id];
         }
 
-        if (!$this->stations) {
-            $this->addStation();
+        if (!$this->rows) {
+            $this->addRow();
         }
     }
 
-    public function addStation(): void
+    public function addRow(): void
     {
-        $this->stations['n' . bin2hex(random_bytes(4))] = [
-            'id'            => null,
-            'name'          => '',
-            'machine'       => null,
-            'machine_count' => 1,
-            'rate'          => null,
-            'rate_period'   => 'hour',
-            'rate_unit'     => null,
-        ];
+        $this->rows['n' . bin2hex(random_bytes(4))] = ['station_id' => ''];
     }
 
-    public function removeStation(string $key): void
+    public function removeRow(string $key): void
     {
-        unset($this->stations[$key]);
+        unset($this->rows[$key]);
     }
 
     /** Move a station one place up (-1) or down (+1) in the line's order. */
-    public function moveStation(string $key, int $direction): void
+    public function moveRow(string $key, int $direction): void
     {
-        $keys  = array_keys($this->stations);
+        $keys  = array_keys($this->rows);
         $index = array_search($key, $keys, true);
         $swap  = $index === false ? null : $index + $direction;
 
@@ -86,95 +79,82 @@ class LineStations extends Component
 
         [$keys[$index], $keys[$swap]] = [$keys[$swap], $keys[$index]];
 
-        $this->stations = array_combine($keys, array_map(fn($k) => $this->stations[$k], $keys));
-    }
-
-    protected function rules(): array
-    {
-        $rules = [];
-
-        foreach (array_keys($this->stations) as $key) {
-            $rules["stations.{$key}.name"]          = 'required|string|max:255';
-            $rules["stations.{$key}.machine"]       = 'nullable|string|max:255';
-            $rules["stations.{$key}.machine_count"] = 'required|integer|min:1|max:999';
-            $rules["stations.{$key}.rate"]          = 'nullable|numeric|min:0';
-            $rules["stations.{$key}.rate_period"]   = 'required|in:hour,minute';
-            $rules["stations.{$key}.rate_unit"]     = 'nullable|string|max:50';
-        }
-
-        return $rules;
-    }
-
-    protected function messages(): array
-    {
-        return [
-            'stations.*.name.required'          => 'Name the station — recipe stages are matched to it by this name.',
-            'stations.*.machine_count.required' => 'How many machines?',
-            'stations.*.machine_count.min'      => 'At least one machine.',
-            'stations.*.rate.numeric'           => 'The rate must be a number.',
-        ];
+        $this->rows = array_combine($keys, array_map(fn($k) => $this->rows[$k], $keys));
     }
 
     public function save()
     {
         authorizeRequest('production.line-edit');
 
-        foreach ($this->stations as $key => $station) {
-            $this->stations[$key]['rate'] = $station['rate'] === '' || $station['rate'] === null
-                ? null
-                : str_replace(',', '', (string) $station['rate']);
+        // An empty row is just an unused line of the form.
+        $this->rows = array_filter($this->rows, fn($row) => (string) ($row['station_id'] ?? '') !== '');
+
+        $known = $this->offered()->pluck('id')->map(fn($id) => (string) $id)->all();
+        $rules = [];
+
+        foreach (array_keys($this->rows) as $key) {
+            $rules["rows.{$key}.station_id"] = ['required', 'in:' . implode(',', $known)];
         }
 
-        if ($this->stations) {
-            $this->validate();
+        if ($rules) {
+            $this->validate($rules, ['rows.*.station_id.in' => 'Pick a station of this line\'s department.']);
         }
 
-        $names = collect($this->stations)->map(fn($s) => mb_strtolower(trim($s['name'])));
+        $ids = collect($this->rows)->pluck('station_id')->map(fn($id) => (int) $id);
 
-        if ($names->duplicates()->isNotEmpty()) {
-            $this->addError('stations', 'Two stations have the same name: "' . $names->duplicates()->first() . '". Recipe stages are matched by name, so each must be unique.');
+        if ($ids->duplicates()->isNotEmpty()) {
+            $this->addError('rows', Station::find($ids->duplicates()->first())?->name . ' is on the line twice.');
 
             return;
         }
 
-        DB::transaction(function () {
-            $kept     = [];
-            $sequence = 0;
-
-            foreach ($this->stations as $station) {
-                $data = [
-                    'line_id'       => $this->lineId,
-                    'sequence'      => ++$sequence,
-                    'name'          => trim($station['name']),
-                    'machine'       => $station['machine'] ? trim($station['machine']) : null,
-                    'machine_count' => (int) $station['machine_count'],
-                    'rate'          => $station['rate'] !== null ? (float) $station['rate'] : null,
-                    'rate_period'   => $station['rate_period'],
-                    'rate_unit'     => $station['rate_unit'] ? trim($station['rate_unit']) : null,
-                ];
-
-                $model = !empty($station['id'])
-                    ? LineStation::where('line_id', $this->lineId)->find($station['id'])
-                    : null;
-
-                $model ? $model->update($data) : $model = LineStation::create($data);
-
-                $kept[] = $model->id;
-            }
-
-            LineStation::where('line_id', $this->lineId)->whereNotIn('id', $kept)->delete();
+        DB::transaction(function () use ($ids) {
+            Line::findOrFail($this->lineId)->stations()->sync(
+                $ids->values()->mapWithKeys(fn($id, $i) => [$id => ['sequence' => $i + 1]])->all()
+            );
         });
 
         return redirect()->route('lines.stations', $this->lineId)->with('success', 'Stations saved.');
     }
 
-    protected function plain(float $number): string
+    /**
+     * The stations this line can take: its department's (all of them when the
+     * line has none), and whatever is on it already.
+     */
+    protected function offered()
     {
-        return rtrim(rtrim(number_format($number, 4, '.', ''), '0'), '.');
+        return Station::with(['type', 'lines' => fn($q) => $q->orderBy('name')])
+            ->when($this->departmentId, fn($q) => $q->where(fn($q) => $q
+                ->where('department_id', $this->departmentId)
+                ->orWhereIn('id', $this->savedIds ?: [0])))
+            ->get();
     }
 
     public function render()
     {
-        return view('livewire.lines.line-stations');
+        $stations = $this->offered();
+        $byType   = $stations->groupBy(fn(Station $station) => $station->station_type_id)
+            ->sortBy(fn($group) => sprintf('%05d|%s', $group->first()->type?->sequence ?? 0, $group->first()->type?->name))
+            ->map(fn($group) => $group->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values());
+
+        // What each stage type adds up to on this line, as the form stands.
+        $chosen  = collect($this->rows)->map(fn($row) => $stations->firstWhere('id', (int) ($row['station_id'] ?? 0)))->filter();
+        $summary = $chosen->groupBy('station_type_id')->map(function ($group) {
+            $rated = $group->filter(fn(Station $station) => $station->hourlyRate() !== null);
+
+            return [
+                'type'     => $group->first()->type?->name,
+                'count'    => $group->count(),
+                'rated'    => $rated->count(),
+                'per_hour' => $rated->sum(fn(Station $station) => $station->hourlyRate()),
+                'unit'     => $rated->first()?->rateUnit() ?? $group->first()->rateUnit(),
+            ];
+        })->values();
+
+        return view('livewire.lines.line-stations', [
+            'stations' => $stations->keyBy('id'),
+            'byType'   => $byType,
+            'summary'  => $summary,
+        ]);
     }
 }

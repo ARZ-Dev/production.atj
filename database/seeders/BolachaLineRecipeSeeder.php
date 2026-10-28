@@ -37,7 +37,8 @@ class BolachaLineRecipeSeeder extends Seeder
      * and the dough per box is the net weight: the sheet gives no bake loss.
      *
      * Fixed ids like the seeders it replaces; matched on recipe type + product,
-     * so it updates their recipes in place; stages matched on name, inputs on
+     * so it updates their recipes in place; stages matched on name (each the
+     * StationTypeSeeder type of that name, which must run first), inputs on
      * item. Refuses before writing if a product, its packaging row or an input
      * has no ids.
      */
@@ -153,6 +154,7 @@ class BolachaLineRecipeSeeder extends Seeder
             $model = $recipe->stages()->withTrashed()->firstOrNew(['name' => $name]);
             $model->fill([
                 'sequence'            => ++$sequence,
+                'station_type_id'     => StationTypeSeeder::idOf($name),
                 'output_quantity'     => $stage['output_quantity'],
                 'output_unit'         => $stage['output_unit'],
                 'output_item_unit_id' => $stage['output_item_unit_id'] ?? null,

@@ -16,10 +16,10 @@
     @if($run['line_name'])
     <div class="ec-run-stations">
         @foreach($run['stages'] as $stage)
-        <div class="ec-run-station {{ $stage['stage'] === $run['bottleneck'] ? 'is-slowest' : '' }} {{ $stage['station_id'] ? '' : 'is-missing' }}">
+        <div class="ec-run-station {{ $stage['stage'] === $run['bottleneck'] ? 'is-slowest' : '' }} {{ !empty($stage['station_ids']) ? '' : 'is-missing' }}">
             <div class="ec-run-station-name">{{ $stage['stage'] }}</div>
             <div class="ec-run-station-rate">
-                @if(!$stage['station_id'])
+                @if(empty($stage['station_ids']))
                     no station
                 @elseif($stage['batches_per_hour'])
                     {{ $ecQty($stage['batches_per_hour'] * $run['per_batch'], 0) }} {{ $run['output_unit'] }}/h
@@ -48,7 +48,7 @@
     @if($run['missing'])
     <div class="ec-run-warn">
         <i class="bi bi-exclamation-circle"></i>
-        {{ $run['line_name'] }} has no station named {{ implode(', ', array_map(fn($m) => '"' . $m . '"', $run['missing'])) }}.
+        {{ $run['line_name'] }} has no {{ implode(', ', $run['missing']) }} station, so {{ count($run['missing']) > 1 ? 'those stages' : 'that stage' }} can't limit its speed. Add one on the line's Stations page.
     </div>
     @endif
     @else

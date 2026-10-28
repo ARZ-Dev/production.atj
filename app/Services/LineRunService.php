@@ -5,22 +5,23 @@ namespace App\Services;
 use App\Models\Event;
 use App\Models\EventQuantity;
 use App\Models\Line;
-use App\Models\LineStation;
 use App\Models\Preparation;
 use App\Models\Recipe;
 use App\Models\RecipeInput;
 use App\Models\RecipeStage;
+use App\Models\Station;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
 /**
  * A line run: one event for a whole continuous line (cutting, cooking,
- * packaging, packing … running at once). Its recipe has stages, each matched
- * by name to one of the line's stations.
+ * packaging, packing … running at once). Its recipe has stages, each a
+ * station type, run on the line's stations (machines) of that type.
  *
- *  - The line runs at its slowest station's rate (lineRate()), which sets the
- *    run's duration and its hourly target.
+ *  - A stage's rate is the sum of its stations' rates; the line runs at its
+ *    slowest stage's (lineRate()), which sets the run's duration and its
+ *    hourly target.
  *  - Nothing is reserved at Start: dough is mixed while the line runs. Stock
  *    moves once, at End, from what the supervisor counts per station
  *    (settle()); everything a run takes or makes passes through the line's
@@ -81,7 +82,7 @@ class LineRunService
     public function lineOf(Event $event): ?Line
     {
         return $event->placeable_type === Line::class && $event->placeable_id
-            ? Line::with('stations')->find($event->placeable_id)
+            ? Line::with('stations.type')->find($event->placeable_id)
             : null;
     }
 
@@ -117,46 +118,41 @@ class LineRunService
     // ─── Rate and duration ───────────────────────────────────────────────────
 
     /**
-     * Each stage with the station of the same name on $line and how many
-     * batches an hour it can take, and the slowest of them — the line's rate.
-     * A stage with no station, or a station with no rate, doesn't limit it.
-     * $downStationId takes one machine of that station out (a station stop).
+     * Each stage with the line's stations of its type and how many batches an
+     * hour they take together, and the slowest stage — the line's rate. A
+     * stage's stations share the work, so their rates add up; one without a
+     * rate adds nothing, and a stage whose stations have none (or that has no
+     * station on the line) doesn't limit it. $downStationId takes that
+     * station out (a station stop): its stage runs on the others, or stops.
      *
      * @return array{stages: array, batches_per_hour: ?float, bottleneck: ?string, missing: array}
      */
     public function lineRate(Recipe $recipe, Line $line, ?int $downStationId = null): array
     {
-        $stations = $line->relationLoaded('stations') ? $line->stations : $line->stations()->get();
+        $stations = $line->relationLoaded('stations') ? $line->stations : $line->stations()->with('type')->get();
         $rows     = [];
         $missing  = [];
         $slowest  = null;
 
         foreach ($recipe->stages->sortBy('sequence') as $stage) {
-            $station = $this->stationFor($stage, $stations);
+            $own = $this->stationsFor($stage, $stations);
 
-            if (!$station) {
+            if ($own->isEmpty()) {
                 $missing[] = $stage->name;
             }
 
-            $machines = $station ? max(1, (int) $station->machine_count) : null;
-
-            if ($station && $downStationId && $station->id === $downStationId) {
-                $machines = max(0, $machines - 1);
-            }
-
-            $hourly = $station?->hourlyRate($machines);
+            $rated  = $own->filter(fn(Station $station) => $station->hourlyRate() !== null);
+            $up     = $rated->reject(fn(Station $station) => $downStationId && $station->id === $downStationId);
+            $hourly = $rated->isNotEmpty() ? (float) $up->sum(fn(Station $station) => $station->hourlyRate()) : null;
             $perBph = $hourly !== null && $stage->output_quantity > 0 ? $hourly / (float) $stage->output_quantity : null;
 
             $rows[] = [
                 'stage_id'         => $stage->id,
                 'stage'            => $stage->name,
-                'station_id'       => $station?->id,
-                'station'          => $station?->machine ?: $station?->name,
-                'machines'         => $machines,
-                'rate_label'       => $station && $station->rate
-                    ? $this->formatNumber($station->rate) . ' ' . ($station->rate_unit ?: $stage->output_unit) . '/' . ($station->rate_period === 'minute' ? 'min' : 'h')
-                        . ((int) $station->machine_count > 1 ? ' × ' . (int) $station->machine_count : '')
-                    : null,
+                'station_ids'      => $own->pluck('id')->all(),
+                'station'          => $own->pluck('name')->implode(', ') ?: null,
+                'machines'         => $own->count() ?: null,
+                'rate_label'       => $this->stageRateLabel($rated, $own->count()),
                 'batches_per_hour' => $perBph,
             ];
 
@@ -173,11 +169,34 @@ class LineRunService
         ];
     }
 
-    public function stationFor(RecipeStage $stage, Collection $stations): ?LineStation
+    /**
+     * The line's stations a stage runs on: those of its station type (by the
+     * type's name for a stage saved without one).
+     */
+    public function stationsFor(RecipeStage $stage, Collection $stations): Collection
     {
+        if ($stage->station_type_id) {
+            return $stations->where('station_type_id', $stage->station_type_id)->values();
+        }
+
         $name = $this->normalize($stage->name);
 
-        return $stations->first(fn(LineStation $station) => $this->normalize($station->name) === $name);
+        return $stations->filter(fn(Station $station) => $this->normalize($station->type?->name) === $name)->values();
+    }
+
+    /** "1,200 kg/h", "2 × 90 packets/min", or the sum when their rates differ. */
+    protected function stageRateLabel(Collection $rated, int $count): ?string
+    {
+        if ($rated->isEmpty()) {
+            return null;
+        }
+
+        $labels = $rated->map(fn(Station $station) => $station->rateLabel())->unique();
+        $label  = $labels->count() === 1
+            ? ($rated->count() > 1 ? $rated->count() . ' × ' : '') . $labels->first()
+            : $this->formatNumber($rated->sum(fn(Station $station) => $station->hourlyRate())) . ' ' . $rated->first()->rateUnit() . '/h';
+
+        return $label . ($rated->count() < $count ? ' (' . $rated->count() . ' of ' . $count . ' rated)' : '');
     }
 
     /** Minutes $batches take on $line, or null when no station has a rate. */
@@ -194,7 +213,7 @@ class LineRunService
      */
     public function estimateMinutes(Recipe $recipe, ?int $eventTypeId, float $batches): ?int
     {
-        $lines = Line::with('stations')
+        $lines = Line::with('stations.type')
             ->when($eventTypeId, fn($q) => $q->whereHas('eventTypes', fn($t) => $t->where('event_types.id', $eventTypeId)))
             ->orderBy('name')
             ->get();
@@ -480,8 +499,8 @@ class LineRunService
 
     /**
      * How the run went against what the line could have made in that time,
-     * and where the difference went: line stops (charged to a station), one
-     * machine of a station down while the line ran on, rejects, and the rest.
+     * and where the difference went: line stops (charged to a station), a
+     * station down while the line ran on, rejects, and the rest.
      * Null when the line has no rates or the run hasn't ended.
      */
     public function summary(Event $run): ?array
@@ -527,16 +546,15 @@ class LineRunService
             ];
         }
 
-        // Station stops: the line ran on at the rate the station's other machines allow.
-        foreach ($run->pauseActivities->whereNotNull('line_station_id') as $activity) {
+        // Station stops: the line ran on at the rate the stage's other stations allow.
+        foreach ($run->pauseActivities->whereNotNull('station_id') as $activity) {
             $from    = Carbon::parse($activity->happened_at ?? $activity->created_at);
             $to      = $activity->ended_at ? Carbon::parse($activity->ended_at) : $at($endLog);
             $minutes = max(0, ($to->getTimestamp() - $from->getTimestamp()) / 60);
-            $reduced = $this->lineRate($recipe, $line, (int) $activity->line_station_id)['batches_per_hour'] ?? 0.0;
+            $reduced = $this->lineRate($recipe, $line, (int) $activity->station_id)['batches_per_hour'] ?? 0.0;
 
             $losses[] = [
-                'kind'    => ($activity->event_type_name ?: 'Station stop') . ' ' . $this->formatNumber(round($minutes)) . ' min'
-                    . ($activity->machine_number ? ', machine ' . $activity->machine_number : ''),
+                'kind'    => ($activity->event_type_name ?: 'Station stop') . ' ' . $this->formatNumber(round($minutes)) . ' min',
                 'station' => $activity->station_name ?: '—',
                 'batches' => $minutes / 60 * max(0.0, $perHour - $reduced),
             ];
@@ -627,7 +645,7 @@ class LineRunService
         $perHour = $this->lineRate($recipe, $line)['batches_per_hour'];
 
         if (!$perHour) {
-            throw new RuntimeException("The stations of {$line->name} have no rates, so the mixes can't be timed. Set the rates on the line's Stations page.");
+            throw new RuntimeException("The stations of {$line->name} have no rates, so the mixes can't be timed. Set the rates on the Stations page.");
         }
 
         $preparations = Preparation::with('eventTypes')

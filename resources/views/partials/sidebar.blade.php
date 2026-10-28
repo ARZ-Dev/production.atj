@@ -368,6 +368,7 @@
                                     @php
                                         $productionActive = request()->is('admin/preparations*')
                                             || request()->is('admin/lines*')
+                                            || request()->is('admin/station*')
                                             || request()->is('admin/production-lines*')
                                             || request()->is('admin/packagings*');
                                     @endphp
@@ -398,6 +399,18 @@
                                             <a href="{{ route('lines') }}"
                                                 class="pe-nav-link {{ request()->is('admin/lines*') ? 'active' : '' }}">
                                                 Lines
+                                            </a>
+                                        </li>
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('stations') }}"
+                                                class="pe-nav-link {{ request()->is('admin/stations*') ? 'active' : '' }}">
+                                                Stations
+                                            </a>
+                                        </li>
+                                        <li class="pe-slide-item">
+                                            <a href="{{ route('station-types') }}"
+                                                class="pe-nav-link {{ request()->is('admin/station-types*') ? 'active' : '' }}">
+                                                Station Types
                                             </a>
                                         </li>
                                         @endhasPermission

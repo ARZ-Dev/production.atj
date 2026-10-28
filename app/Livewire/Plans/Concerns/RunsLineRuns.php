@@ -6,10 +6,10 @@ use App\Models\Event;
 use App\Models\EventCount;
 use App\Models\EventQuantity;
 use App\Models\Line;
-use App\Models\LineStation;
 use App\Models\Recipe;
 use App\Models\RecipeStage;
 use App\Models\ReportItem;
+use App\Models\Station;
 use App\Models\StockIn;
 use App\Models\Waste;
 use App\Services\InventoryService;
@@ -22,8 +22,9 @@ use Illuminate\Support\Facades\DB;
  *
  *  - Start takes nothing — dough is mixed while the line runs.
  *  - While it runs: hourly counts against the line's rate, Pause for a stop
- *    of the whole line (charged to a station), and station stops (one machine
- *    down while the rest run on), which are emergency events with a station.
+ *    of the whole line (charged to a station), and station stops (one
+ *    station down while the rest run on), which are emergency events with a
+ *    station.
  *  - End: what each station counted, its rejects and leftovers, and what was
  *    used of each material; checked, then stock moves in one batch.
  *
@@ -60,18 +61,17 @@ trait RunsLineRuns
 
     // ─── Stations ────────────────────────────────────────────────────────────
 
-    /** The stations of the line a run is on, for the station pickers. */
+    /** The stations of the line a run is on, in the line's order, for the station pickers. */
     protected function runStations(Event $event): array
     {
         $line = $this->lineRuns->lineOf($event);
 
         return $line
-            ? $line->stations->map(fn(LineStation $station) => [
-                'id'       => $station->id,
-                'name'     => $station->name,
-                'machine'  => $station->machine,
-                'machines' => max(1, (int) $station->machine_count),
-            ])->all()
+            ? $line->stations->map(fn(Station $station) => [
+                'id'   => $station->id,
+                'name' => $station->name,
+                'type' => $station->type?->name,
+            ])->values()->all()
             : [];
     }
 
@@ -260,12 +260,12 @@ trait RunsLineRuns
             }
         }
 
-        foreach ($event->pauseActivities()->whereNotNull('line_station_id')->get() as $activity) {
+        foreach ($event->pauseActivities()->whereNotNull('station_id')->get() as $activity) {
             $at = Carbon::parse($activity->happened_at ?? $activity->created_at);
 
             if ($at->between($from, $to)) {
                 $minutes = $activity->ended_at ? (int) round(abs(Carbon::parse($activity->ended_at)->diffInMinutes($at))) : null;
-                $stops[] = ($activity->station_name ?: 'Station') . ($activity->machine_number ? " machine {$activity->machine_number}" : '')
+                $stops[] = ($activity->station_name ?: 'Station')
                     . ' down' . ($minutes !== null ? " {$minutes} min" : '') . ($activity->event_type_name ? " ({$activity->event_type_name})" : '');
             }
         }

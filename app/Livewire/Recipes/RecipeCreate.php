@@ -7,6 +7,7 @@ use App\Models\RecipeInput;
 use App\Models\RecipeSideProduct;
 use App\Models\RecipeStage;
 use App\Models\RecipeType;
+use App\Models\StationType;
 use App\Services\ApiService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -62,7 +63,7 @@ class RecipeCreate extends Component
     public array $sideSections     = [];
     public array $sideSectionItems = [];
 
-    // ─── Line stages (a recipe run on a line, one stage per station) ─────────
+    // ─── Line stages (a recipe run on a line, one stage per station type) ────
     // Keyed by a stable key ("t<id>" saved, "n<hex>" new) — ingredient rows
     // point at a stage by this key, and removing a stage never shifts the
     // wire:model paths of another.
@@ -122,7 +123,7 @@ class RecipeCreate extends Component
         foreach ($recipe->stages as $stage) {
             $this->stages['t' . $stage->id] = [
                 'id'                  => $stage->id,
-                'name'                => $stage->name,
+                'station_type_id'     => $stage->station_type_id ? (string) $stage->station_type_id : '',
                 'output_quantity'     => format_quantity($stage->output_quantity),
                 'output_unit'         => $stage->output_unit,
                 'output_item_unit_id' => $stage->output_item_unit_id,
@@ -400,7 +401,7 @@ class RecipeCreate extends Component
 
     /**
      * A recipe with stages is run on a line as one event across its stations:
-     * each stage is matched by name to the line's station of the same name.
+     * each stage names a station type and runs on the line's stations of it.
      */
     public function addStage(): void
     {
@@ -410,7 +411,7 @@ class RecipeCreate extends Component
 
         $this->stages['n' . bin2hex(random_bytes(4))] = [
             'id'                  => null,
-            'name'                => '',
+            'station_type_id'     => '',
             'output_quantity'     => '',
             'output_unit'         => null,
             'output_item_unit_id' => null,
@@ -588,7 +589,7 @@ class RecipeCreate extends Component
         }
 
         foreach (array_keys($this->stages) as $key) {
-            $rules["stages.{$key}.name"]            = 'required|string|max:255';
+            $rules["stages.{$key}.station_type_id"] = ['required', Rule::exists('station_types', 'id')->whereNull('deleted_at')];
             $rules["stages.{$key}.output_quantity"] = 'required|numeric|min:0.0001';
             $rules["stages.{$key}.output_unit"]     = 'nullable|string|max:50';
             $rules["stages.{$key}.reject_action"]   = 'required|in:waste,rework';
@@ -602,7 +603,8 @@ class RecipeCreate extends Component
         }
 
         $this->validate($rules, [
-            'stages.*.name.required'               => 'Name the stage — it runs on the line\'s station of the same name.',
+            'stages.*.station_type_id.required'    => 'Pick the station type — the stage runs on the line\'s stations of it.',
+            'stages.*.station_type_id.exists'      => 'Pick the station type — the stage runs on the line\'s stations of it.',
             'stages.*.output_quantity.required'    => 'How much does this stage make per batch?',
             'stages.*.output_quantity.min'         => 'Must be more than 0.',
             'stages.*.rework_item_id.required'     => 'Pick what rejects are reworked into.',
@@ -635,10 +637,10 @@ class RecipeCreate extends Component
             return;
         }
 
-        $stageNames = collect($this->stages)->map(fn($stage) => mb_strtolower(trim($stage['name'])));
+        $stageTypes = collect($this->stages)->map(fn($stage) => (int) $stage['station_type_id']);
 
-        if ($stageNames->duplicates()->isNotEmpty()) {
-            $this->addError('stages', 'Two stages have the same name: "' . $stageNames->duplicates()->first() . '". Each stage is matched to a station by its name.');
+        if ($stageTypes->duplicates()->isNotEmpty()) {
+            $this->addError('stages', 'Two stages are ' . StationType::find($stageTypes->duplicates()->first())?->name . '. Each station type can be one stage of a recipe.');
 
             return;
         }
@@ -759,13 +761,15 @@ class RecipeCreate extends Component
         $ids      = [];
         $sequence = 0;
         $rework   = collect($this->reworkItems)->keyBy('id');
+        $types    = StationType::withTrashed()->pluck('name', 'id');
 
         foreach ($this->stages as $key => $stage) {
             $reworkItem = $stage['rework_item_id'] ? $rework->get((int) $stage['rework_item_id']) : null;
 
             $data = [
                 'sequence'            => ++$sequence,
-                'name'                => trim($stage['name']),
+                'station_type_id'     => (int) $stage['station_type_id'],
+                'name'                => $types[(int) $stage['station_type_id']] ?? '',
                 'output_quantity'     => (float) $stage['output_quantity'],
                 'output_unit'         => $stage['output_unit'] ? trim($stage['output_unit']) : null,
                 'output_item_unit_id' => $stage['output_item_unit_id'] ? (int) $stage['output_item_unit_id'] : null,
@@ -799,6 +803,7 @@ class RecipeCreate extends Component
             'sectionItems'        => $this->sectionItems,
             'sideSections'        => $this->sideSections,
             'sideSectionItems'    => $this->sideSectionItems,
+            'stationTypes'        => StationType::orderBy('sequence')->orderBy('name')->get(['id', 'name', 'rate_unit']),
         ]);
     }
 }

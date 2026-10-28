@@ -28,6 +28,8 @@ class DatabaseSeeder extends Seeder
         // $this->call(RecipeSeeder::class);
         $this->call(FactoryRecipeTypeSeeder::class);
         $this->call(MassaTomateRecipeSeeder::class);
+        // Line recipes' stages name a station type.
+        $this->call(StationTypeSeeder::class);
         // Since 2026-10-28 a production run is one event across its line's
         // stations: the line recipes (in stages) replace the production and
         // packaging recipes, reading their figures.
@@ -41,7 +43,9 @@ class DatabaseSeeder extends Seeder
         $this->call(ProductionLineSeeder::class);
         $this->call(PreparationSeeder::class);
         $this->call(LineSeeder::class);
-        $this->call(LineStationSeeder::class);
+        // Since 2026-10-28 (later) a line picks its machines from the stations list.
+        // $this->call(LineStationSeeder::class);
+        $this->call(StationSeeder::class);
         // Packing is the lines' last station now; no packaging lanes are seeded.
         // $this->call(PackagingSeeder::class);
         $this->call(CapacitySeeder::class);

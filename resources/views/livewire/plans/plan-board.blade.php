@@ -541,13 +541,17 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        @if(!empty($eventAction['run']))
+                        @if(!empty($eventAction['run']) && !empty($eventAction['stations']))
                         <div class="col-md-6">
                             <label class="form-label">Station that stopped the line <span class="text-danger">*</span></label>
                             <select class="form-select @error('actionStationId') is-invalid @enderror" wire:model="actionStationId">
                                 <option value="">Select station…</option>
-                                @foreach($eventAction['stations'] as $station)
-                                <option value="{{ $station['id'] }}">{{ $station['name'] }}{{ $station['machine'] ? ' — ' . $station['machine'] : '' }}</option>
+                                @foreach(collect($eventAction['stations'])->groupBy('type') as $type => $group)
+                                <optgroup label="{{ $type }}">
+                                    @foreach($group as $station)
+                                    <option value="{{ $station['id'] }}">{{ $station['name'] }}</option>
+                                    @endforeach
+                                </optgroup>
                                 @endforeach
                             </select>
                             @error('actionStationId')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -792,28 +796,21 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
-                            @if(!empty($eventAction['run']))
-                            @php $rowStation = collect($eventAction['stations'])->firstWhere('id', (int) ($row['line_station_id'] ?? 0)); @endphp
-                            <div style="width: 200px;">
-                                <select class="form-select form-select-sm @error("pauseActivityRows.{$i}.line_station_id") is-invalid @enderror"
-                                    wire:model.live="pauseActivityRows.{{ $i }}.line_station_id">
+                            @if(!empty($eventAction['run']) && !empty($eventAction['stations']))
+                            <div style="width: 220px;">
+                                <select class="form-select form-select-sm @error("pauseActivityRows.{$i}.station_id") is-invalid @enderror"
+                                    wire:model="pauseActivityRows.{{ $i }}.station_id">
                                     <option value="">Station…</option>
-                                    @foreach($eventAction['stations'] as $station)
-                                    <option value="{{ $station['id'] }}">{{ $station['name'] }}</option>
+                                    @foreach(collect($eventAction['stations'])->groupBy('type') as $type => $group)
+                                    <optgroup label="{{ $type }}">
+                                        @foreach($group as $station)
+                                        <option value="{{ $station['id'] }}">{{ $station['name'] }}</option>
+                                        @endforeach
+                                    </optgroup>
                                     @endforeach
                                 </select>
-                                @error("pauseActivityRows.{$i}.line_station_id")<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                @error("pauseActivityRows.{$i}.station_id")<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
-                            @if($rowStation && $rowStation['machines'] > 1)
-                            <div style="width: 120px;">
-                                <select class="form-select form-select-sm" wire:model="pauseActivityRows.{{ $i }}.machine_number" title="Which of its machines">
-                                    <option value="">Machine…</option>
-                                    @for($m = 1; $m <= $rowStation['machines']; $m++)
-                                    <option value="{{ $m }}">Machine {{ $m }}</option>
-                                    @endfor
-                                </select>
-                            </div>
-                            @endif
                             @endif
                             <div style="width: 140px;">
                                 @php $rowType = collect($pauseEventTypes)->firstWhere('id', (int) ($row['event_type_id'] ?? 0)); @endphp

@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * One step of a recipe run on a line (Cutting, Cooking, Packaging, Packing …),
- * matched by name to the line's stations. output_quantity is what the stage
- * makes per batch, in output_unit: the station's rate is read in that unit.
+ * One step of a recipe run on a line (Cutting, Cooking, Packaging, Packing …).
+ * It names a station type and runs on the line's machines of that type; name
+ * is the type's name, kept as written when the stage was saved.
+ * output_quantity is what the stage makes per batch, in output_unit: the
+ * machines' rates are read in that unit.
  */
 class RecipeStage extends Model
 {
@@ -30,6 +32,11 @@ class RecipeStage extends Model
     public function inputs()
     {
         return $this->hasMany(RecipeInput::class);
+    }
+
+    public function stationType()
+    {
+        return $this->belongsTo(StationType::class)->withTrashed();
     }
 
     /** Rejects can be reworked only when the stage says into what. */

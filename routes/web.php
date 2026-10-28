@@ -26,6 +26,8 @@ use App\Livewire\Recipes\RecipeCreate;
 use App\Livewire\Recipes\RecipeIndex;
 use App\Livewire\RolesPermissions\PermissionView;
 use App\Livewire\Shifts\ShiftIndex;
+use App\Livewire\Stations\StationIndex;
+use App\Livewire\Stations\StationTypeIndex;
 use App\Http\Controllers\Auth\AuthCallbackController;
 use App\Livewire\StockOut\StockOutCreate;
 use App\Livewire\StockOut\StockOutIndex;
@@ -266,6 +268,12 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
             ->name('lines.capacity');
         Route::get('/{id}/stations', LineStations::class)->name('lines.stations');
     });
+
+    // |--------------------------------------------------------------------------
+    // | Station types and stations (the machines lines are made of)
+    // |--------------------------------------------------------------------------
+    Route::get('/station-types', StationTypeIndex::class)->name('station-types');
+    Route::get('/stations', StationIndex::class)->name('stations');
 
     // |--------------------------------------------------------------------------
     // | Production Lines

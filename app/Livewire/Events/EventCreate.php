@@ -642,8 +642,8 @@ class EventCreate extends Component
 
         $placed = ($row['placeable_type'] ?? null) === Line::class && !empty($row['placeable_id']);
         $line   = $placed
-            ? Line::with('stations')->find($row['placeable_id'])
-            : Line::with('stations')
+            ? Line::with('stations.type')->find($row['placeable_id'])
+            : Line::with('stations.type')
                 ->whereHas('stations')
                 ->when($row['event_type_id'] ?? null, fn($q, $typeId) => $q->whereHas('eventTypes', fn($t) => $t->where('event_types.id', $typeId)))
                 ->orderBy('name')
