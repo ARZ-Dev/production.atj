@@ -78,7 +78,7 @@ class CapacitySeeder extends Seeder
     {
         // "Equipment and capacity Massa tomate.xlsx" (sheet FAB MASSA TOMAT).
         // The can lines' rates moved to their stations on 2026-10-28
-        // (LineStationSeeder): a line run takes its speed from its slowest
+        // (StationSeeder): a line run takes its speed from its slowest
         // station. The packaging machines are the lines' Packing stations, and
         // PackagingSeeder no longer runs — so only the mixer keeps capacities.
         $capacities = array_merge(

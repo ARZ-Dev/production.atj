@@ -12,9 +12,9 @@
 
 <div class="ec-run-stations mb-2">
     @foreach($eventAction['stages'] as $stage)
-    <div class="ec-run-station {{ $stage['stage'] === $eventAction['bottleneck'] ? 'is-slowest' : '' }} {{ $stage['station_id'] ? '' : 'is-missing' }}">
+    <div class="ec-run-station {{ $stage['stage'] === $eventAction['bottleneck'] ? 'is-slowest' : '' }} {{ !empty($stage['station_ids']) ? '' : 'is-missing' }}">
         <div class="ec-run-station-name">{{ $stage['stage'] }}</div>
-        <div class="ec-run-station-rate">{{ $stage['rate_label'] ?? ($stage['station_id'] ? 'no rate' : 'no station') }}</div>
+        <div class="ec-run-station-rate">{{ $stage['rate_label'] ?? (!empty($stage['station_ids']) ? 'no rate' : 'no station') }}</div>
         @if($stage['stage'] === $eventAction['bottleneck'])<div class="ec-run-station-tag">slowest</div>@endif
     </div>
     @endforeach

@@ -32,7 +32,11 @@ class Line extends Model
     /** Its machines in the order the product passes them. */
     public function stations()
     {
-        return $this->hasMany(LineStation::class)->orderBy('sequence')->orderBy('id');
+        return $this->belongsToMany(Station::class, 'line_station')
+            ->withPivot('sequence')
+            ->withTimestamps()
+            ->orderByPivot('sequence')
+            ->orderBy('stations.name');
     }
 
     public function eventTypes()

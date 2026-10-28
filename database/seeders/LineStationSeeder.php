@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 class LineStationSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Superseded 2026-10-28 (later that day) by StationTypeSeeder + StationSeeder: stations are
+     * machines of their own now, which a line picks, and line_stations /
+     * LineStation are gone — this file is kept as the record, its call
+     * commented out of DatabaseSeeder, and won't run any more.
      *
      * The machines of each line, in the order the product passes them. A
      * recipe's stages run on the stations of the same name, and a station's

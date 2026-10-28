@@ -29,7 +29,8 @@ class MassaTomateLineRecipeSeeder extends Seeder
      * item 57).
      *
      * Matched on recipe type + product, so it updates the old recipes in place;
-     * stages on name, the input on its item. Refuses before writing if a
+     * stages on name (each the StationTypeSeeder type of that name, which must
+     * run first), the input on its item. Refuses before writing if a
      * product has no ids or its case unit doesn't hold the sheet's cans.
      */
     private const RECIPE_TYPE_NAME = 'Production Massa Tomate';
@@ -139,6 +140,7 @@ class MassaTomateLineRecipeSeeder extends Seeder
             $model = $recipe->stages()->withTrashed()->firstOrNew(['name' => $name]);
             $model->fill([
                 'sequence'            => ++$sequence,
+                'station_type_id'     => StationTypeSeeder::idOf($name),
                 'output_quantity'     => $stage['output_quantity'],
                 'output_unit'         => $stage['output_unit'],
                 'output_item_unit_id' => $stage['output_item_unit_id'] ?? null,

@@ -18,7 +18,7 @@ class LineSeeder extends Seeder
      * this app's own rows — runs after FactoryEventTypeSeeder and ProductionLineSeeder.
      *
      * A line is a whole continuous line run as one event; its machines are
-     * its stations (LineStationSeeder).
+     * its stations (StationSeeder).
      *
      * Massa Tomate's two can lines come from "Equipment and capacity Massa
      * tomate.xlsx" (sheet FAB MASSA TOMAT): one per filler, each ending in its

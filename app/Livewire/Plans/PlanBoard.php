@@ -1323,10 +1323,8 @@ class PlanBoard extends Component
         return [
             'id'                => $activity->id,
             'type_name'         => $activity->event_type_name ?: ($activity->eventType?->name ?? '—'),
-            // A line run's station stop: which station, and which of its machines.
-            'station'           => $activity->station_name
-                ? $activity->station_name . ($activity->machine_number ? ' · machine ' . $activity->machine_number : '')
-                : null,
+            // A line run's station stop: which station.
+            'station'           => $activity->station_name ?: null,
             'reason'            => $activity->reason,
             'expected_duration' => $activity->expected_duration,
             'at'                => $startedAt->format('d M Y H:i'),
@@ -1583,7 +1581,7 @@ class PlanBoard extends Component
 
     protected function blankPauseActivityRow(): array
     {
-        return ['event_type_id' => null, 'line_station_id' => null, 'machine_number' => null, 'items' => []];
+        return ['event_type_id' => null, 'station_id' => null, 'items' => []];
     }
 
     /**
@@ -1740,18 +1738,17 @@ class PlanBoard extends Component
                 'pauseActivityRows'                 => 'required|array|min:1',
                 'pauseActivityRows.*.event_type_id' => "required|in:{$allowedIds}",
                 'pauseActivityRows.*.items.*.quantity' => 'nullable|numeric|min:0',
-            ], $isRun ? [
+            ], $isRun && $stationIds !== '' ? [
                 // On a line run every stop is one station's.
-                'pauseActivityRows.*.line_station_id' => "required|in:{$stationIds}",
-                'pauseActivityRows.*.machine_number'  => 'nullable|integer|min:1|max:999',
+                'pauseActivityRows.*.station_id' => "required|in:{$stationIds}",
             ] : []),
             [
                 'actionReason.required'                      => 'Please enter a reason.',
                 'pauseActivityRows.*.event_type_id.required' => 'Please select an event type.',
                 'pauseActivityRows.*.event_type_id.in'       => 'Please select a valid event type.',
                 'pauseActivityRows.*.items.*.quantity.numeric' => 'Quantity must be a number.',
-                'pauseActivityRows.*.line_station_id.required' => 'Which station stopped?',
-                'pauseActivityRows.*.line_station_id.in'       => 'Which station stopped?',
+                'pauseActivityRows.*.station_id.required' => 'Which station stopped?',
+                'pauseActivityRows.*.station_id.in'       => 'Which station stopped?',
             ]
         );
 
@@ -1790,16 +1787,15 @@ class PlanBoard extends Component
             foreach ($this->pauseActivityRows as $row) {
                 $type = collect($this->pauseEventTypes)->firstWhere('id', (int) $row['event_type_id']);
 
-                $station = $isRun ? $this->runStation($event, $row['line_station_id'] ?? null) : null;
+                $station = $isRun ? $this->runStation($event, $row['station_id'] ?? null) : null;
 
                 $activity = EventPauseActivity::create([
                     'event_id'            => $event->id,
                     'event_status_log_id' => $pauseLog?->id,
                     'event_type_id'       => (int) $row['event_type_id'],
                     'event_type_name'     => $type['name'] ?? null,
-                    'line_station_id'     => $station['id'] ?? null,
+                    'station_id'          => $station['id'] ?? null,
                     'station_name'        => $station['name'] ?? null,
-                    'machine_number'      => $station && !empty($row['machine_number']) ? (int) $row['machine_number'] : null,
                     'reason'              => $this->actionReason,
                     'expected_duration'   => $type['duration'] ?? null,
                     'happened_at'         => $this->parsedActionTime(),
@@ -2555,9 +2551,9 @@ class PlanBoard extends Component
     {
         $station = null;
 
-        if ($this->lineRuns->isRun($event)) {
-            $stationIds = collect($this->runStations($event))->pluck('id')->implode(',');
+        $stationIds = $this->lineRuns->isRun($event) ? collect($this->runStations($event))->pluck('id')->implode(',') : '';
 
+        if ($stationIds !== '') {
             $this->validate(
                 ['actionStationId' => "required|in:{$stationIds}"],
                 ['actionStationId.required' => 'Which station stopped the line?', 'actionStationId.in' => 'Which station stopped the line?']
@@ -2569,7 +2565,7 @@ class PlanBoard extends Component
         DB::transaction(fn() => $this->applyStatusChange($event, 'pause', [
             'reason'          => $this->actionReason,
             'happened_at'     => $this->parsedActionTime(),
-            'line_station_id' => $station['id'] ?? null,
+            'station_id'      => $station['id'] ?? null,
             'station_name'    => $station['name'] ?? null,
         ]));
 

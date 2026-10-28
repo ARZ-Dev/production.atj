@@ -29,7 +29,7 @@ class RecipeDurationService
     {
         // A line run takes as long as its slowest station needs.
         if ($placeableClass === Line::class && ($recipe = $this->stagedRecipe($event))) {
-            $line = Line::with('stations')->find($placeableId);
+            $line = Line::with('stations.type')->find($placeableId);
 
             return $line ? $this->minutes($this->lineRuns->durationMinutes($recipe, $line, $this->batches($event))) : null;
         }

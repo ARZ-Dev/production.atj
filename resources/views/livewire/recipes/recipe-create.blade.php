@@ -193,7 +193,7 @@
                         </div>
                         <small class="text-muted">
                             Give the recipe stages to run it as <strong>one event across a line</strong> — cutting, cooking, packaging and packing all running at once.
-                            Each stage runs on the line's station of the same name; each ingredient is used at one stage.
+                            Each stage is a <a href="{{ route('station-types') }}" target="_blank">station type</a> and runs on the line's stations of that type; each ingredient is used at one stage.
                         </small>
                     </div>
                     <div class="card-body">
@@ -238,8 +238,13 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <input type="text" class="form-control" wire:model="stages.{{ $key }}.name" placeholder="e.g. Cooking">
-                                            @error("stages.{$key}.name")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                            <select class="form-select" wire:model.live="stages.{{ $key }}.station_type_id" @disabled($viewing)>
+                                                <option value="">Select a station type</option>
+                                                @foreach($stationTypes as $type)
+                                                <option value="{{ $type->id }}" @selected((string) ($stage['station_type_id'] ?? '') === (string) $type->id)>{{ $type->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error("stages.{$key}.station_type_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </td>
                                         <td>
                                             <input type="text" class="form-control cleave-input" wire:model="stages.{{ $key }}.output_quantity" placeholder="e.g. 1.2">
@@ -414,7 +419,7 @@
                                     <select class="form-select" wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.stage_key">
                                         <option value="">Select stage</option>
                                         @foreach($stages as $stageKey => $stage)
-                                        <option value="{{ $stageKey }}" @selected(($row['stage_key'] ?? null) === $stageKey)>{{ $stage['name'] ?: 'Stage ' . $loop->iteration }}</option>
+                                        <option value="{{ $stageKey }}" @selected(($row['stage_key'] ?? null) === $stageKey)>{{ $stationTypes->firstWhere('id', (int) ($stage['station_type_id'] ?? 0))?->name ?: 'Stage ' . $loop->iteration }}</option>
                                         @endforeach
                                     </select>
                                     @error("sections.{$sectionIndex}.rows.{$rowIndex}.stage_key")
