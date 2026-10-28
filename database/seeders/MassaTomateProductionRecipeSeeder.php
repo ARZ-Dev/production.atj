@@ -23,14 +23,14 @@ class MassaTomateProductionRecipeSeeder extends Seeder
      * server, so they're written out. Keep them in step with auth-service's
      * item seeders.
      */
-    private const SEMI_FINISHED_ITEM_TYPE_ID = 12; // SFG Massa Tomate
+    public const SEMI_FINISHED_ITEM_TYPE_ID = 12; // SFG Massa Tomate
 
     /**
      * What the products are made from — MassaTomateRecipeSeeder's products,
      * from auth-service's MassaTomateBomSemiFinishedGoodItemSeeder:
      * code => [item id, basic unit id (KG), name].
      */
-    private const SEMI_FINISHED = [
+    public const SEMI_FINISHED = [
         'SFGMT-01' => [122, 150, 'Mamatia'],
         'SFGMT-02' => [123, 151, 'Dourado'],
         'SFGMT-03' => [124, 152, 'Yokabel'],
@@ -51,7 +51,7 @@ class MassaTomateProductionRecipeSeeder extends Seeder
      * the comment gives the basic unit and, where it differs, the parent's
      * own name for the item.
      */
-    private const PRODUCTS = [
+    public const PRODUCTS = [
         '403000001' => [1, 1, 4, 'MASSA TOMATE MAMA TIA LATA 50X70 GR'], // 70g · MASSA TOMATE MAMA TIA LATA 70 GR
         '403000003' => [3, 5, 4, 'MASSA TOMATE MAMA TIA LATA ABRI FACIL 24X400 GR'], // 400g · MASSA TOMATE MAMA TIA LATA ABRI FACIL 400 GR
         '403000005' => [5, 9, 4, 'MASSA TOMATE MAMA TIA PACOTE 50X70 GR'], // 70g · MASSA TOMATE MAMA TIA PACOTE 70 GR
@@ -88,7 +88,7 @@ class MassaTomateProductionRecipeSeeder extends Seeder
      * case. Ketchup's "Dourado" is the ketchup BOM recipe, Kup Dourado, and
      * peeled tomato's "Same recipe" is Sauce of Peeled Tomato.
      */
-    private const RECIPES = [
+    public const RECIPES = [
         '403000001' => ['SFGMT-01', 50, 3.5], // Tomato paste · Mamatia
         '403000003' => ['SFGMT-01', 24, 9.6], // Tomato paste · Mamatia
         '403000005' => ['SFGMT-01', 50, 3.35], // Tomato paste · Mamatia

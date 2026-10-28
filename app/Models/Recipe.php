@@ -17,6 +17,15 @@ class Recipe extends Model
         return $this->hasMany(RecipeInput::class);
     }
 
+    /**
+     * The steps of a recipe run on a line, in order. A recipe with stages is
+     * a line run: one event across the line's stations.
+     */
+    public function stages()
+    {
+        return $this->hasMany(RecipeStage::class)->orderBy('sequence')->orderBy('id');
+    }
+
     public function sideProducts()
     {
         return $this->hasMany(RecipeSideProduct::class);

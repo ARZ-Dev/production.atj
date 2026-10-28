@@ -182,6 +182,143 @@
                     </div>
                 </div>
 
+                {{-- ── Line stages (optional): run the recipe as one event across a line ── --}}
+                @if($recipe_type_id)
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h5 class="mb-0">Line Stages</h5>
+                            <span class="badge bg-light-secondary text-muted">Optional</span>
+                            @if($stages)<span class="ir-count">{{ count($stages) }}</span>@endif
+                        </div>
+                        <small class="text-muted">
+                            Give the recipe stages to run it as <strong>one event across a line</strong> — cutting, cooking, packaging and packing all running at once.
+                            Each stage runs on the line's station of the same name; each ingredient is used at one stage.
+                        </small>
+                    </div>
+                    <div class="card-body">
+                        @error('stages')
+                        <div class="alert alert-danger">{{ $message }}</div>
+                        @enderror
+
+                        @if($stages)
+                        <div class="table-responsive">
+                            <table class="table align-middle rs-table mb-2">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 72px">Order</th>
+                                        <th>Stage <span class="text-danger">*</span></th>
+                                        <th style="width: 120px">Makes per batch <span class="text-danger">*</span></th>
+                                        <th style="width: 110px">Unit</th>
+                                        <th style="width: 150px">Is the product in</th>
+                                        <th style="width: 130px">Rejects go to</th>
+                                        <th>Rework into</th>
+                                        <th style="width: 100px">Rework per reject</th>
+                                        <th style="width: 52px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($stages as $key => $stage)
+                                    <tr wire:key="stage-{{ $key }}">
+                                        <td>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <span class="ir-idx">{{ $loop->iteration }}</span>
+                                                @unless($viewing)
+                                                <div class="btn-group-vertical btn-group-sm">
+                                                    <button type="button" class="btn btn-link p-0 lh-1" title="Move up"
+                                                        wire:click="moveStage('{{ $key }}', -1)" @disabled($loop->first)>
+                                                        <i class="bi bi-chevron-up"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-link p-0 lh-1" title="Move down"
+                                                        wire:click="moveStage('{{ $key }}', 1)" @disabled($loop->last)>
+                                                        <i class="bi bi-chevron-down"></i>
+                                                    </button>
+                                                </div>
+                                                @endunless
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control" wire:model="stages.{{ $key }}.name" placeholder="e.g. Cooking">
+                                            @error("stages.{$key}.name")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control cleave-input" wire:model="stages.{{ $key }}.output_quantity" placeholder="e.g. 1.2">
+                                            @error("stages.{$key}.output_quantity")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control" wire:model="stages.{{ $key }}.output_unit" placeholder="e.g. kg">
+                                        </td>
+                                        <td>
+                                            <select class="form-select" wire:model="stages.{{ $key }}.output_item_unit_id" title="When this stage's output is the product itself in one of its units, what's left over at End can go into stock.">
+                                                <option value="">— not the product —</option>
+                                                @foreach($headerUnits as $unit)
+                                                <option value="{{ $unit['id'] }}" @selected(($stage['output_item_unit_id'] ?? null) == $unit['id'])>{{ $unit['name'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-select" wire:model.live="stages.{{ $key }}.reject_action">
+                                                <option value="waste">Waste</option>
+                                                <option value="rework">Rework</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-select" wire:model="stages.{{ $key }}.rework_item_id" @disabled(($stage['reject_action'] ?? 'waste') !== 'rework')>
+                                                <option value="">— none —</option>
+                                                @foreach($reworkItems as $item)
+                                                <option value="{{ $item['id'] }}" @selected(($stage['rework_item_id'] ?? null) == $item['id'])>{{ $item['name'] }}{{ $item['unit_name'] ? ' · ' . $item['unit_name'] : '' }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error("stages.{$key}.rework_item_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control cleave-input" wire:model="stages.{{ $key }}.rework_factor" placeholder="1">
+                                        </td>
+                                        <td class="text-end">
+                                            @unless($viewing)
+                                            <button type="button" class="btn btn-light-danger icon-btn-sm" title="Remove stage"
+                                                wire:click="removeStage('{{ $key }}')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            @endunless
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-muted small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Makes per batch</strong> is what the stage puts out for one batch of this recipe, in the unit its station's rate is in (kg through the oven, packets off the wrapper …).
+                            The last stage is counted at End in the recipe's own output unit — that is what goes into stock.
+                            <strong>Rework per reject</strong> is how much of the rework item one reject gives (e.g. 0.036 kg of powder from one 36 g packet).
+                        </p>
+
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="balance_tolerance">Tolerance at End (%)</label>
+                                <input type="text" id="balance_tolerance" class="form-control cleave-input" wire:model="balance_tolerance" placeholder="1">
+                                <div class="form-text">A material used more than this far from the recipe flags the run for review.</div>
+                                @error('balance_tolerance')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="reject_allowance">Reject allowance (%)</label>
+                                <input type="text" id="reject_allowance" class="form-control cleave-input" wire:model="reject_allowance" placeholder="0">
+                                <div class="form-text">Extra dough planned on top of the recipe when mixes are planned for a run.</div>
+                                @error('reject_allowance')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                            </div>
+                        </div>
+                        @endif
+
+                        @unless($viewing)
+                        <button type="button" class="ir-add mt-3" wire:click="addStage">
+                            <i class="bi bi-plus-lg"></i> Add stage
+                        </button>
+                        @endunless
+                    </div>
+                </div>
+                @endif
+
                 {{-- ── Dynamic Ingredient Sections (one per item_type_id) ──────────── --}}
                 @error('sections')
                 <div class="alert alert-danger mb-4">{{ $message }}</div>
@@ -198,17 +335,18 @@
                         <div class="ir-editor">
 
                             {{-- Column header (desktop) --}}
-                            <div class="ir-head ir-cols-notes">
+                            <div class="ir-head {{ $stages ? 'ir-cols-stage' : 'ir-cols-notes' }}">
                                 <div class="ir-idx-h">#</div>
                                 <div>Item</div>
                                 <div>Unit</div>
-                                <div>Quantity</div>
+                                <div>Quantity{{ $stages ? ' per batch' : '' }}</div>
+                                @if($stages)<div>Stage</div>@endif
                                 <div>Notes</div>
                                 <div></div>
                             </div>
 
                             @forelse($section['rows'] as $rowIndex => $row)
-                            <div class="ir-row ir-cols-notes" wire:key="section-{{ $sectionIndex }}-row-{{ $rowIndex }}">
+                            <div class="ir-row {{ $stages ? 'ir-cols-stage' : 'ir-cols-notes' }}" wire:key="section-{{ $sectionIndex }}-row-{{ $rowIndex }}">
 
                                 {{-- Index --}}
                                 <div class="ir-idx-cell"><span class="ir-idx">{{ $rowIndex + 1 }}</span></div>
@@ -268,6 +406,22 @@
                                     <div class="text-danger small mt-1">{{ $message }}</div>
                                     @enderror
                                 </div>
+
+                                {{-- Stage (recipes with line stages) --}}
+                                @if($stages)
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Stage</span>
+                                    <select class="form-select" wire:model="sections.{{ $sectionIndex }}.rows.{{ $rowIndex }}.stage_key">
+                                        <option value="">Select stage</option>
+                                        @foreach($stages as $stageKey => $stage)
+                                        <option value="{{ $stageKey }}" @selected(($row['stage_key'] ?? null) === $stageKey)>{{ $stage['name'] ?: 'Stage ' . $loop->iteration }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error("sections.{$sectionIndex}.rows.{$rowIndex}.stage_key")
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                @endif
 
                                 {{-- Notes --}}
                                 <div class="ir-cell">

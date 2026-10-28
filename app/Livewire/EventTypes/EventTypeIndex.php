@@ -19,11 +19,6 @@ class EventTypeIndex extends Component
     // Recipe event types only: the consumed quantities can't be measured when
     // the event starts, so the operator records the planned amounts.
     public bool $start_items_unverifiable = false;
-    // Recipe event types only: "executed with another event type" — creating
-    // an event of this type also creates one of the companion type, run in
-    // parallel (e.g. packaging alongside production).
-    public bool $has_companion = false;
-    public $companion_event_type_id = null;
     public $duration = null;
     public string $color = '#818cf8';
     public $item_type_ids = [];
@@ -52,7 +47,7 @@ class EventTypeIndex extends Component
 
     public function loadEventTypes()
     {
-        $this->eventTypes = EventType::with('companionEventType')->orderBy('name')->get();
+        $this->eventTypes = EventType::orderBy('name')->get();
     }
 
     public function resetForm()
@@ -61,8 +56,6 @@ class EventTypeIndex extends Component
         $this->name = '';
         $this->has_recipe = false;
         $this->start_items_unverifiable = false;
-        $this->has_companion = false;
-        $this->companion_event_type_id = null;
         $this->duration = null;
         $this->color = '#818cf8';
         $this->item_type_ids = [];
@@ -88,8 +81,6 @@ class EventTypeIndex extends Component
         $this->name = $eventType->name;
         $this->has_recipe = (bool) $eventType->has_recipe;
         $this->start_items_unverifiable = (bool) $eventType->start_items_unverifiable;
-        $this->has_companion = (bool) $eventType->companion_event_type_id;
-        $this->companion_event_type_id = $eventType->companion_event_type_id;
         $this->duration = $eventType->duration;
         $this->color = $eventType->color ?? '#818cf8';
         $this->item_type_ids = $eventType->item_type_ids ?? [];
@@ -111,34 +102,12 @@ class EventTypeIndex extends Component
         if ($value) {
             $this->duration = null;
         } else {
-            // Both flags only apply to recipe event types.
+            // The flag only applies to recipe event types.
             $this->start_items_unverifiable = false;
-            $this->has_companion = false;
-            $this->companion_event_type_id = null;
         }
 
         // Recipe event types don't carry a fixed items list.
         $this->buildEventTypeItems();
-    }
-
-    public function updatedHasCompanion($value): void
-    {
-        if (!$value) {
-            $this->companion_event_type_id = null;
-        }
-    }
-
-    /**
-     * Event types this one can be executed with: other recipe event types. The
-     * pre-finished good is handed from one recipe to the other, so both sides
-     * need a recipe.
-     */
-    public function companionOptions()
-    {
-        return EventType::where('has_recipe', true)
-            ->when($this->event_type_id, fn($q) => $q->where('id', '!=', $this->event_type_id))
-            ->orderBy('name')
-            ->get(['id', 'name', 'color']);
     }
 
     public function updatedItemTypeIds(): void
@@ -203,36 +172,17 @@ class EventTypeIndex extends Component
             'duration' => 'required_if:has_recipe,false|nullable|integer|min:1',
             'color' => 'required|string|max:7',
             'item_type_ids' => 'nullable|array',
-            'has_companion' => 'boolean',
-            'companion_event_type_id' => [
-                'nullable',
-                'required_if_accepted:has_companion',
-                'integer',
-                \Illuminate\Validation\Rule::in($this->companionOptions()->pluck('id')->all()),
-            ],
         ];
     }
 
-    protected $messages = [
-        'companion_event_type_id.required_if_accepted' => 'Select the event type this one is executed with.',
-        'companion_event_type_id.in'                   => 'Select another event type with a recipe.',
-    ];
-
     public function submit()
     {
-        // The dropdown's placeholder posts "" — treat it as no selection, and
-        // drop any selection left behind when the checkbox is cleared.
-        if ($this->companion_event_type_id === '' || !$this->has_companion) {
-            $this->companion_event_type_id = null;
-        }
-
         $this->validate();
 
         $data = [
             'name' => $this->name,
             'has_recipe' => $this->has_recipe,
             'start_items_unverifiable' => $this->has_recipe ? $this->start_items_unverifiable : false,
-            'companion_event_type_id' => $this->has_recipe && $this->has_companion ? (int) $this->companion_event_type_id : null,
             'duration' => $this->has_recipe ? null : $this->duration,
             'color' => $this->color,
             'item_type_ids' => array_map('intval', $this->item_type_ids ?? []),

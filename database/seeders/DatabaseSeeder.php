@@ -28,15 +28,22 @@ class DatabaseSeeder extends Seeder
         // $this->call(RecipeSeeder::class);
         $this->call(FactoryRecipeTypeSeeder::class);
         $this->call(MassaTomateRecipeSeeder::class);
-        $this->call(MassaTomateProductionRecipeSeeder::class);
+        // Since 2026-10-28 a production run is one event across its line's
+        // stations: the line recipes (in stages) replace the production and
+        // packaging recipes, reading their figures.
+        // $this->call(MassaTomateProductionRecipeSeeder::class);
+        $this->call(MassaTomateLineRecipeSeeder::class);
         $this->call(BolachaRecipeSeeder::class);
-        $this->call(BolachaProductionRecipeSeeder::class);
-        $this->call(BolachaPackagingRecipeSeeder::class);
+        // $this->call(BolachaProductionRecipeSeeder::class);
+        // $this->call(BolachaPackagingRecipeSeeder::class);
+        $this->call(BolachaLineRecipeSeeder::class);
         $this->call(ShiftSeeder::class);
         $this->call(ProductionLineSeeder::class);
         $this->call(PreparationSeeder::class);
         $this->call(LineSeeder::class);
-        $this->call(PackagingSeeder::class);
+        $this->call(LineStationSeeder::class);
+        // Packing is the lines' last station now; no packaging lanes are seeded.
+        // $this->call(PackagingSeeder::class);
         $this->call(CapacitySeeder::class);
     }
 }

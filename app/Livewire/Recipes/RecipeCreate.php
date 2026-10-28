@@ -5,10 +5,12 @@ namespace App\Livewire\Recipes;
 use App\Models\Recipe;
 use App\Models\RecipeInput;
 use App\Models\RecipeSideProduct;
+use App\Models\RecipeStage;
 use App\Models\RecipeType;
 use App\Services\ApiService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -60,6 +62,16 @@ class RecipeCreate extends Component
     public array $sideSections     = [];
     public array $sideSectionItems = [];
 
+    // ─── Line stages (a recipe run on a line, one stage per station) ─────────
+    // Keyed by a stable key ("t<id>" saved, "n<hex>" new) — ingredient rows
+    // point at a stage by this key, and removing a stage never shifts the
+    // wire:model paths of another.
+    public array   $stages            = [];
+    public ?string $balance_tolerance = null;
+    public ?string $reject_allowance  = null;
+    // Active items (with their basic unit) a stage's rejects can be reworked into.
+    public array   $reworkItems       = [];
+
     // ─── API ──────────────────────────────────────────────────────────────────
     protected ApiService $api;
 
@@ -91,7 +103,7 @@ class RecipeCreate extends Component
     // ─── Load existing recipe for edit ───────────────────────────────────────
     protected function loadRecipe(int $id): void
     {
-        $recipe = Recipe::with(['inputs', 'sideProducts'])->findOrFail($id);
+        $recipe = Recipe::with(['inputs', 'sideProducts', 'stages'])->findOrFail($id);
 
         $this->name              = $recipe->name;
         $this->recipe_type_id    = $recipe->recipe_type_id;
@@ -103,6 +115,26 @@ class RecipeCreate extends Component
         $this->batch_volume      = $recipe->batch_volume !== null ? format_quantity($recipe->batch_volume) : null;
         $this->status            = (bool) $recipe->status;
         $this->notes             = $recipe->notes;
+        $this->balance_tolerance = $recipe->balance_tolerance !== null ? format_quantity($recipe->balance_tolerance) : null;
+        $this->reject_allowance  = $recipe->reject_allowance !== null ? format_quantity($recipe->reject_allowance) : null;
+
+        // Stages first: ingredient rows below point at them by key.
+        foreach ($recipe->stages as $stage) {
+            $this->stages['t' . $stage->id] = [
+                'id'                  => $stage->id,
+                'name'                => $stage->name,
+                'output_quantity'     => format_quantity($stage->output_quantity),
+                'output_unit'         => $stage->output_unit,
+                'output_item_unit_id' => $stage->output_item_unit_id,
+                'reject_action'       => $stage->reject_action ?: 'waste',
+                'rework_item_id'      => $stage->rework_item_id,
+                'rework_factor'       => format_quantity($stage->rework_factor),
+            ];
+        }
+
+        if ($this->stages) {
+            $this->loadReworkItems();
+        }
 
         if ($this->recipe_type_id) {
             $this->buildSections($this->recipe_type_id, $recipe->inputs, $recipe->sideProducts);
@@ -177,18 +209,20 @@ class RecipeCreate extends Component
 
             foreach ($existingRows as $record) {
                 $itemId     = is_object($record) ? $record->item_id : $record['item_id'];
+                $stageId    = is_object($record) ? ($record->recipe_stage_id ?? null) : ($record['recipe_stage_id'] ?? null);
                 $rows[]     = [
                     'id'           => is_object($record) ? $record->id : ($record['id'] ?? null),
                     'item_id'      => $itemId,
                     'item_unit_id' => is_object($record) ? $record->item_unit_id : $record['item_unit_id'],
                     'quantity'     => format_quantity(is_object($record) ? $record->quantity : $record['quantity']),
                     'notes'        => is_object($record) ? $record->notes : ($record['notes'] ?? null),
+                    'stage_key'    => $stageId && isset($this->stages['t' . $stageId]) ? 't' . $stageId : null,
                 ];
                 $rowUnits[] = $itemId ? $this->fetchUnitsForItem((int) $itemId) : [];
             }
 
             if (empty($rows)) {
-                $rows[]     = ['id' => null, 'item_id' => null, 'item_unit_id' => null, 'quantity' => '', 'notes' => null];
+                $rows[]     = $this->blankRow();
                 $rowUnits[] = [];
             }
 
@@ -272,7 +306,7 @@ class RecipeCreate extends Component
     // ─── Row management ───────────────────────────────────────────────────────
     public function addRowToSection(int $sectionIndex): void
     {
-        $this->sections[$sectionIndex]['rows'][]     = ['id' => null, 'item_id' => null, 'item_unit_id' => null, 'quantity' => '', 'notes' => null];
+        $this->sections[$sectionIndex]['rows'][]     = $this->blankRow();
         $this->sections[$sectionIndex]['rowUnits'][] = [];
     }
 
@@ -316,7 +350,7 @@ class RecipeCreate extends Component
     // ─── Row management (side product sections) ──────────────────────────────
     public function addRowToSideSection(int $sectionIndex): void
     {
-        $this->sideSections[$sectionIndex]['rows'][]     = ['id' => null, 'item_id' => null, 'item_unit_id' => null, 'quantity' => '', 'notes' => null];
+        $this->sideSections[$sectionIndex]['rows'][]     = $this->blankRow();
         $this->sideSections[$sectionIndex]['rowUnits'][] = [];
     }
 
@@ -357,6 +391,95 @@ class RecipeCreate extends Component
         }
     }
 
+    protected function blankRow(): array
+    {
+        return ['id' => null, 'item_id' => null, 'item_unit_id' => null, 'quantity' => '', 'notes' => null, 'stage_key' => null];
+    }
+
+    // ─── Line stages ─────────────────────────────────────────────────────────
+
+    /**
+     * A recipe with stages is run on a line as one event across its stations:
+     * each stage is matched by name to the line's station of the same name.
+     */
+    public function addStage(): void
+    {
+        if ($this->viewing) {
+            return;
+        }
+
+        $this->stages['n' . bin2hex(random_bytes(4))] = [
+            'id'                  => null,
+            'name'                => '',
+            'output_quantity'     => '',
+            'output_unit'         => null,
+            'output_item_unit_id' => null,
+            'reject_action'       => 'waste',
+            'rework_item_id'      => null,
+            'rework_factor'       => '1',
+        ];
+
+        $this->loadReworkItems();
+    }
+
+    public function removeStage(string $key): void
+    {
+        if ($this->viewing || !isset($this->stages[$key])) {
+            return;
+        }
+
+        unset($this->stages[$key]);
+
+        // Ingredients that were on it go back to having no stage.
+        foreach ($this->sections as $sIdx => $section) {
+            foreach ($section['rows'] as $rIdx => $row) {
+                if (($row['stage_key'] ?? null) === $key) {
+                    $this->sections[$sIdx]['rows'][$rIdx]['stage_key'] = null;
+                }
+            }
+        }
+    }
+
+    /** One place up (-1) or down (+1) in the line's order. */
+    public function moveStage(string $key, int $direction): void
+    {
+        $keys  = array_keys($this->stages);
+        $index = array_search($key, $keys, true);
+        $swap  = $index === false ? null : $index + $direction;
+
+        if ($this->viewing || $swap === null || $swap < 0 || $swap >= count($keys)) {
+            return;
+        }
+
+        [$keys[$index], $keys[$swap]] = [$keys[$swap], $keys[$index]];
+
+        $this->stages = array_combine($keys, array_map(fn($k) => $this->stages[$k], $keys));
+    }
+
+    /** Every active item, with its basic unit, for "rework into". One call. */
+    protected function loadReworkItems(): void
+    {
+        if ($this->reworkItems) {
+            return;
+        }
+
+        $this->reworkItems = collect($this->api->get('/v1/items', ['is_active' => 1])['data'] ?? [])
+            ->map(function ($item) {
+                $basic = collect($item['units'] ?? [])->firstWhere('basic', true) ?? ($item['units'][0] ?? null);
+
+                return [
+                    'id'           => (int) $item['id'],
+                    'name'         => $item['name'] . (!empty($item['code']) ? " ({$item['code']})" : ''),
+                    'item_type_id' => isset($item['item_type_id']) ? (int) $item['item_type_id'] : null,
+                    'unit_id'      => $basic['id'] ?? null,
+                    'unit_name'    => $basic['name'] ?? null,
+                ];
+            })
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+    }
+
     /**
      * Strip Cleave.js thousands separators (e.g. "1,000" → "1000") from every
      * quantity field before validation/save. Null/empty values are preserved
@@ -367,6 +490,13 @@ class RecipeCreate extends Component
         $this->quantity_per_batch = $this->stripThousands($this->quantity_per_batch);
         $this->batch_weight       = $this->stripThousands($this->batch_weight);
         $this->batch_volume       = $this->stripThousands($this->batch_volume);
+        $this->balance_tolerance  = $this->stripThousands($this->balance_tolerance);
+        $this->reject_allowance   = $this->stripThousands($this->reject_allowance);
+
+        foreach ($this->stages as $key => $stage) {
+            $this->stages[$key]['output_quantity'] = $this->stripThousands($stage['output_quantity'] ?? '');
+            $this->stages[$key]['rework_factor']   = $this->stripThousands($stage['rework_factor'] ?? '');
+        }
 
         foreach ($this->sections as $sIdx => $section) {
             foreach ($section['rows'] as $rIdx => $row) {
@@ -435,6 +565,11 @@ class RecipeCreate extends Component
                 $rules["sections.{$sIdx}.rows.{$rIdx}.item_id"]      = 'required|integer';
                 $rules["sections.{$sIdx}.rows.{$rIdx}.item_unit_id"] = 'required|integer';
                 $rules["sections.{$sIdx}.rows.{$rIdx}.quantity"]     = 'required|numeric|min:0.0001';
+
+                // On a recipe with stages every ingredient is used at one of them.
+                if ($this->stages) {
+                    $rules["sections.{$sIdx}.rows.{$rIdx}.stage_key"] = ['required', Rule::in(array_keys($this->stages))];
+                }
             }
         }
 
@@ -452,7 +587,27 @@ class RecipeCreate extends Component
             }
         }
 
+        foreach (array_keys($this->stages) as $key) {
+            $rules["stages.{$key}.name"]            = 'required|string|max:255';
+            $rules["stages.{$key}.output_quantity"] = 'required|numeric|min:0.0001';
+            $rules["stages.{$key}.output_unit"]     = 'nullable|string|max:50';
+            $rules["stages.{$key}.reject_action"]   = 'required|in:waste,rework';
+            $rules["stages.{$key}.rework_item_id"]  = ($this->stages[$key]['reject_action'] ?? 'waste') === 'rework' ? 'required|integer' : 'nullable|integer';
+            $rules["stages.{$key}.rework_factor"]   = 'nullable|numeric|min:0';
+        }
+
+        if ($this->stages) {
+            $rules['balance_tolerance'] = 'nullable|numeric|min:0|max:100';
+            $rules['reject_allowance']  = 'nullable|numeric|min:0|max:100';
+        }
+
         $this->validate($rules, [
+            'stages.*.name.required'               => 'Name the stage — it runs on the line\'s station of the same name.',
+            'stages.*.output_quantity.required'    => 'How much does this stage make per batch?',
+            'stages.*.output_quantity.min'         => 'Must be more than 0.',
+            'stages.*.rework_item_id.required'     => 'Pick what rejects are reworked into.',
+            'sections.*.rows.*.stage_key.required' => 'Pick the stage that uses it.',
+            'sections.*.rows.*.stage_key.in'       => 'Pick the stage that uses it.',
             'name.required'                => 'Recipe name is required.',
             'recipe_type_id.required'      => 'Recipe type is required.',
             'output_item_type_id.required' => 'Output item type is required.',
@@ -480,6 +635,14 @@ class RecipeCreate extends Component
             return;
         }
 
+        $stageNames = collect($this->stages)->map(fn($stage) => mb_strtolower(trim($stage['name'])));
+
+        if ($stageNames->duplicates()->isNotEmpty()) {
+            $this->addError('stages', 'Two stages have the same name: "' . $stageNames->duplicates()->first() . '". Each stage is matched to a station by its name.');
+
+            return;
+        }
+
         DB::beginTransaction();
         try {
             $recipeData = [
@@ -494,11 +657,15 @@ class RecipeCreate extends Component
                 'batch_volume'      => $this->batch_volume,
                 'status'            => $this->status,
                 'notes'             => $this->notes,
+                'balance_tolerance' => $this->stages && $this->balance_tolerance !== null && $this->balance_tolerance !== '' ? $this->balance_tolerance : null,
+                'reject_allowance'  => $this->stages && $this->reject_allowance !== null && $this->reject_allowance !== '' ? $this->reject_allowance : null,
             ];
 
             $recipe = $this->editing
                 ? tap(Recipe::findOrFail($this->id))->update($recipeData)
                 : Recipe::create($recipeData);
+
+            $stageIds = $this->saveStages($recipe);
 
             $syncedIds = [];
 
@@ -517,6 +684,7 @@ class RecipeCreate extends Component
                         'item_unit_id' => (int) $row['item_unit_id'],
                         'quantity'     => (float) $row['quantity'],
                         'notes'        => $row['notes'] ?? null,
+                        'recipe_stage_id' => $stageIds[$row['stage_key'] ?? ''] ?? null,
                     ];
 
                     if (!empty($row['id'])) {
@@ -578,6 +746,45 @@ class RecipeCreate extends Component
             DB::rollBack();
             $this->dispatch('swal:error', ['title' => 'Error', 'text' => 'An error occurred: ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * Create, update and remove the recipe's stages to match the form, in
+     * the form's order.
+     *
+     * @return array<string, int> stage key => id
+     */
+    protected function saveStages(Recipe $recipe): array
+    {
+        $ids      = [];
+        $sequence = 0;
+        $rework   = collect($this->reworkItems)->keyBy('id');
+
+        foreach ($this->stages as $key => $stage) {
+            $reworkItem = $stage['rework_item_id'] ? $rework->get((int) $stage['rework_item_id']) : null;
+
+            $data = [
+                'sequence'            => ++$sequence,
+                'name'                => trim($stage['name']),
+                'output_quantity'     => (float) $stage['output_quantity'],
+                'output_unit'         => $stage['output_unit'] ? trim($stage['output_unit']) : null,
+                'output_item_unit_id' => $stage['output_item_unit_id'] ? (int) $stage['output_item_unit_id'] : null,
+                'reject_action'       => $stage['reject_action'] === 'rework' && $reworkItem ? 'rework' : 'waste',
+                'rework_item_type_id' => $reworkItem['item_type_id'] ?? null,
+                'rework_item_id'      => $reworkItem['id'] ?? null,
+                'rework_item_unit_id' => $reworkItem['unit_id'] ?? null,
+                'rework_factor'       => $stage['rework_factor'] !== null && $stage['rework_factor'] !== '' ? (float) $stage['rework_factor'] : 1,
+            ];
+
+            $model = !empty($stage['id']) ? RecipeStage::where('recipe_id', $recipe->id)->find($stage['id']) : null;
+            $model ? $model->update($data) : $model = $recipe->stages()->create($data);
+
+            $ids[$key] = $model->id;
+        }
+
+        $recipe->stages()->whereNotIn('id', array_values($ids) ?: [0])->delete();
+
+        return $ids;
     }
 
     public function render(): \Illuminate\View\View

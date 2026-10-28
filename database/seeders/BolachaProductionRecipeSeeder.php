@@ -23,14 +23,14 @@ class BolachaProductionRecipeSeeder extends Seeder
      * server, so they're written out. Keep them in step with auth-service's
      * item seeders.
      */
-    private const SEMI_FINISHED_ITEM_TYPE_ID = 16; // SFG Bolacha
+    public const SEMI_FINISHED_ITEM_TYPE_ID = 16; // SFG Bolacha
 
     /**
      * What the products are made from — BolachaRecipeSeeder's products, from
      * auth-service's BolachaSemiFinishedGoodItemSeeder: code => [item id,
      * basic unit id (KG)].
      */
-    private const SEMI_FINISHED = [
+    public const SEMI_FINISHED = [
         'SFGBL-01' => [213, 241], // Maria (KG)
         'SFGBL-02' => [214, 242], // Dona Jowna (KG)
         'SFGBL-03' => [215, 243], // Maria Samakaka Azul (KG)
@@ -79,7 +79,7 @@ class BolachaProductionRecipeSeeder extends Seeder
      * typical figures, not the factory's (2026-10-27): a cream wafer is
      * about 70 % cream, a sandwich biscuit about 25 %.
      */
-    private const SHELL_SHARE = [
+    public const SHELL_SHARE = [
         'wafer' => 0.30,    // Super Wafer, Waffi: wafer sheet + cream
         'sandwich' => 0.75, // Tondo Sandwich, Fix Fix Feliz: biscuit + cream
     ];
@@ -154,7 +154,7 @@ class BolachaProductionRecipeSeeder extends Seeder
      * — Chocolate Duplo the dark one — and the Tondo sandwiches Tondo New
      * Massa. Crème Happy Face Ginguba and Limao make no product here.
      */
-    private const RECIPES = [
+    public const RECIPES = [
         '066103017' => [0.05, 'SFGBL-04'],                         // Fix Fix · 50 g a packet, 24 a box
         '066103006' => [0.04, 'SFGBL-04'],                         // Fix Fix · 40 g a packet, 24 a box
         '066103012' => [0.05, 'SFGBL-07'],                         // Fix Fix Bife Picante · 50 g a packet, 24 a box

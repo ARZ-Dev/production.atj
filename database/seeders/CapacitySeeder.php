@@ -77,16 +77,20 @@ class CapacitySeeder extends Seeder
     public function run(): void
     {
         // "Equipment and capacity Massa tomate.xlsx" (sheet FAB MASSA TOMAT).
+        // The can lines' rates moved to their stations on 2026-10-28
+        // (LineStationSeeder): a line run takes its speed from its slowest
+        // station. The packaging machines are the lines' Packing stations, and
+        // PackagingSeeder no longer runs — so only the mixer keeps capacities.
         $capacities = array_merge(
             $this->rates(Preparation::class, 1, self::SFG_MASSA_TOMATE, 3500), // Mixing — 3.5 t/h
-            $this->rates(Line::class, 1, self::CANS_70G, 360 * 60),            // Filling & Seaming 70g — 360 cans/min
-            $this->rates(Line::class, 3, self::CANS_400G, 130 * 60),           // Filling & Seaming 400g — 130 cans/min
+            // $this->rates(Line::class, 1, self::CANS_70G, 360 * 60),         // Filling & Seaming 70g — 360 cans/min
+            // $this->rates(Line::class, 3, self::CANS_400G, 130 * 60),        // Filling & Seaming 400g — 130 cans/min
         );
 
-        $packagingCapacities = array_merge(
-            $this->rates(Packaging::class, 3, self::CANS_70G, 600 * 60),       // Packaging Machine 70g — 600 cans/min
-            $this->rates(Packaging::class, 4, self::CANS_400G, 200 * 60),      // Packaging Machine 400g — 200 cans/min
-        );
+        $packagingCapacities = [
+            // ...$this->rates(Packaging::class, 3, self::CANS_70G, 600 * 60), // Packaging Machine 70g — 600 cans/min
+            // ...$this->rates(Packaging::class, 4, self::CANS_400G, 200 * 60), // Packaging Machine 400g — 200 cans/min
+        ];
 
         DB::transaction(function () use ($capacities, $packagingCapacities) {
             foreach (collect($capacities)->groupBy(fn($row) => "{$row['model']}#{$row['id']}") as $rows) {

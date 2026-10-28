@@ -18,9 +18,8 @@
     $continuesNextDay = !$isCarryOver && $event->placeable_id && $event->from_time && $event->to_time
         && \Carbon\Carbon::parse($event->to_time)->gt(\Carbon\Carbon::parse($event->from_time)->startOfDay()->addDay());
 
-    // The rest of a linked group: a companion's lead, or a lead's companions.
-    $pairedWith = $event->leadEvent ? collect([$event->leadEvent]) : $event->companionEvents;
-    $pairedLabel = $pairedWith->map(fn($e) => ($e->eventType->name ?? 'event') . ' #' . $e->id)->implode(', ');
+    // A line run (one event across a line's stations) and a mix planned for one.
+    $isRun = $hasRecipe && $event->recipe && $event->recipe->stages->isNotEmpty();
 
     $timeLabel = $event->from_time ? ' — ' . \Carbon\Carbon::parse($event->from_time)->format('H:i') : '';
     $timeLabel .= $event->to_time ? ' – ' . \Carbon\Carbon::parse($event->to_time)->format('H:i') : '';
@@ -34,9 +33,10 @@
     draggable="{{ $canMove ? 'true' : 'false' }}" data-event-id="{{ $event->id }}" wire:key="pbc-event-{{ $event->id }}"
     wire:click="showEventDetails({{ $event->id }})"
     style="left: calc(var(--pbc-hour-w) * {{ $fromHour }}); width: calc(var(--pbc-hour-w) * {{ $spanHours }} - 4px); top: {{ $track * 48 + 4 }}px; background-color: {{ $color }}; color: #fff;"
-    title="{{ $event->eventType->name ?? 'No type' }}{{ $timeLabel }}{{ $pairedLabel ? ' · runs together with ' . $pairedLabel : '' }}">
+    title="{{ $event->eventType->name ?? 'No type' }}{{ $isRun ? ' · line run: ' . $event->recipe->name : '' }}{{ $timeLabel }}{{ $event->feeds_event_id ? ' · mix for run #' . $event->feeds_event_id : '' }}">
     <span class="pbc-card-type">
-        @if($pairedLabel)<i class="bi bi-link-45deg"></i>@endif
+        @if($isRun)<i class="bi bi-diagram-3"></i>@endif
+        @if($event->feeds_event_id)<i class="bi bi-arrow-right-circle"></i>@endif
         @if($isCarryOver)<i class="bi bi-arrow-bar-right"></i>@endif
         {{ $event->eventType->name ?? 'No type' }}{{ $event->batch_count ? ' · '.$event->batch_count.' batches' : '' }}
         @if($continuesNextDay)<i class="bi bi-arrow-bar-right"></i>@endif

@@ -1,6 +1,6 @@
 <div class="ec-root">
     @php
-        // Quantities in the split panel: separators, at most $dp decimals, no trailing zeros.
+        // Quantities in the line-run panel: separators, at most $dp decimals, no trailing zeros.
         $ecQty = function ($n, int $dp = 2) {
             if ($n === null) {
                 return '—';
@@ -14,12 +14,10 @@
             $r = $m % 60;
             return $h ? ($r ? "{$h}h {$r}m" : "{$h}h") : "{$r}m";
         };
-        // One colour per companion, shared by its number badge and its slice of the bar.
-        $ecShareColors = ['#14b8a6', '#6366f1', '#f59e0b', '#ec4899', '#0ea5e9', '#84cc16'];
     @endphp
 
     {{-- Shown while any request of this popup is in flight (every picker change
-         is a round trip: options, durations and the split are worked out on the
+         is a round trip: options, durations and the line run are worked out on the
          server). It also covers the form, so a second change can't be made
          against the options the first one is about to replace. The short delay
          keeps instant responses from flickering. --}}
@@ -178,6 +176,7 @@
                         @enderror
                     </div>
 
+                    @unless(!empty($runs[$index]))
                     <div class="col-12 col-md-6">
                         <div class="ec-field-label">Duration</div>
                         <div class="ec-duration-note">
@@ -185,6 +184,7 @@
                             Duration will be calculated when the event is placed on a production/preparation line.
                         </div>
                     </div>
+                    @endunless
                     @else
                     <div class="col-6 col-md-3">
                         <div class="ec-field-label">Duration</div>
@@ -206,241 +206,10 @@
                     @enderror
                 </div>
 
-                {{-- The event type executed with this one (e.g. packaging alongside
-                     production) — one companion per lane the run is packed on.
-                     Their fields live in this card — the group is one run — and
-                     are bound under events.{i}.companions.{key}, keyed by a stable
-                     key so removing one never shifts another's bindings. --}}
-                @if(!empty($event['companions']))
-                @php
-                    $companions     = $event['companions'];
-                    $companionKeys  = array_map('strval', array_keys($companions));
-                    $firstCompanion = reset($companions);
-                    $dist           = $distributions[$index] ?? null;
-                    $shareColors    = array_map(fn($i) => $ecShareColors[$i % count($ecShareColors)], array_keys($companionKeys));
-                    $packagingOpts  = $companionPackagingsByRow[$index] ?? [];
-                    $leadUnit       = !empty($dist['unit']) ? ' ' . $dist['unit'] : '';
-                @endphp
-                <div class="ec-companion" wire:key="ec-companion-{{ $rowKey }}">
-                    <div class="ec-companion-head">
-                        <i class="bi bi-link-45deg"></i>
-                        <span>Runs together with</span>
-                        <span class="ec-companion-type">
-                            <span class="d-inline-block rounded-circle" style="width:9px;height:9px;background-color: {{ $firstCompanion['color'] }};"></span>
-                            {{ $firstCompanion['type_name'] }}
-                        </span>
-                        <span class="ec-companion-count">× {{ count($companions) }}</span>
-                    </div>
-
-                    @include('livewire.events.partials._companion-split', [
-                        'dist'          => $dist,
-                        'index'         => $index,
-                        'colors'        => $shareColors,
-                        'companionKeys' => $companionKeys,
-                        'rowStarted'    => $rowStarted,
-                    ])
-
-                    @foreach($companions as $cKey => $companion)
-                    @php
-                        $cKey   = (string) $cKey;
-                        $cPath  = 'events.' . $index . '.companions.' . $cKey;
-                        $cId    = $rowKey . '_' . $cKey;
-                        $share  = $dist['companions'][$cKey] ?? null;
-                        $packagingName = collect($packagingOpts)->firstWhere('id', $companion['packaging_id'])['name'] ?? null;
-                    @endphp
-                    <div class="ec-companion-item" wire:key="ec-companion-{{ $rowKey }}-{{ $cKey }}">
-                        <div class="ec-companion-item-head">
-                            <span class="ec-share-dot" style="background-color: {{ $shareColors[$loop->index] }};">{{ $loop->iteration }}</span>
-                            <span class="ec-companion-item-title">{{ $companion['type_name'] }} #{{ $loop->iteration }}</span>
-                            <span class="{{ !empty($companion['id']) ? 'ec-badge-saved' : 'ec-badge-new' }}">
-                                {{ !empty($companion['id']) ? 'Saved' : 'New' }}
-                            </span>
-                            @if($companion['placed'])
-                            <span class="ec-companion-where"><i class="bi bi-geo-alt"></i> On the board</span>
-                            @elseif($packagingName)
-                            <span class="ec-companion-where" title="Placing this event on the board puts this one on {{ $packagingName }} at the same time">
-                                <i class="bi bi-box-seam"></i> Goes on {{ $packagingName }} when this event is placed
-                            </span>
-                            @endif
-                            @if(count($companions) > 1 && !$rowStarted)
-                            <button type="button" class="ec-remove-btn ms-auto" title="Remove this {{ $companion['type_name'] }} event"
-                                wire:click="removeCompanion({{ $index }}, @js($cKey))">
-                                <i class="bi bi-x"></i>
-                            </button>
-                            @endif
-                        </div>
-
-                        <div class="row g-2">
-                            <div class="col-6 col-lg">
-                                <div class="ec-field-label">Packaging</div>
-                                <div wire:ignore>
-                                    <select id="ec_c_packaging_{{ $cId }}" data-key="{{ $rowKey }}" data-ckey="{{ $cKey }}"
-                                        class="selectpicker ec-c-packaging-select" data-width="100%" @disabled($rowStarted)>
-                                        <option value="">— Place it later —</option>
-                                        @foreach($packagingOpts as $packaging)
-                                        <option value="{{ $packaging['id'] }}" @selected((int) ($companion['packaging_id'] ?? 0) === $packaging['id'])>
-                                            {{ $packaging['name'] }}
-                                        </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                @error($cPath . '.packaging_id')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
-                                @if(!$packagingOpts)
-                                <div class="ec-companion-hint">No packaging of this factory runs {{ $companion['type_name'] }} — drag it onto a lane instead.</div>
-                                @endif
-                            </div>
-
-                            <div class="col-6 col-lg">
-                                <div class="ec-field-label">Item Type <span class="text-danger">*</span></div>
-                                <div wire:ignore>
-                                    <select id="ec_c_item_type_{{ $cId }}" data-key="{{ $rowKey }}" data-ckey="{{ $cKey }}"
-                                        class="selectpicker ec-c-item-type-select" data-width="100%" @disabled($rowStarted)
-                                        data-live-search="true" title="— Select —">
-                                        @foreach($companionItemTypesByRow[$index] ?? [] as $type)
-                                        <option value="{{ $type['id'] }}" @selected((int)($companion['item_type_id'] ?? 0) === $type['id'])>
-                                            {{ $type['name'] }}
-                                        </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                @error($cPath . '.item_type_id')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-6 col-lg">
-                                <div class="ec-field-label">Item <span class="text-danger">*</span></div>
-                                <div wire:ignore>
-                                    <select id="ec_c_item_{{ $cId }}" data-key="{{ $rowKey }}" data-ckey="{{ $cKey }}"
-                                        class="selectpicker ec-c-item-select" data-width="100%" @disabled($rowStarted)
-                                        data-live-search="true" title="— Select —">
-                                        @foreach($companionItemsByRow[$index][$cKey] ?? [] as $item)
-                                        <option value="{{ $item['id'] }}" @selected((int)($companion['item_id'] ?? 0) === $item['id'])>
-                                            {{ $item['name'] }}
-                                        </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                @error($cPath . '.item_id')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-6 col-lg">
-                                <div class="ec-field-label">Recipe <span class="text-danger">*</span></div>
-                                <div wire:ignore>
-                                    <select id="ec_c_recipe_{{ $cId }}" data-key="{{ $rowKey }}" data-ckey="{{ $cKey }}"
-                                        class="selectpicker ec-c-recipe-select" data-width="100%" @disabled($rowStarted)
-                                        data-live-search="true" title="— Select —">
-                                        @foreach($companionRecipesByRow[$index][$cKey] ?? [] as $recipe)
-                                        <option value="{{ $recipe['id'] }}" @selected((int)($companion['recipe_id'] ?? 0) === $recipe['id'])>
-                                            {{ $recipe['name'] }}
-                                        </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                @error($cPath . '.recipe_id')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
-                                @if(!empty($companion['item_id']) && !empty($event['item_id']) && empty($companionRecipesByRow[$index][$cKey] ?? []))
-                                <div class="text-warning small mt-1">
-                                    <i class="bi bi-exclamation-circle"></i> No active recipe for this item uses what this production makes.
-                                </div>
-                                @endif
-                            </div>
-
-                            <div class="col-6 col-lg">
-                                <div class="ec-field-label">Batch Number <span class="text-danger">*</span></div>
-                                <input type="text"
-                                    class="form-control form-control-sm @error($cPath . '.batch_count') is-invalid @enderror"
-                                    wire:model.defer="{{ $cPath }}.batch_count"
-                                    wire:change="onCompanionBatchChanged({{ $index }}, @js($cKey), $event.target.value)"
-                                    @disabled($rowStarted)
-                                    placeholder="e.g. 1">
-                                @error($cPath . '.batch_count')
-                                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                                @enderror
-                                @if($companion['batch_auto'] !== null)
-                                <div class="ec-companion-hint">
-                                    @if(abs((float) $companion['batch_auto'] - (float) str_replace(',', '', (string) $companion['batch_count'])) < 0.00005)
-                                    <i class="bi bi-magic"></i> Its share of the run
-                                    @else
-                                    Its share of the run: {{ $companion['batch_auto'] }}
-                                    @endif
-                                </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        {{-- This companion's slice of the run --}}
-                        @if($share && $share['issue'] !== 'recipe')
-                        <div class="ec-share">
-                            @if($share['issue'] === 'consumes')
-                            <span class="ec-share-chip ec-share-chip--warn">
-                                <i class="bi bi-exclamation-circle"></i> This recipe doesn't use {{ $dist['item_name'] }}, so it takes no share of the run.
-                            </span>
-                            @else
-                            <span class="ec-share-chip" title="What one batch of {{ $companion['type_name'] }}'s recipe uses and makes">
-                                <span class="ec-share-k">Per batch</span>
-                                {{ $ecQty($share['in_qty'], 3) }} {{ $share['in_unit'] }}
-                                <i class="bi bi-arrow-right"></i>
-                                {{ $ecQty($share['per_batch_out'], 3) }} {{ $share['out_unit'] }}
-                            </span>
-                            @if($share['assigned'] !== null)
-                            <span class="ec-share-chip ec-share-chip--strong" style="--ec-share: {{ $shareColors[$loop->index] }};">
-                                <span class="ec-share-k">Takes</span>
-                                {{ $ecQty($share['assigned'], 3) }}{{ $leadUnit }}
-                                @if($share['assigned_share'] !== null)
-                                <span class="ec-share-pct">{{ round($share['assigned_share'] * 100) }}%</span>
-                                @endif
-                            </span>
-                            <span class="ec-share-chip">
-                                <span class="ec-share-k">Makes</span>
-                                {{ $ecQty($share['makes'], 3) }} {{ $share['out_unit'] }} {{ $share['out_item'] }}
-                            </span>
-                            @else
-                            <span class="ec-share-chip ec-share-chip--muted">Enter a batch number to see its share.</span>
-                            @endif
-                            @if($share['rate'])
-                            <span class="ec-share-chip" title="{{ $share['packaging_name'] }}'s capacity for {{ $share['out_item'] }}">
-                                <i class="bi bi-speedometer2"></i>
-                                {{ $ecQty($share['rate']['capacity'], 2) }} {{ $share['rate']['unit'] }}/h
-                                @if($share['minutes'])
-                                · ≈ {{ $ecMinutes($share['minutes']) }}
-                                @endif
-                            </span>
-                            @elseif($share['issue'] === 'packaging')
-                            <span class="ec-share-chip ec-share-chip--muted">
-                                <i class="bi bi-speedometer2"></i> Pick a packaging to use its capacity
-                            </span>
-                            @elseif($share['issue'] === 'capacity')
-                            <span class="ec-share-chip ec-share-chip--warn">
-                                <i class="bi bi-exclamation-circle"></i> No capacity set on {{ $share['packaging_name'] }} for {{ $share['out_item'] }}
-                            </span>
-                            @endif
-                            @endif
-                        </div>
-                        @endif
-                    </div>
-                    @endforeach
-
-                    @unless($rowStarted)
-                    <button type="button" class="ec-companion-add" wire:click="addCompanion({{ $index }})"
-                        wire:loading.attr="disabled" wire:target="addCompanion">
-                        <i class="bi bi-plus-lg"></i> Add another {{ $firstCompanion['type_name'] }}
-                        <span class="ec-companion-add-sub">— pack part of this run on another lane</span>
-                    </button>
-                    @endunless
-
-                    <div class="ec-companion-note">
-                        <i class="bi bi-info-circle"></i>
-                        All of these start and end together with this event. The pre-finished goods made here pass
-                        straight to {{ $firstCompanion['type_name'] }} without going through a warehouse, so they're
-                        never checked or stocked — each packaging event takes the share its batch number says.
-                    </div>
-                </div>
+                {{-- A recipe with stages runs as one event across a line's
+                     stations: what it makes, how long it takes and what it uses. --}}
+                @if(!empty($runs[$index]))
+                @include('livewire.events.partials._line-run-panel', ['run' => $runs[$index]])
                 @endif
 
             </div>
@@ -486,12 +255,7 @@
             $el.selectpicker('val', '');
         };
 
-        const EC_SELECTS = '.ec-event-type-select, .ec-item-type-select, .ec-item-select, .ec-recipe-select, '
-            + '.ec-c-packaging-select, .ec-c-item-type-select, .ec-c-item-select, .ec-c-recipe-select';
-
-        // A companion's stable key within its row (read as an attribute: jQuery's
-        // .data() would turn a key that looks numeric into a number).
-        const ecCompanionKey = (el) => String($(el).attr('data-ckey'));
+        const EC_SELECTS = '.ec-event-type-select, .ec-item-type-select, .ec-item-select, .ec-recipe-select';
 
         // Boot: initialise pickers already in the DOM.
         $('.ec-card .selectpicker').each(function () { ecInitPicker(this); });
@@ -528,38 +292,12 @@
             $wire.call('onRecipeChanged', ecRowIndex(this), $(this).val());
         });
 
-        // The companion events' cascade (the event type executed with the
-        // row's type), inside the same card — same row index, plus the
-        // companion's key.
-        $(document).on('change', '.ec-c-packaging-select', function () {
-            // Clearing it is a choice too: "place it later".
-            $wire.call('onCompanionPackagingChanged', ecRowIndex(this), ecCompanionKey(this), $(this).val() || '');
-        });
-        $(document).on('change', '.ec-c-item-type-select', function () {
-            if ($(this).val() === '') return;
-            $wire.call('onCompanionItemTypeChanged', ecRowIndex(this), ecCompanionKey(this), $(this).val());
-        });
-        $(document).on('change', '.ec-c-item-select', function () {
-            if ($(this).val() === '') return;
-            $wire.call('onCompanionItemChanged', ecRowIndex(this), ecCompanionKey(this), $(this).val());
-        });
-        $(document).on('change', '.ec-c-recipe-select', function () {
-            if ($(this).val() === '') return;
-            $wire.call('onCompanionRecipeChanged', ecRowIndex(this), ecCompanionKey(this), $(this).val());
-        });
-
         $wire.on('ec-cascade', (e) => {
             if (!e || !e.key) return;
 
             if (e.itemTypes !== undefined) ecApplyOptions('ec_item_type_' + e.key, e.itemTypes);
             if (e.items      !== undefined) ecApplyOptions('ec_item_'      + e.key, e.items);
             if (e.recipes    !== undefined) ecApplyOptions('ec_recipe_'    + e.key, e.recipes);
-
-            if (!e.ckey) return;
-            const cId = e.key + '_' + e.ckey;
-
-            if (e.cItems   !== undefined) ecApplyOptions('ec_c_item_'   + cId, e.cItems);
-            if (e.cRecipes !== undefined) ecApplyOptions('ec_c_recipe_' + cId, e.cRecipes);
         });
 
     </script>

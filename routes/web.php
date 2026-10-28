@@ -10,6 +10,7 @@ use App\Livewire\Guides\GuideView;
 use App\Livewire\ItemRequests\ItemRequestCreate;
 use App\Livewire\ItemRequests\ItemRequestIndex;
 use App\Livewire\Lines\LineIndex;
+use App\Livewire\Lines\LineStations;
 use App\Livewire\Plans\PlanBoard;
 use App\Livewire\Plans\PlanIndex;
 use App\Livewire\Preparations\PreparationIndex;
@@ -263,6 +264,7 @@ Route::middleware(['auth.service'])->prefix('admin')->group(function () {
         Route::get('/{id}/capacity', CapacityManage::class)
             ->defaults('modelType', 'line')
             ->name('lines.capacity');
+        Route::get('/{id}/stations', LineStations::class)->name('lines.stations');
     });
 
     // |--------------------------------------------------------------------------
