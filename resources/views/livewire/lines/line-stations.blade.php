@@ -21,9 +21,6 @@
                     <a href="{{ route('stations') }}" class="btn btn-light-info" target="_blank">
                         <i class="bi bi-gear-wide-connected me-1"></i>All Stations
                     </a>
-                    <a href="{{ route('lines.capacity', $lineId) }}" class="btn btn-light-success">
-                        <i class="bi bi-speedometer2 me-1"></i>Capacity
-                    </a>
                     <a href="{{ route('lines') }}" class="btn btn-light-light text-muted">
                         <i class="bi bi-arrow-left me-1"></i>Back
                     </a>
@@ -138,7 +135,7 @@
                             <div class="text-muted">
                                 {{ $type['count'] }} {{ str('station')->plural($type['count']) }}
                                 @if($type['rated'])
-                                    · {{ $fmt($type['per_hour']) }} {{ $type['unit'] }}/h together{{ $type['rated'] < $type['count'] ? ' (' . $type['rated'] . ' rated)' : '' }}
+                                    · {{ $fmt($type['per_hour']) }}/h together{{ $type['rated'] < $type['count'] ? ' (' . $type['rated'] . ' rated)' : '' }}
                                 @else
                                     · no rate
                                 @endif

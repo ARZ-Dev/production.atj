@@ -14,12 +14,15 @@ return new class extends Migration
             $table->foreignId('station_type_id')->nullable()->constrained('station_types')->nullOnDelete();
             $table->unsignedSmallInteger('sequence')->default(1);
             $table->string('name');   // the station type's, written on save
+            // What the stage makes per batch, in one of the product's units
+            // (output_item_unit_id), or in kg when that is null (dough stages).
+            // Its stations' rates are in the unit's basic unit, so a box or case
+            // converts with the unit's formula.
             $table->decimal('output_quantity', 15, 4);
-            $table->string('output_unit', 50)->nullable();
-            // Set when the stage's output is the product itself in one of its
-            // units (packets before they are boxed): leftovers can then be
-            // stocked at End.
             $table->unsignedBigInteger('output_item_unit_id')->nullable();
+            // What's left on this stage at End goes into stock, in that unit
+            // (packets not boxed, cans not cased).
+            $table->boolean('stock_leftovers')->default(false);
             $table->string('reject_action', 10)->default('waste');  // waste | rework
             $table->unsignedBigInteger('rework_item_type_id')->nullable();
             $table->unsignedBigInteger('rework_item_id')->nullable();

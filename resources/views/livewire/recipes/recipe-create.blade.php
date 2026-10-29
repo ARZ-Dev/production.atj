@@ -209,8 +209,8 @@
                                         <th style="width: 72px">Order</th>
                                         <th>Stage <span class="text-danger">*</span></th>
                                         <th style="width: 120px">Makes per batch <span class="text-danger">*</span></th>
-                                        <th style="width: 110px">Unit</th>
-                                        <th style="width: 150px">Is the product in</th>
+                                        <th style="width: 170px">Counted in</th>
+                                        <th style="width: 90px" class="text-center">Leftovers to stock</th>
                                         <th style="width: 130px">Rejects go to</th>
                                         <th>Rework into</th>
                                         <th style="width: 100px">Rework per reject</th>
@@ -251,15 +251,21 @@
                                             @error("stages.{$key}.output_quantity")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </td>
                                         <td>
-                                            <input type="text" class="form-control" wire:model="stages.{{ $key }}.output_unit" placeholder="e.g. kg">
-                                        </td>
-                                        <td>
-                                            <select class="form-select" wire:model="stages.{{ $key }}.output_item_unit_id" title="When this stage's output is the product itself in one of its units, what's left over at End can go into stock.">
-                                                <option value="">— not the product —</option>
+                                            {{-- Keyed by the product: its units are the options (see §3 "Livewire"). --}}
+                                            <select class="form-select" wire:model.live="stages.{{ $key }}.output_item_unit_id" @disabled($viewing)
+                                                wire:key="stage-unit-{{ $key }}-{{ $item_id }}">
+                                                <option value="" @selected(($stage['output_item_unit_id'] ?? '') == '')>kg — by weight</option>
                                                 @foreach($headerUnits as $unit)
-                                                <option value="{{ $unit['id'] }}" @selected(($stage['output_item_unit_id'] ?? null) == $unit['id'])>{{ $unit['name'] }}</option>
+                                                @php $formula = (float) ($unit['formula'] ?? 1); @endphp
+                                                <option value="{{ $unit['id'] }}" @selected((string) ($stage['output_item_unit_id'] ?? '') === (string) $unit['id'])>{{ $unit['name'] }}{{ $formula != 1 ? ' (' . rtrim(rtrim(number_format($formula, 4, '.', ''), '0'), '.') . ' basic)' : '' }}</option>
                                                 @endforeach
                                             </select>
+                                            @error("stages.{$key}.output_item_unit_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        </td>
+                                        <td class="text-center">
+                                            <input type="checkbox" class="form-check-input" wire:model="stages.{{ $key }}.stock_leftovers"
+                                                @checked(!empty($stage['stock_leftovers'])) @disabled($viewing || empty($stage['output_item_unit_id']))
+                                                title="What's left on this stage at End goes into stock, in its unit (packets not boxed, cans not cased).">
                                         </td>
                                         <td>
                                             <select class="form-select" wire:model.live="stages.{{ $key }}.reject_action">
@@ -294,7 +300,8 @@
                         </div>
                         <p class="text-muted small mb-3">
                             <i class="bi bi-info-circle me-1"></i>
-                            <strong>Makes per batch</strong> is what the stage puts out for one batch of this recipe, in the unit its station's rate is in (kg through the oven, packets off the wrapper …).
+                            <strong>Makes per batch</strong> is what the stage puts out for one batch of this recipe, <strong>counted in</strong> one of the product's units or in kg (dough through the cutter and oven).
+                            Machine rates are in the basic unit, so a stage that makes boxes or cases converts with the unit's formula (a packer at 200 packets/min makes 250 boxes of 48 an hour).
                             The last stage is counted at End in the recipe's own output unit — that is what goes into stock.
                             <strong>Rework per reject</strong> is how much of the rework item one reject gives (e.g. 0.036 kg of powder from one 36 g packet).
                         </p>

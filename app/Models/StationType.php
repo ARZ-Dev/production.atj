@@ -7,8 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * What a station does — Cutting, Cooking, Packaging … A recipe stage names
- * one, and runs on the machines of that type the line has. Its rate unit is
- * the default for its machines' rates.
+ * one, and runs on the machines of that type the line has.
  */
 class StationType extends Model
 {

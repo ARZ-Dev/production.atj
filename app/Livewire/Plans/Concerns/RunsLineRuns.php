@@ -374,7 +374,7 @@ trait RunsLineRuns
                 'name'            => $stage->name,
                 'is_last'         => $isLast,
                 'count_per_batch' => $this->lineRuns->countPerBatch($stage, $recipe),
-                'count_unit'      => $isLast ? $unit : ($stage->output_unit ?: 'units'),
+                'count_unit'      => $isLast ? $unit : $this->lineRuns->stageUnit($recipe, $stage),
                 // The last station's counter is the hourly counts' one.
                 'made'            => $isLast && $lastCount ? $this->plainNumber($lastCount->counter) : '',
                 'rejects'         => '',
@@ -382,7 +382,7 @@ trait RunsLineRuns
                 'reject_action'   => $stage->canRework() ? ($stage->reject_action ?: 'waste') : 'waste',
                 'can_rework'      => $stage->canRework(),
                 'rework_label'    => $stage->canRework() ? $this->lineRuns->itemAndUnitNames((int) $stage->rework_item_id, (int) $stage->rework_item_unit_id)[0] : null,
-                'has_leftover'    => !$isLast && $stage->output_item_unit_id,
+                'has_leftover'    => !$isLast && $stage->stock_leftovers && $stage->output_item_unit_id,
                 'leftover'        => '',
             ];
         }

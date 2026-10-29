@@ -96,11 +96,11 @@ class BolachaLineRecipeSeeder extends Seeder
                 $recipe->save();
 
                 $stages = [
-                    'Cutting'   => ['output_quantity' => $shellKg, 'output_unit' => 'kg', 'reject_action' => 'rework', 'rework' => [$shellItem, $shellUnit, BolachaProductionRecipeSeeder::SEMI_FINISHED_ITEM_TYPE_ID, 1]],
-                    'Cooking'   => ['output_quantity' => $shellKg, 'output_unit' => 'kg', 'reject_action' => 'waste', 'rework' => [$powderItem, $powderUnit, $powderType, 1]],
-                    'Creaming'  => $creamCode ? ['output_quantity' => $boxKg, 'output_unit' => 'kg', 'reject_action' => 'waste', 'rework' => [$powderItem, $powderUnit, $powderType, 1]] : null,
-                    'Packaging' => ['output_quantity' => $unitsPerBox, 'output_unit' => 'packets', 'output_item_unit_id' => $basicUnitId, 'reject_action' => 'rework', 'rework' => [$powderItem, $powderUnit, $powderType, $kgPacket]],
-                    'Packing'   => ['output_quantity' => 1, 'output_unit' => 'box', 'reject_action' => 'waste', 'rework' => null],
+                    'Cutting'   => ['output_quantity' => $shellKg, 'reject_action' => 'rework', 'rework' => [$shellItem, $shellUnit, BolachaProductionRecipeSeeder::SEMI_FINISHED_ITEM_TYPE_ID, 1]],
+                    'Cooking'   => ['output_quantity' => $shellKg, 'reject_action' => 'waste', 'rework' => [$powderItem, $powderUnit, $powderType, 1]],
+                    'Creaming'  => $creamCode ? ['output_quantity' => $boxKg, 'reject_action' => 'waste', 'rework' => [$powderItem, $powderUnit, $powderType, 1]] : null,
+                    'Packaging' => ['output_quantity' => $unitsPerBox, 'output_item_unit_id' => $basicUnitId, 'stock_leftovers' => true, 'reject_action' => 'rework', 'rework' => [$powderItem, $powderUnit, $powderType, $kgPacket]],
+                    'Packing'   => ['output_quantity' => 1, 'output_item_unit_id' => $boxUnitId, 'reject_action' => 'waste', 'rework' => null],
                 ];
 
                 $stageIds = $this->syncStages($recipe, array_filter($stages));
@@ -156,8 +156,8 @@ class BolachaLineRecipeSeeder extends Seeder
                 'sequence'            => ++$sequence,
                 'station_type_id'     => StationTypeSeeder::idOf($name),
                 'output_quantity'     => $stage['output_quantity'],
-                'output_unit'         => $stage['output_unit'],
-                'output_item_unit_id' => $stage['output_item_unit_id'] ?? null,
+                'output_item_unit_id' => $stage['output_item_unit_id'] ?? null,   // null: kg
+                'stock_leftovers'     => $stage['stock_leftovers'] ?? false,
                 'reject_action'       => $stage['reject_action'],
                 'rework_item_type_id' => $reworkType,
                 'rework_item_id'      => $reworkItem,

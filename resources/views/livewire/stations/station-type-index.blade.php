@@ -40,7 +40,6 @@
                             <tr>
                                 <th>Order</th>
                                 <th>Name</th>
-                                <th>Rate unit</th>
                                 <th>Stations</th>
                                 <th>Used in</th>
                                 <th>Recipe stages</th>
@@ -53,7 +52,6 @@
                             <tr>
                                 <td>{{ $type->sequence }}</td>
                                 <td class="fw-semibold">{{ $type->name }}</td>
-                                <td>{{ $type->rate_unit ?: '—' }}</td>
                                 <td>{{ $type->stations_count }}</td>
                                 <td>
                                     @forelse($type->stations->pluck('department_id')->filter()->unique()->sort() as $departmentId)
@@ -115,13 +113,6 @@
                             <input type="number" min="0" step="1" class="form-control @error('sequence') is-invalid @enderror"
                                 id="st_sequence" wire:model="sequence">
                             @error('sequence')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-12">
-                            <label for="st_unit" class="form-label">Rate unit</label>
-                            <input type="text" class="form-control @error('rate_unit') is-invalid @enderror"
-                                id="st_unit" wire:model="rate_unit" placeholder="e.g. kg, packets, cans">
-                            <div class="form-text">What its stations' rates count, unless a station says otherwise.</div>
-                            @error('rate_unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-12">
                             <label for="st_description" class="form-label">Description</label>

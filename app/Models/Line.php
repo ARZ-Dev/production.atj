@@ -24,11 +24,6 @@ class Line extends Model
         return 'sfg_warehouse_id';
     }
 
-    public function capacities()
-    {
-        return $this->morphMany(Capacity::class, 'capacityable');
-    }
-
     /** Its machines in the order the product passes them. */
     public function stations()
     {

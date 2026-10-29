@@ -1,9 +1,9 @@
 {{--
-    One planned (drag & drop) board: the production board or the packaging board.
-    Expects: $rows (PlanBoard::laneRows output), $board ('production' | 'packaging'), $emptyMessage
+    The planned (drag & drop) board: production lines and their lanes.
+    Expects: $rows (PlanBoard::laneRows output), $emptyMessage
 --}}
-<div class="pbc-grid-wrap" wire:key="pbc-board-{{ $board }}">
-    <div class="pbc-grid" data-board="{{ $board }}">
+<div class="pbc-grid-wrap" wire:key="pbc-board">
+    <div class="pbc-grid">
         <div class="pbc-corner"></div>
         <div class="pbc-hour-row">
             @for($slot = 0; $slot < 96; $slot++)
@@ -19,7 +19,7 @@
             @foreach($row['lanes'] as $i => $laneRow)
             @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
             @if($i === 0)
-            <div class="pbc-pl-label {{ $board === 'packaging' ? 'pbc-pl-label--packaging' : '' }}" style="grid-row: span {{ $laneCount }};" wire:key="pbc-{{ $row['key'] }}">
+            <div class="pbc-pl-label" style="grid-row: span {{ $laneCount }};" wire:key="pbc-{{ $row['key'] }}">
                 {{ $row['label'] }}
             </div>
             @endif
@@ -44,7 +44,7 @@
             </div>
             @endforeach
         @else
-            <div class="pbc-pl-label {{ $board === 'packaging' ? 'pbc-pl-label--packaging' : '' }}" style="grid-row: span 1;" wire:key="pbc-{{ $row['key'] }}">
+            <div class="pbc-pl-label" style="grid-row: span 1;" wire:key="pbc-{{ $row['key'] }}">
                 {{ $row['label'] }}
             </div>
             <div class="pbc-row-track-empty">{{ $row['empty'] }}</div>

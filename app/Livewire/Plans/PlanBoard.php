@@ -11,7 +11,6 @@ use App\Models\EventStatusLog;
 use App\Models\EventType;
 use App\Models\EventTypeItem;
 use App\Models\Line;
-use App\Models\Packaging;
 use App\Models\Plan;
 use App\Models\Preparation;
 use App\Models\ProductionLine;
@@ -52,12 +51,10 @@ class PlanBoard extends Component
     public const LANE_ICONS = [
         'preparation' => 'egg-fried',
         'line'        => 'diagram-3',
-        'packaging'   => 'box-seam',
     ];
 
     public Plan $plan;
     public $productionLines = [];
-    public $packagings = [];
     public $unplacedEvents = [];
     public ?string $factoryName = null;
     public ?array $selectedEvent = null;
@@ -153,11 +150,6 @@ class PlanBoard extends Component
         $this->plan = Plan::findOrFail($id);
 
         $this->productionLines = ProductionLine::with('preparations.eventTypes', 'lines.eventTypes')
-            ->where('factory_id', $this->plan->factory_id)
-            ->orderBy('name')
-            ->get();
-
-        $this->packagings = Packaging::with('eventTypes')
             ->where('factory_id', $this->plan->factory_id)
             ->orderBy('name')
             ->get();
@@ -296,14 +288,10 @@ class PlanBoard extends Component
 
     // ─── Calendar layout ──────────────────────────────────────────────────────
     //
-    // Drawn as two boards sharing one row shape: the production board
-    // (preparations and lines, grouped by production line) and, under it, the
-    // packaging board (one lane per packaging of this plan's factory). A row is
+    // One row per production line, its preparations and lines as lanes:
     //   ['key', 'label', 'production_line_id', 'lanes', 'empty']
-    // with production_line_id null on the packaging board — an event placed on
-    // a packaging belongs to no production line.
 
-    public function laneRows(string $board = 'production'): array
+    public function laneRows(): array
     {
         return array_map(function (array $row) {
             $row['lanes'] = array_map(fn(array $lane) => [
@@ -316,22 +304,12 @@ class PlanBoard extends Component
             ], $row['lanes']);
 
             return $row;
-        }, $this->boardRows($board));
+        }, $this->boardRows());
     }
 
-    /** Row skeletons (lanes without events) for one board. */
-    protected function boardRows(string $board): array
+    /** Row skeletons (lanes without events). */
+    protected function boardRows(): array
     {
-        if ($board === 'packaging') {
-            return [[
-                'key'                => 'packaging',
-                'label'              => 'Packaging',
-                'production_line_id' => null,
-                'lanes'              => collect($this->packagings)->map(fn($p) => $this->lane('packaging', $p))->all(),
-                'empty'              => 'No packaging is set up for this factory.',
-            ]];
-        }
-
         return collect($this->productionLines)->map(fn($pl) => [
             'key'                => "pl-{$pl->id}",
             'label'              => $pl->name,
@@ -359,19 +337,15 @@ class PlanBoard extends Component
     }
 
     /**
-     * Events on one lane. A packaging lane is identified by its placeable
-     * alone; a preparation or line can sit under several production lines, so
-     * those lanes also match on the production line.
+     * Events on one lane. A preparation or line can sit under several
+     * production lines, so a lane also matches on the production line.
      */
-    protected function laneEvents(?int $productionLineId, array $lane): Collection
+    protected function laneEvents(int $productionLineId, array $lane): Collection
     {
-        $events = $this->allEvents
+        return $this->allEvents
             ->where('placeable_type', $this->classForAlias($lane['type']))
-            ->where('placeable_id', $lane['id']);
-
-        return $productionLineId === null
-            ? $events
-            : $events->where('production_line_id', $productionLineId);
+            ->where('placeable_id', $lane['id'])
+            ->where('production_line_id', $productionLineId);
     }
 
     protected function layoutTracks(Collection $events): array
@@ -448,7 +422,7 @@ class PlanBoard extends Component
      * run times (start → end status logs) with emergency events as red
      * segments; 'downtime' shows only the emergency events.
      */
-    public function readonlyLaneRows(string $mode, string $board = 'production'): array
+    public function readonlyLaneRows(string $mode): array
     {
         return array_map(function (array $row) use ($mode) {
             $row['lanes'] = array_map(function (array $lane) use ($mode, $row) {
@@ -465,7 +439,7 @@ class PlanBoard extends Component
             }, $row['lanes']);
 
             return $row;
-        }, $this->boardRows($board));
+        }, $this->boardRows());
     }
 
     /**
@@ -678,20 +652,12 @@ class PlanBoard extends Component
             return;
         }
 
-        // Packaging lanes sit on their own board and belong to no production
-        // line; preparations and lines always sit under one.
-        if ($placeableClass === Packaging::class) {
-            $productionLineId = null;
-        } elseif (!$productionLineId) {
+        // Preparations and lines always sit under a production line.
+        if (!$productionLineId) {
             return;
         }
 
         $target = $placeableClass::find($placeableId);
-
-        // Only this factory's packagings are on the board.
-        if ($target instanceof Packaging && (int) $target->factory_id !== (int) $this->plan->factory_id) {
-            $target = null;
-        }
 
         if (!$target || !$event->event_type_id || !$target->eventTypes()->where('event_types.id', $event->event_type_id)->exists()) {
             $this->dispatch('dropRejected', message: "\"{$event->eventType?->name}\" is not an allowed event type on \"" . ($target->name ?? 'this lane') . '".');
@@ -816,13 +782,13 @@ class PlanBoard extends Component
             return;
         }
 
-        // An event must be placed on a preparation, line or packaging before it
+        // An event must be placed on a preparation or line before it
         // can be started — that placement determines which warehouse stock
         // moves from.
         if ($action === 'start' && !$event->placeable_id) {
             $this->dispatch('swal:error', [
                 'title' => 'Event not placed',
-                'text'  => 'Place this event on a preparation, line or packaging before starting it.',
+                'text'  => 'Place this event on a preparation or line before starting it.',
             ]);
 
             return;
@@ -1927,7 +1893,7 @@ class PlanBoard extends Component
     // on insufficient stock so the surrounding transaction rolls back.
 
     /**
-     * The placeable (preparation, line or packaging) the event runs on. Resolved once per
+     * The placeable (preparation or line) the event runs on. Resolved once per
      * request — a single status change asks for it per quantity row.
      */
     protected function placeableFor(Event $event)
@@ -2765,7 +2731,6 @@ class PlanBoard extends Component
             'placeable_kind'       => match ($event->placeable_type) {
                 Preparation::class => 'Preparation',
                 Line::class        => 'Line',
-                Packaging::class   => 'Packaging',
                 default            => null,
             },
             'placeable_name'       => $placeableName,
@@ -2829,7 +2794,6 @@ class PlanBoard extends Component
         return match ($alias) {
             'preparation' => Preparation::class,
             'line' => Line::class,
-            'packaging' => Packaging::class,
             default => null,
         };
     }

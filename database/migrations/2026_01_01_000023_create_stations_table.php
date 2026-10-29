@@ -18,9 +18,10 @@ return new class extends Migration
             $table->unsignedBigInteger('factory_id')->nullable()->index();
             $table->string('name');
             $table->string('manufacturer')->nullable();
+            // Per machine, in the basic unit of what its stage makes (packets,
+            // cans …; kg for dough stages).
             $table->decimal('rate', 15, 4)->nullable();
             $table->string('rate_period', 10)->default('hour');   // hour | minute
-            $table->string('rate_unit', 50)->nullable();          // else the type's
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();

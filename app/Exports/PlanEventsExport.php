@@ -3,7 +3,6 @@
 namespace App\Exports;
 
 use App\Models\Event;
-use App\Models\Packaging;
 use App\Models\ProductionLine;
 use App\Services\ApiService;
 use Carbon\Carbon;
@@ -63,8 +62,7 @@ class PlanEventsExport implements FromCollection, WithHeadings, WithMapping, Wit
             $event->from_time ? Carbon::parse($event->from_time)->format('Y-m-d H:i') : '—',
             $event->to_time ? Carbon::parse($event->to_time)->format('Y-m-d H:i') : '—',
             ($hasRecipe ? $event->calculated_duration : $event->planned_duration) ?: '—',
-            // Packaging lanes sit on their own board, outside any production line.
-            $productionLineName ?? ($event->placeable_type === Packaging::class ? 'Packaging' : '—'),
+            $productionLineName ?? '—',
             $placeableName ?? '—',
             $event->status ?? '—',
             $event->description ?? '—',

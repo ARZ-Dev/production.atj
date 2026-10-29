@@ -12,7 +12,6 @@ return new class extends Migration
             $table->id();
             $table->string('name', 100);
             $table->unsignedSmallInteger('sequence')->default(0);   // position on a line
-            $table->string('rate_unit', 50)->nullable();            // default for its stations
             $table->text('description')->nullable();
             $table->timestamps();
             $table->softDeletes();

@@ -15,7 +15,7 @@
                     <h5 class="mb-0">Capacity — {{ $modelName }}</h5>
                     <small class="text-muted">Output per hour this {{ $modelType }} can produce — one figure per item, entered in any of its units.</small>
                 </div>
-                <a href="{{ $modelType === 'preparation' ? route('preparations') : route('lines') }}"
+                <a href="{{ route('preparations') }}"
                     class="btn btn-light-light text-muted">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </a>

@@ -123,20 +123,12 @@
                         </td>
                         <td>{{ $event->recipe?->name ?? '—' }}</td>
                         <td style="white-space: nowrap;">{{ $durationLabel ?? '—' }}</td>
-                        @php $isPackaging = $event->placeable_type === \App\Models\Packaging::class; @endphp
-                        <td>
-                            @if($isPackaging)
-                            <span class="text-muted">Packaging</span>
-                            @else
-                            {{ $event->productionLine?->name ?? '—' }}
-                            @endif
-                        </td>
+                        <td>{{ $event->productionLine?->name ?? '—' }}</td>
                         <td>
                             @if($event->placeable_id)
                             @php
                                 $laneIcon = match ($event->placeable_type) {
                                     \App\Models\Preparation::class => 'egg-fried',
-                                    \App\Models\Packaging::class   => 'box-seam',
                                     default                        => 'diagram-3',
                                 };
                             @endphp

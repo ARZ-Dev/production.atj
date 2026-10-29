@@ -125,8 +125,8 @@ class RecipeCreate extends Component
                 'id'                  => $stage->id,
                 'station_type_id'     => $stage->station_type_id ? (string) $stage->station_type_id : '',
                 'output_quantity'     => format_quantity($stage->output_quantity),
-                'output_unit'         => $stage->output_unit,
-                'output_item_unit_id' => $stage->output_item_unit_id,
+                'output_item_unit_id' => $stage->output_item_unit_id ? (string) $stage->output_item_unit_id : '',
+                'stock_leftovers'     => (bool) $stage->stock_leftovers,
                 'reject_action'       => $stage->reject_action ?: 'waste',
                 'rework_item_id'      => $stage->rework_item_id,
                 'rework_factor'       => format_quantity($stage->rework_factor),
@@ -413,8 +413,8 @@ class RecipeCreate extends Component
             'id'                  => null,
             'station_type_id'     => '',
             'output_quantity'     => '',
-            'output_unit'         => null,
-            'output_item_unit_id' => null,
+            'output_item_unit_id' => '',
+            'stock_leftovers'     => false,
             'reject_action'       => 'waste',
             'rework_item_id'      => null,
             'rework_factor'       => '1',
@@ -591,7 +591,8 @@ class RecipeCreate extends Component
         foreach (array_keys($this->stages) as $key) {
             $rules["stages.{$key}.station_type_id"] = ['required', Rule::exists('station_types', 'id')->whereNull('deleted_at')];
             $rules["stages.{$key}.output_quantity"] = 'required|numeric|min:0.0001';
-            $rules["stages.{$key}.output_unit"]     = 'nullable|string|max:50';
+            // One of the product's units, or blank for kg.
+            $rules["stages.{$key}.output_item_unit_id"] = ['nullable', Rule::in(array_map('strval', array_column($this->headerUnits, 'id')))];
             $rules["stages.{$key}.reject_action"]   = 'required|in:waste,rework';
             $rules["stages.{$key}.rework_item_id"]  = ($this->stages[$key]['reject_action'] ?? 'waste') === 'rework' ? 'required|integer' : 'nullable|integer';
             $rules["stages.{$key}.rework_factor"]   = 'nullable|numeric|min:0';
@@ -607,6 +608,7 @@ class RecipeCreate extends Component
             'stages.*.station_type_id.exists'      => 'Pick the station type — the stage runs on the line\'s stations of it.',
             'stages.*.output_quantity.required'    => 'How much does this stage make per batch?',
             'stages.*.output_quantity.min'         => 'Must be more than 0.',
+            'stages.*.output_item_unit_id.in'      => 'Pick one of the product\'s units, or kg.',
             'stages.*.rework_item_id.required'     => 'Pick what rejects are reworked into.',
             'sections.*.rows.*.stage_key.required' => 'Pick the stage that uses it.',
             'sections.*.rows.*.stage_key.in'       => 'Pick the stage that uses it.',
@@ -765,14 +767,16 @@ class RecipeCreate extends Component
 
         foreach ($this->stages as $key => $stage) {
             $reworkItem = $stage['rework_item_id'] ? $rework->get((int) $stage['rework_item_id']) : null;
+            $unitId     = !empty($stage['output_item_unit_id']) ? (int) $stage['output_item_unit_id'] : null;
 
             $data = [
                 'sequence'            => ++$sequence,
                 'station_type_id'     => (int) $stage['station_type_id'],
                 'name'                => $types[(int) $stage['station_type_id']] ?? '',
                 'output_quantity'     => (float) $stage['output_quantity'],
-                'output_unit'         => $stage['output_unit'] ? trim($stage['output_unit']) : null,
-                'output_item_unit_id' => $stage['output_item_unit_id'] ? (int) $stage['output_item_unit_id'] : null,
+                'output_item_unit_id' => $unitId,
+                // Only a stage that counts the product itself can stock its leftovers.
+                'stock_leftovers'     => $unitId && !empty($stage['stock_leftovers']),
                 'reject_action'       => $stage['reject_action'] === 'rework' && $reworkItem ? 'rework' : 'waste',
                 'rework_item_type_id' => $reworkItem['item_type_id'] ?? null,
                 'rework_item_id'      => $reworkItem['id'] ?? null,
@@ -803,7 +807,7 @@ class RecipeCreate extends Component
             'sectionItems'        => $this->sectionItems,
             'sideSections'        => $this->sideSections,
             'sideSectionItems'    => $this->sideSectionItems,
-            'stationTypes'        => StationType::orderBy('sequence')->orderBy('name')->get(['id', 'name', 'rate_unit']),
+            'stationTypes'        => StationType::orderBy('sequence')->orderBy('name')->get(['id', 'name']),
         ]);
     }
 }
