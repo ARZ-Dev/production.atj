@@ -144,7 +144,8 @@ class LineRunService
             $rated  = $own->filter(fn(Station $station) => $station->hourlyRate() !== null);
             $up     = $rated->reject(fn(Station $station) => $downStationId && $station->id === $downStationId);
             $hourly = $rated->isNotEmpty() ? (float) $up->sum(fn(Station $station) => $station->hourlyRate()) : null;
-            $perBph = $hourly !== null && $stage->output_quantity > 0 ? $hourly / (float) $stage->output_quantity : null;
+            $basic  = (float) $stage->output_quantity * $this->stageFormula($recipe, $stage);
+            $perBph = $hourly !== null && $basic > 0 ? $hourly / $basic : null;
 
             $rows[] = [
                 'stage_id'         => $stage->id,
@@ -184,7 +185,22 @@ class LineRunService
         return $stations->filter(fn(Station $station) => $this->normalize($station->type?->name) === $name)->values();
     }
 
-    /** "1,200 kg/h", "2 × 90 packets/min", or the sum when their rates differ. */
+    /**
+     * Basic units in one of what a stage counts: its unit's formula (a box of
+     * 48 packets is 48), 1 for the basic unit and for kg.
+     */
+    public function stageFormula(Recipe $recipe, RecipeStage $stage): float
+    {
+        return $stage->output_item_unit_id ? $this->unitFormula((int) $recipe->item_id, $stage->output_item_unit_id) : 1.0;
+    }
+
+    /** What a stage counts in: one of the product's units, else kg. */
+    public function stageUnit(Recipe $recipe, RecipeStage $stage): string
+    {
+        return $stage->output_item_unit_id ? ($this->unitName((int) $recipe->item_id, $stage->output_item_unit_id) ?? 'units') : 'kg';
+    }
+
+    /** "1,200/h", "2 × 90/min", or the sum when their rates differ. */
     protected function stageRateLabel(Collection $rated, int $count): ?string
     {
         if ($rated->isEmpty()) {
@@ -194,7 +210,7 @@ class LineRunService
         $labels = $rated->map(fn(Station $station) => $station->rateLabel())->unique();
         $label  = $labels->count() === 1
             ? ($rated->count() > 1 ? $rated->count() . ' × ' : '') . $labels->first()
-            : $this->formatNumber($rated->sum(fn(Station $station) => $station->hourlyRate())) . ' ' . $rated->first()->rateUnit() . '/h';
+            : $this->formatNumber($rated->sum(fn(Station $station) => $station->hourlyRate())) . '/h';
 
         return $label . ($rated->count() < $count ? ' (' . $rated->count() . ' of ' . $count . ' rated)' : '');
     }

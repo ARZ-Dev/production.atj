@@ -447,7 +447,6 @@
     border-right: 1px solid rgba(130,130,180,.18); border-bottom: 1px solid rgba(130,130,180,.18);
 }
 /* The packaging board's group label, tinted so the two boards read apart */
-.pbc-pl-label.pbc-pl-label--packaging { background: rgba(20,184,166,.10); color: #0f766e; }
 .pbc-row-label {
     grid-column: 2; position: sticky; left: 64px; z-index: 1;
     background: inherit; display: flex; align-items: center;

@@ -147,7 +147,6 @@ class LineStations extends Component
                 'count'    => $group->count(),
                 'rated'    => $rated->count(),
                 'per_hour' => $rated->sum(fn(Station $station) => $station->hourlyRate()),
-                'unit'     => $rated->first()?->rateUnit() ?? $group->first()->rateUnit(),
             ];
         })->values();
 

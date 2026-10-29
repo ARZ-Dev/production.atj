@@ -72,11 +72,6 @@
                                         title="Stations">
                                         <i class="bi bi-diagram-3"></i>
                                     </a>
-                                    <a href="{{ route('lines.capacity', $line->id) }}"
-                                        class="btn btn-light-success icon-btn-sm"
-                                        title="Manage Capacity">
-                                        <i class="bi bi-speedometer2"></i>
-                                    </a>
                                     <button type="button" wire:click="edit({{ $line->id }})"
                                         class="btn btn-light-primary icon-btn-sm"
                                         data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="Edit">

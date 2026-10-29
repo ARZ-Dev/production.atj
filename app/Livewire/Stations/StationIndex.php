@@ -42,7 +42,6 @@ class StationIndex extends Component
     public ?string $manufacturer = null;
     public $rate = null;
     public string $rate_period = 'hour';
-    public ?string $rate_unit = null;
     public ?string $notes = null;
 
     protected ApiService $api;
@@ -68,7 +67,7 @@ class StationIndex extends Component
         $this->stations = Station::with(['type', 'lines' => fn($q) => $q->orderBy('name')])->get()
             ->sortBy(fn(Station $station) => sprintf('%05d|%s', $station->type?->sequence ?? 0, $station->type?->name) . '|' . $station->name, SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
-        $this->types = StationType::orderBy('sequence')->orderBy('name')->get(['id', 'name', 'rate_unit']);
+        $this->types = StationType::orderBy('sequence')->orderBy('name')->get(['id', 'name']);
     }
 
     public function resetForm(): void
@@ -83,7 +82,6 @@ class StationIndex extends Component
         $this->manufacturer    = null;
         $this->rate            = null;
         $this->rate_period     = 'hour';
-        $this->rate_unit       = null;
         $this->notes           = null;
         $this->resetValidation();
     }
@@ -112,7 +110,6 @@ class StationIndex extends Component
         $this->manufacturer    = $station->manufacturer;
         $this->rate            = $station->rate !== null ? rtrim(rtrim(number_format($station->rate, 4, '.', ''), '0'), '.') : null;
         $this->rate_period     = $station->rate_period ?: 'hour';
-        $this->rate_unit       = $station->rate_unit;
         $this->notes           = $station->notes;
 
         $this->dispatch('openModal');
@@ -152,7 +149,6 @@ class StationIndex extends Component
             'manufacturer'    => 'nullable|string|max:255',
             'rate'            => 'nullable|numeric|min:0',
             'rate_period'     => 'required|in:hour,minute',
-            'rate_unit'       => 'nullable|string|max:50',
             'notes'           => 'nullable|string|max:2000',
         ];
     }
@@ -199,7 +195,6 @@ class StationIndex extends Component
             'manufacturer'    => $this->manufacturer ? trim($this->manufacturer) : null,
             'rate'            => $this->rate !== null && (float) $this->rate > 0 ? (float) $this->rate : null,
             'rate_period'     => $this->rate_period,
-            'rate_unit'       => $this->rate_unit ? trim($this->rate_unit) : null,
             'notes'           => $this->notes ? trim($this->notes) : null,
         ];
 
@@ -230,8 +225,6 @@ class StationIndex extends Component
 
     public function render()
     {
-        return view('livewire.stations.station-index', [
-            'typeUnit' => $this->types->firstWhere('id', (int) $this->station_type_id)?->rate_unit,
-        ]);
+        return view('livewire.stations.station-index');
     }
 }

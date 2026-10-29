@@ -103,11 +103,8 @@
     @if($boardMode !== 'planned')
 
     @php
-        $readonlyBoards = [
-            'production' => $this->readonlyLaneRows($boardMode),
-            'packaging'  => $this->readonlyLaneRows($boardMode, 'packaging'),
-        ];
-        $readonlyHasItems = collect($readonlyBoards)->flatten(1)->contains(
+        $readonlyRows = $this->readonlyLaneRows($boardMode);
+        $readonlyHasItems = collect($readonlyRows)->contains(
             fn($row) => collect($row['lanes'])->contains(fn($laneRow) => count($laneRow['layout']['items']) > 0)
         );
     @endphp
@@ -122,16 +119,11 @@
     @endunless
 
     <div class="pbc-wrap">
-        @foreach($readonlyBoards as $board => $rows)
         @include('livewire.plans.partials._readonly-grid', [
-            'rows'         => $rows,
+            'rows'         => $readonlyRows,
             'mode'         => $boardMode,
-            'board'        => $board,
-            'emptyMessage' => $board === 'packaging'
-                ? 'No packaging is set up for this factory.'
-                : 'No production lines found for this factory.',
+            'emptyMessage' => 'No production lines found for this factory.',
         ])
-        @endforeach
     </div>
 
     @else
@@ -159,15 +151,7 @@
 
         @include('livewire.plans.partials._planned-grid', [
             'rows'         => $this->laneRows(),
-            'board'        => 'production',
             'emptyMessage' => 'No production lines found for this factory.',
-        ])
-
-        {{-- Packaging runs separately from the production lines, on its own board --}}
-        @include('livewire.plans.partials._planned-grid', [
-            'rows'         => $this->laneRows('packaging'),
-            'board'        => 'packaging',
-            'emptyMessage' => 'No packaging is set up for this factory.',
         ])
     </div>
 
@@ -235,11 +219,7 @@
                         <div class="col-6">
                             <div class="pvc-body-label">Production Line</div>
                             <div>
-                                @if(($selectedEvent['placeable_kind'] ?? null) === 'Packaging')
-                                <span class="text-muted">— (packaging board)</span>
-                                @else
                                 {{ $selectedEvent['production_line_name'] ?? '—' }}
-                                @endif
                             </div>
                         </div>
                         <div class="col-6">
@@ -1204,8 +1184,7 @@
                         return;
                     }
 
-                    // Packaging lanes belong to no production line.
-                    if (!placeableType || !placeableId || (!productionLineId && placeableType !== 'packaging')) {
+                    if (!placeableType || !placeableId || !productionLineId) {
                         return;
                     }
 
@@ -1290,22 +1269,6 @@
                 selectEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
-
-        // ─── Production and packaging boards scroll together ─────────────
-        // Each board is its own horizontal scroller; keep them on the same
-        // time window. Scroll events don't bubble, hence the capture listener.
-        // A board already at the target position isn't touched, which is what
-        // stops the echo from the other board's own scroll event.
-        document.addEventListener('scroll', (e) => {
-            const source = e.target;
-            if (!(source instanceof Element) || !source.classList.contains('pbc-grid')) return;
-
-            document.querySelectorAll('.pbc-grid').forEach(grid => {
-                if (grid !== source && grid.scrollLeft !== source.scrollLeft) {
-                    grid.scrollLeft = source.scrollLeft;
-                }
-            });
-        }, true);
 
         const initAll = () => {
             initCalendarDrag();

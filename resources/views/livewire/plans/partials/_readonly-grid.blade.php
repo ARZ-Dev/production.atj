@@ -1,11 +1,10 @@
 {{--
-    One read-only board for the "Actual" and "Downtime" modes — the production
-    board or the packaging board. The "nothing recorded" notice lives in the
-    caller, since it covers both boards.
-    Expects: $rows (readonlyLaneRows output), $mode, $board, $emptyMessage
+    The read-only board for the "Actual" and "Downtime" modes. The "nothing
+    recorded" notice lives in the caller.
+    Expects: $rows (readonlyLaneRows output), $mode, $emptyMessage
 --}}
-<div class="pbc-grid-wrap" wire:key="ro-{{ $mode }}-board-{{ $board }}">
-    <div class="pbc-grid" data-board="{{ $board }}">
+<div class="pbc-grid-wrap" wire:key="ro-{{ $mode }}-board">
+    <div class="pbc-grid">
         <div class="pbc-corner"></div>
         <div class="pbc-hour-row">
             @for($slot = 0; $slot < 96; $slot++)
@@ -21,7 +20,7 @@
             @foreach($row['lanes'] as $i => $laneRow)
             @php $lane = $laneRow['lane']; $layout = $laneRow['layout']; @endphp
             @if($i === 0)
-            <div class="pbc-pl-label {{ $board === 'packaging' ? 'pbc-pl-label--packaging' : '' }}" style="grid-row: span {{ $laneCount }};" wire:key="ro-{{ $mode }}-{{ $row['key'] }}">
+            <div class="pbc-pl-label" style="grid-row: span {{ $laneCount }};" wire:key="ro-{{ $mode }}-{{ $row['key'] }}">
                 {{ $row['label'] }}
             </div>
             @endif
@@ -49,7 +48,7 @@
             </div>
             @endforeach
         @else
-            <div class="pbc-pl-label {{ $board === 'packaging' ? 'pbc-pl-label--packaging' : '' }}" style="grid-row: span 1;" wire:key="ro-{{ $mode }}-{{ $row['key'] }}">
+            <div class="pbc-pl-label" style="grid-row: span 1;" wire:key="ro-{{ $mode }}-{{ $row['key'] }}">
                 {{ $row['label'] }}
             </div>
             <div class="pbc-row-track-empty">{{ $row['empty'] }}</div>

@@ -106,9 +106,11 @@ class MassaTomateLineRecipeSeeder extends Seeder
                 $recipe->save();
 
                 $stageIds = $this->syncStages($recipe, [
-                    'Filling & Seaming' => ['output_quantity' => $perCase, 'output_unit' => 'cans'],
-                    'Pasteurizing'      => ['output_quantity' => $perCase, 'output_unit' => 'cans', 'output_item_unit_id' => $caseUnit ? $basicUnitId : null],
-                    'Packing'           => ['output_quantity' => $perCase, 'output_unit' => 'cans'],
+                    'Filling & Seaming' => ['output_quantity' => $perCase, 'output_item_unit_id' => $basicUnitId],
+                    'Pasteurizing'      => ['output_quantity' => $perCase, 'output_item_unit_id' => $basicUnitId, 'stock_leftovers' => (bool) $caseUnit],
+                    'Packing'           => $caseUnit
+                        ? ['output_quantity' => 1, 'output_item_unit_id' => $caseUnit]
+                        : ['output_quantity' => $perCase, 'output_item_unit_id' => $basicUnitId],
                 ]);
 
                 $data = [
@@ -142,8 +144,8 @@ class MassaTomateLineRecipeSeeder extends Seeder
                 'sequence'            => ++$sequence,
                 'station_type_id'     => StationTypeSeeder::idOf($name),
                 'output_quantity'     => $stage['output_quantity'],
-                'output_unit'         => $stage['output_unit'],
-                'output_item_unit_id' => $stage['output_item_unit_id'] ?? null,
+                'output_item_unit_id' => $stage['output_item_unit_id'],
+                'stock_leftovers'     => $stage['stock_leftovers'] ?? false,
                 // Bad seams, dented or leaking cans: thrown away.
                 'reject_action'       => 'waste',
                 'rework_item_type_id' => null,

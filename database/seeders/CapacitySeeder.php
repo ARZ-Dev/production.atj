@@ -3,9 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Capacity;
-use App\Models\Line;
-use App\Models\Packaging;
-use App\Models\PackagingCapacity;
 use App\Models\Preparation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -35,64 +32,22 @@ class CapacitySeeder extends Seeder
     ];
 
     /**
-     * MassaTomateProductionRecipeSeeder's products by size, in "SKU's
-     * TP.xlsx" order, rated in cans. The basic unit is the can or sachet
-     * itself, except Super Chef 403000021's, which is KG — 70 g a can.
-     */
-    private const CANS_70G = [
-        '403000001' => [1, 1, 4, 1],         // MASSA TOMATE MAMA TIA LATA 70 GR (50X70), 70g
-        '403000005' => [5, 9, 4, 1],         // MASSA TOMATE MAMA TIA PACOTE 70 GR (sachet, 67 g), 70g
-        '403000018' => [18, 35, 4, 1],       // MASSA TOMATE MAMA TIA LATA 70 GR (25X70), 70g
-        '403000002' => [2, 3, 4, 1],         // MASSA TOMATE DOURADO LATA 70 GR, 70g
-        '403000006' => [6, 11, 4, 1],        // MASSA TOMATE DOURADO PACOTE 70 GR (sachet, 67 g), 70g
-        '403000021' => [121, 149, 4, 0.07],  // MASSA TOMATE SUPER CHEF LATA 50x70 GR, KG
-        '403000101' => [258, 288, 4, 1],     // MASSA TOMATE ADAL 50X70 GR, 70g
-    ];
-
-    private const CANS_400G = [
-        '403000003' => [3, 5, 4, 1],         // MASSA TOMATE MAMA TIA LATA ABRI FACIL 400 GR, 400g
-        '403000007' => [7, 13, 4, 1],        // MASSA TOMATE MAMA TIA PACOTE 400 GR (sachet), 400g
-        '403000004' => [4, 7, 4, 1],         // MASSA TOMATE DOURADO LATA ABRI FACIL 400 GR, 400g
-        '403000008' => [8, 15, 4, 1],        // MASSA TOMATE DOURADO PACOTE 400 GR (sachet), 400g
-        '403000019' => [256, 284, 4, 1],     // MASSA TOMATE YOKABEL LATA ABRI FACIL 24X400 GR, 400g
-        '403000022' => [257, 286, 4, 1],     // MASSA TOMATE SUPER CHEF LATA ABRI FACIL 24X400 GR, 400g
-        '403000102' => [259, 290, 4, 1],     // MASSA TOMATE ADAL LATA ABRI FACIL 24X400 GR, 400g
-        '403900001' => [263, 300, 5, 1],     // Tomato Peelado Mamatia 24X400 GR, 400g
-        '403900002' => [21, 41, 5, 1],       // TOMATE PELADO MAMATIA 400 GR (12X400), 400g
-        '403900003' => [22, 43, 5, 1],       // TOMATE PELADO MAMATIA 400 GR (6X400), 400g
-        '403900004' => [264, 302, 5, 1],     // Tomato Peelado Yokabel 24X400 GR, 400g
-    ];
-
-    /**
-     * Run the database seeds. Runs after PreparationSeeder, LineSeeder and
-     * PackagingSeeder.
+     * Run the database seeds. Runs after PreparationSeeder.
      *
-     * A preparation / line keeps one capacity per item, in its basic unit
-     * (the unit is the one it was entered in); a packaging keeps one per item
-     * unit, and gets its basic unit's here. Capacities are per hour. Every
-     * placeable listed ends up with exactly these — matched on those keys and
-     * updated in place, anything else on it removed, as saving its capacity
-     * page does; placeables not listed are left alone.
+     * Only preparations have capacities: a line's speed comes from its
+     * stations (StationSeeder) and packagings are gone (2026-10-29). A
+     * preparation keeps one capacity per item, in its basic unit (the unit is
+     * the one it was entered in), per hour. Every preparation listed ends up
+     * with exactly these — matched on those keys and updated in place,
+     * anything else on it removed, as saving its capacity page does;
+     * preparations not listed are left alone.
      */
     public function run(): void
     {
         // "Equipment and capacity Massa tomate.xlsx" (sheet FAB MASSA TOMAT).
-        // The can lines' rates moved to their stations on 2026-10-28
-        // (StationSeeder): a line run takes its speed from its slowest
-        // station. The packaging machines are the lines' Packing stations, and
-        // PackagingSeeder no longer runs — so only the mixer keeps capacities.
-        $capacities = array_merge(
-            $this->rates(Preparation::class, 1, self::SFG_MASSA_TOMATE, 3500), // Mixing — 3.5 t/h
-            // $this->rates(Line::class, 1, self::CANS_70G, 360 * 60),         // Filling & Seaming 70g — 360 cans/min
-            // $this->rates(Line::class, 3, self::CANS_400G, 130 * 60),        // Filling & Seaming 400g — 130 cans/min
-        );
+        $capacities = $this->rates(Preparation::class, 1, self::SFG_MASSA_TOMATE, 3500); // Mixing — 3.5 t/h
 
-        $packagingCapacities = [
-            // ...$this->rates(Packaging::class, 3, self::CANS_70G, 600 * 60), // Packaging Machine 70g — 600 cans/min
-            // ...$this->rates(Packaging::class, 4, self::CANS_400G, 200 * 60), // Packaging Machine 400g — 200 cans/min
-        ];
-
-        DB::transaction(function () use ($capacities, $packagingCapacities) {
+        DB::transaction(function () use ($capacities) {
             foreach (collect($capacities)->groupBy(fn($row) => "{$row['model']}#{$row['id']}") as $rows) {
                 Capacity::where('capacityable_type', $rows[0]['model'])
                     ->where('capacityable_id', $rows[0]['id'])
@@ -103,19 +58,6 @@ class CapacitySeeder extends Seeder
                     Capacity::updateOrCreate(
                         ['capacityable_type' => $row['model'], 'capacityable_id' => $row['id'], 'item_id' => $row['item_id']],
                         ['item_type_id' => $row['item_type_id'], 'item_unit_id' => $row['item_unit_id'], 'capacity' => $row['capacity']]
-                    );
-                }
-            }
-
-            foreach (collect($packagingCapacities)->groupBy('id') as $packagingId => $rows) {
-                PackagingCapacity::where('packaging_id', $packagingId)
-                    ->whereNotIn('item_unit_id', $rows->pluck('item_unit_id'))
-                    ->delete();
-
-                foreach ($rows as $row) {
-                    PackagingCapacity::updateOrCreate(
-                        ['packaging_id' => $row['id'], 'item_unit_id' => $row['item_unit_id']],
-                        ['item_type_id' => $row['item_type_id'], 'item_id' => $row['item_id'], 'capacity' => $row['capacity']]
                     );
                 }
             }

@@ -28,7 +28,6 @@ class StationTypeIndex extends Component
 
     public string $name = '';
     public $sequence = '';
-    public ?string $rate_unit = null;
     public ?string $description = null;
 
     /** id => name of the production departments, for "Used in". */
@@ -55,7 +54,6 @@ class StationTypeIndex extends Component
         $this->editing     = false;
         $this->name        = '';
         $this->sequence    = '';
-        $this->rate_unit   = null;
         $this->description = null;
         $this->resetValidation();
     }
@@ -79,7 +77,6 @@ class StationTypeIndex extends Component
         $this->editing     = true;
         $this->name        = $type->name;
         $this->sequence    = (string) $type->sequence;
-        $this->rate_unit   = $type->rate_unit;
         $this->description = $type->description;
 
         $this->dispatch('openModal');
@@ -90,7 +87,6 @@ class StationTypeIndex extends Component
         return [
             'name'        => ['required', 'string', 'max:100', Rule::unique('station_types', 'name')->whereNull('deleted_at')->ignore($this->typeId)],
             'sequence'    => 'required|integer|min:0|max:999',
-            'rate_unit'   => 'nullable|string|max:50',
             'description' => 'nullable|string|max:1000',
         ];
     }
@@ -112,7 +108,6 @@ class StationTypeIndex extends Component
         $data = [
             'name'        => $this->name,
             'sequence'    => (int) $this->sequence,
-            'rate_unit'   => $this->rate_unit ? trim($this->rate_unit) : null,
             'description' => $this->description ? trim($this->description) : null,
         ];
 

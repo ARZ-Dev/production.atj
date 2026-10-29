@@ -151,29 +151,24 @@
                             @error('manufacturer')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-6"></div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label for="s_rate" class="form-label">Rate</label>
                             <input type="number" min="0" step="any" class="form-control @error('rate') is-invalid @enderror"
                                 id="s_rate" wire:model="rate" placeholder="No rate">
                             @error('rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label for="s_period" class="form-label">Per</label>
                             <select class="form-select" id="s_period" wire:model="rate_period">
                                 <option value="hour">per hour</option>
                                 <option value="minute">per minute</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label for="s_unit" class="form-label">Unit</label>
-                            <input type="text" class="form-control @error('rate_unit') is-invalid @enderror"
-                                id="s_unit" wire:model="rate_unit" placeholder="{{ $typeUnit ?: 'e.g. kg' }}">
-                            @error('rate_unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
                         <div class="col-12">
                             <div class="form-text mt-0">
-                                What this one machine makes, in the unit its recipe stage counts (kg, packets, boxes …).
-                                A station without a rate doesn't limit its line. Blank unit = the type's{{ $typeUnit ? ' (' . $typeUnit . ')' : '' }}.
+                                What this one machine makes, in the basic unit of the product (packets, cans …) — kg for
+                                cutting, cooking, creaming and mixing. A stage that makes boxes or cases converts with the
+                                unit's formula. A station without a rate doesn't limit its line.
                             </div>
                         </div>
                         <div class="col-12">

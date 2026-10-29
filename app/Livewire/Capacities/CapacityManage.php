@@ -9,8 +9,8 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * Capacity of a preparation or line — the same page shape as the packaging
- * capacity page, but with a different model underneath: one figure per *item*,
+ * Capacity of a preparation (a line's speed comes from its stations): one
+ * figure per *item*,
  * stored in basic units (that's what RecipeDurationService divides by), entered
  * in whichever unit is convenient. The per-unit inputs are linked in the browser;
  * only the basic value and the unit it was entered in reach the server.
@@ -23,7 +23,7 @@ class CapacityManage extends Component
     use OffersOutputWarehouseItemTypes;
 
     #[Locked]
-    public string $modelType;   // 'preparation' | 'line'
+    public string $modelType;   // 'preparation'
     #[Locked]
     public int    $modelId;
     #[Locked]
@@ -61,11 +61,10 @@ class CapacityManage extends Component
         $this->modelType = $modelType;
         $this->modelId   = $id;
 
-        // A capacity is part of the preparation / line's setup — the same gate
-        // as editing it (packaging's capacity page uses packaging-edit).
+        // A capacity is part of the preparation's setup — the same gate as
+        // editing it.
         authorizeRequest(match ($modelType) {
             'preparation' => 'production.preparation-edit',
-            'line'        => 'production.line-edit',
             default       => abort(404),
         });
 
@@ -73,11 +72,8 @@ class CapacityManage extends Component
         $this->modelName = $model->name;
         $this->loadCatalog();
 
-        // A preparation makes semi-finished goods, a line finished ones; both
-        // keep the warehouse they produce into in fg_warehouse_id.
-        $this->catalogLoaded = $this->loadOutputWarehouse($model, $modelType === 'preparation'
-                ? 'semi-finished goods warehouse'
-                : 'finished goods warehouse')
+        // A preparation makes semi-finished goods, into its fg_warehouse_id.
+        $this->catalogLoaded = $this->loadOutputWarehouse($model, 'semi-finished goods warehouse')
             && $this->catalogLoaded;
 
         // Group by the item's *current* type, falling back to the stored one,
@@ -103,7 +99,6 @@ class CapacityManage extends Component
     {
         return match($this->modelType) {
             'preparation' => \App\Models\Preparation::class,
-            'line'        => \App\Models\Line::class,
             default       => abort(404),
         };
     }
@@ -360,7 +355,7 @@ class CapacityManage extends Component
 
         // A full reload, so every unit input comes back from what was stored —
         // the visible per-unit fields are driven by JS, not by wire:model.
-        $route = $this->modelType === 'preparation' ? 'preparations.capacity' : 'lines.capacity';
+        $route = 'preparations.capacity';
 
         return redirect()->route($route, $this->modelId)
             ->with('success', 'Capacity saved successfully.');
