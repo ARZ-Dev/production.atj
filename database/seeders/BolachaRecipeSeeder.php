@@ -11,9 +11,8 @@ use RuntimeException;
 class BolachaRecipeSeeder extends Seeder
 {
     /**
-     * Seeded by FactoryRecipeTypeSeeder: uses RM Bolacha, RM Massa Tomate
-     * (the raw materials both factories share) and SFG Bolacha (Xarope),
-     * makes SFG Bolacha.
+     * Seeded by FactoryRecipeTypeSeeder: uses Raw Materials (one type for
+     * both factories) and SFG Bolacha (Xarope), makes SFG Bolacha.
      */
     private const RECIPE_TYPE_NAME = 'Preparation Bolacha';
 
@@ -79,51 +78,51 @@ class BolachaRecipeSeeder extends Seeder
 
     /**
      * The raw materials the BOM uses: code => [item id, basic unit id (KG),
-     * item type id, name]. Most are RM Bolacha (15), from auth-service's
-     * BolachaRawMaterialItemSeeder; sugar, salt, citric acid and caramel
-     * colouring are the tomato paste factory's RM Massa Tomate (11) items,
-     * shared. RMBL-01 (Corante) is a placeholder code. The names are here for
-     * reading only.
+     * item type id, name]. All are Raw Materials (11): most from
+     * auth-service's BolachaRawMaterialItemSeeder; sugar, salt, citric acid
+     * and caramel colouring are the tomato paste factory's items
+     * (MassaTomateRawMaterialItemSeeder), shared. RMBL-01 (Corante) is a
+     * placeholder code. The names are here for reading only.
      */
     public const RAW_MATERIALS = [
-        '990101003' => [57, 85, 11, 'Y- ACUCAR CRISTAL INDUSTRIAL'], // RM Massa Tomate
-        '990101014' => [131, 159, 15, 'Y- Bicarbonato de Sodium'],
-        '990101002' => [56, 84, 11, 'Y- SAL INDUSTRIAL FABRICA'], // RM Massa Tomate
-        '990101020' => [132, 160, 15, 'Y -Lecitina de Soja ( SL 180209 )'],
-        '990101018' => [133, 161, 15, 'Y- Gordura Vegetal Industrial'],
-        '990101016' => [134, 162, 15, 'Y- Metabisulfito de Sodium (SMBS)'],
-        '990101012' => [135, 163, 15, 'Y- Bicarbonato de Amonia'],
-        '990101010' => [58, 86, 11, 'Y- ACIDO CITRICO'], // RM Massa Tomate
-        '990100002' => [136, 164, 15, 'Y- Farinha de Trigo Industrial'],
-        '990101017' => [137, 165, 15, 'Amido de Milho'],
-        '990100009' => [138, 166, 15, 'Y-Farelo do Trigo'],
-        '990101059' => [140, 168, 15, 'Coconut Flavor (TAKASAGO)'],
-        '990101093' => [141, 169, 15, 'SKB SPECTA PAN ( ENZIMA)'],
-        '990101074' => [142, 170, 15, 'Y- Cacau em Po'],
-        '990101055' => [144, 172, 15, 'Chocolate Flavor (TAKASAGO)'],
-        '990101040' => [145, 173, 15, 'Y- Semisweet Chocolate Flavor 2990A'],
-        '990101028' => [147, 175, 15, 'Y- Milk vanilha flaver 12708A (GLUCOSO)'],
-        '990101025' => [149, 177, 15, 'Y- Butter Flavor (45840A)'],
-        '990101037' => [150, 178, 15, 'Y-Srawberry Flavor'],
-        '990101008' => [152, 180, 15, '2 FLAVOR - MILK MICRON FLAVOR / KG'],
-        '990101031' => [153, 181, 15, 'CONDENCE MILK FLAVOR'],
-        '990101011' => [156, 184, 15, 'PIROFOSFATO ACIDO DE SODIO'],
-        '990101062' => [158, 186, 15, 'Cream Flavor Takasago'],
-        '990101082' => [160, 188, 15, 'Strawberry Flavor Takasago'],
-        '401000005' => [41, 69, 11, 'COLOROCAO CARAMELO'], // RM Massa Tomate
-        '999511585' => [162, 190, 15, 'COCONUT FLAVOR'],
-        '990101047' => [164, 192, 15, 'Milk Flavor Powder'],
-        '990101067' => [165, 193, 15, 'Lucta Aroma Chicken 03828A'],
-        '990101068' => [166, 194, 15, 'Lucat Aroma Chilli Beef 33479'],
-        '990101069' => [167, 195, 15, 'Lucat Aroma Chilli 49014'],
-        '990101070' => [168, 196, 15, 'Olive Powder 202347'],
-        '990101071' => [169, 197, 15, 'Black Olives 25263A'],
-        'RMBL-01' => [170, 198, 15, 'Corante'],
-        '990101094' => [171, 199, 15, 'Sabor Tutti Fruit'],
-        '990101096' => [172, 200, 15, 'Sabor de Limão'],
-        '999511774' => [173, 201, 15, 'Rolo Wafi Ginguba'],
-        '988888889' => [174, 202, 15, 'Wafer Em po'],
-        '988888888' => [175, 203, 15, 'Bolacha em po'],
+        '990101003' => [57, 85, 11, 'Y- ACUCAR CRISTAL INDUSTRIAL'],
+        '990101014' => [131, 159, 11, 'Y- Bicarbonato de Sodium'],
+        '990101002' => [56, 84, 11, 'Y- SAL INDUSTRIAL FABRICA'],
+        '990101020' => [132, 160, 11, 'Y -Lecitina de Soja ( SL 180209 )'],
+        '990101018' => [133, 161, 11, 'Y- Gordura Vegetal Industrial'],
+        '990101016' => [134, 162, 11, 'Y- Metabisulfito de Sodium (SMBS)'],
+        '990101012' => [135, 163, 11, 'Y- Bicarbonato de Amonia'],
+        '990101010' => [58, 86, 11, 'Y- ACIDO CITRICO'],
+        '990100002' => [136, 164, 11, 'Y- Farinha de Trigo Industrial'],
+        '990101017' => [137, 165, 11, 'Amido de Milho'],
+        '990100009' => [138, 166, 11, 'Y-Farelo do Trigo'],
+        '990101059' => [140, 168, 11, 'Coconut Flavor (TAKASAGO)'],
+        '990101093' => [141, 169, 11, 'SKB SPECTA PAN ( ENZIMA)'],
+        '990101074' => [142, 170, 11, 'Y- Cacau em Po'],
+        '990101055' => [144, 172, 11, 'Chocolate Flavor (TAKASAGO)'],
+        '990101040' => [145, 173, 11, 'Y- Semisweet Chocolate Flavor 2990A'],
+        '990101028' => [147, 175, 11, 'Y- Milk vanilha flaver 12708A (GLUCOSO)'],
+        '990101025' => [149, 177, 11, 'Y- Butter Flavor (45840A)'],
+        '990101037' => [150, 178, 11, 'Y-Srawberry Flavor'],
+        '990101008' => [152, 180, 11, '2 FLAVOR - MILK MICRON FLAVOR / KG'],
+        '990101031' => [153, 181, 11, 'CONDENCE MILK FLAVOR'],
+        '990101011' => [156, 184, 11, 'PIROFOSFATO ACIDO DE SODIO'],
+        '990101062' => [158, 186, 11, 'Cream Flavor Takasago'],
+        '990101082' => [160, 188, 11, 'Strawberry Flavor Takasago'],
+        '401000005' => [41, 69, 11, 'COLOROCAO CARAMELO'],
+        '999511585' => [162, 190, 11, 'COCONUT FLAVOR'],
+        '990101047' => [164, 192, 11, 'Milk Flavor Powder'],
+        '990101067' => [165, 193, 11, 'Lucta Aroma Chicken 03828A'],
+        '990101068' => [166, 194, 11, 'Lucat Aroma Chilli Beef 33479'],
+        '990101069' => [167, 195, 11, 'Lucat Aroma Chilli 49014'],
+        '990101070' => [168, 196, 11, 'Olive Powder 202347'],
+        '990101071' => [169, 197, 11, 'Black Olives 25263A'],
+        'RMBL-01' => [170, 198, 11, 'Corante'],
+        '990101094' => [171, 199, 11, 'Sabor Tutti Fruit'],
+        '990101096' => [172, 200, 11, 'Sabor de Limão'],
+        '999511774' => [173, 201, 11, 'Rolo Wafi Ginguba'],
+        '988888889' => [174, 202, 11, 'Wafer Em po'],
+        '988888888' => [175, 203, 11, 'Bolacha em po'],
     ];
 
     /**

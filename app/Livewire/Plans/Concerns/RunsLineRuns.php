@@ -21,10 +21,10 @@ use Illuminate\Support\Facades\DB;
  * whole continuous line.
  *
  *  - Start takes nothing — dough is mixed while the line runs.
- *  - While it runs: hourly counts against the line's rate, Pause for a stop
- *    of the whole line (charged to a station), and station stops (one
- *    station down while the rest run on), which are emergency events with a
- *    station.
+ *  - While it runs: hourly counts against the line's rate, and one Stop
+ *    (the emergency-event modal) that records either a stop of the whole
+ *    line — a pause, charged to a station — or a station stop, one station
+ *    down while the rest run on, which is an emergency event with a station.
  *  - End: what each station counted, its rejects and leftovers, and what was
  *    used of each material; checked, then stock moves in one batch.
  *
@@ -51,12 +51,19 @@ trait RunsLineRuns
     /** The station a line stop (Pause) is charged to. */
     public ?int $actionStationId = null;
 
+    /**
+     * What a run's Stop records: 'station' — one machine down while the line
+     * runs on (a station stop) — or 'line', the whole line stopped (a pause).
+     */
+    public string $runStopScope = 'station';
+
     protected function resetRunForm(): void
     {
         $this->runEnd          = [];
         $this->runEndCheck     = null;
         $this->runCount        = [];
         $this->actionStationId = null;
+        $this->runStopScope    = 'station';
     }
 
     // ─── Stations ────────────────────────────────────────────────────────────

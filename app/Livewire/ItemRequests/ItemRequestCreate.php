@@ -41,12 +41,8 @@ class ItemRequestCreate extends Component
 
         $this->warehouses = $this->api->get('/v1/warehouses', ['module' => 'production'])['data'] ?? [];
 
-        // Every factory's raw materials — one call per item type, since the
-        // parent filters on a single item type name.
-        $this->rawMaterials = collect(['RM Massa Tomate', 'RM Bolacha'])
-            ->flatMap(fn ($itemType) => $api->get('/v1/items', ['item_type' => $itemType, 'is_active' => true])['data'] ?? [])
-            ->values()
-            ->all();
+        // Every factory's raw materials: one item type for the whole company.
+        $this->rawMaterials = array_values($api->get('/v1/items', ['item_type' => 'Raw Materials', 'is_active' => true])['data'] ?? []);
 
         if ($id) {
             $request            = ItemRequest::with('inputs')->findOrFail($id);

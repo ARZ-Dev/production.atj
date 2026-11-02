@@ -49,5 +49,9 @@ class DatabaseSeeder extends Seeder
         // Packing is the lines' last station now; no packaging lanes are seeded.
         // $this->call(PackagingSeeder::class);
         $this->call(CapacitySeeder::class);
+        // Testing stock: an approved Stock In of 1,000 of every item per production
+        // warehouse (auth-service's ProductionTestStockSeeder puts the stock in).
+        // Comment it out before seeding a real environment.
+        $this->call(TestStockInSeeder::class);
     }
 }

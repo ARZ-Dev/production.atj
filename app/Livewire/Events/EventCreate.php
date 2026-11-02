@@ -622,11 +622,12 @@ class EventCreate extends Component
     // ─── Line runs ───────────────────────────────────────────────────────────
 
     /**
-     * What the popup shows for a row whose recipe has stages: the line's
-     * stations and which is slowest, the run's duration at that rate, and what
-     * it uses with what each warehouse holds now. The line is the one the
-     * event is placed on, or else the first line taking its event type that
-     * has stations — an estimate until it's placed. Null for anything else.
+     * What the popup shows for a row whose recipe has stages: every line of
+     * the plan's factory that takes its event type — each with its stations,
+     * the slowest one and the run's duration at that rate — and what the run
+     * uses, with what each warehouse holds now. The line it's placed on comes
+     * first, then the fastest; an unplaced run's are all estimates. Null for
+     * anything else.
      */
     private function runInfo(array $row): ?array
     {
@@ -640,41 +641,97 @@ class EventCreate extends Component
             return null;
         }
 
-        $placed = ($row['placeable_type'] ?? null) === Line::class && !empty($row['placeable_id']);
-        $line   = $placed
-            ? Line::with('stations.type')->find($row['placeable_id'])
-            : Line::with('stations.type')
-                ->whereHas('stations')
-                ->when($row['event_type_id'] ?? null, fn($q, $typeId) => $q->whereHas('eventTypes', fn($t) => $t->where('event_types.id', $typeId)))
-                ->orderBy('name')
-                ->first();
+        $placedId = ($row['placeable_type'] ?? null) === Line::class && !empty($row['placeable_id']) ? (int) $row['placeable_id'] : null;
+        $lines    = Line::with('stations.type')
+            ->when($row['event_type_id'] ?? null, fn($q, $typeId) => $q->whereHas('eventTypes', fn($t) => $t->where('event_types.id', $typeId)))
+            ->when($this->plan->factory_id, fn($q, $factoryId) => $q->whereHas('productionLines', fn($p) => $p->where('factory_id', $factoryId)))
+            ->orderBy('name')
+            ->get();
+
+        // The line it's on, even should it no longer take the event type.
+        if ($placedId && !$lines->contains('id', $placedId) && ($placedLine = Line::with('stations.type')->find($placedId))) {
+            $lines->prepend($placedLine);
+        }
 
         $batches  = $this->lineRuns->number($row['batch_count'] ?? null) ?: 1.0;
         $perBatch = (float) ($recipe->quantity_per_batch ?: 1);
-        $rate     = $line ? $this->lineRuns->lineRate($recipe, $line) : null;
-        $perHour  = $rate['batches_per_hour'] ?? null;
 
-        $materials = array_values(array_map(function (array $material) use ($line) {
-            $warehouseId = $line ? $this->lineRuns->warehouseFor($line, $material['item_type_id']) : null;
+        $lineRows = $lines->map(function (Line $line) use ($recipe, $batches, $perBatch, $placedId) {
+            $rate    = $this->lineRuns->lineRate($recipe, $line);
+            $perHour = $rate['batches_per_hour'];
+
+            return [
+                'id'           => $line->id,
+                'name'         => $line->name,
+                'placed'       => $line->id === $placedId,
+                'has_stations' => $line->stations->isNotEmpty(),
+                'stages'       => $rate['stages'],
+                'bottleneck'   => $rate['bottleneck'],
+                'missing'      => $rate['missing'],
+                'per_hour'     => $perHour ? $perHour * $perBatch : null,
+                // Exact minutes, so a run shorter than a minute still reads as
+                // having a rate.
+                'minutes'      => $perHour ? $batches / $perHour * 60 : null,
+                'fastest'      => false,
+            ];
+        })
+            // Placed first, then quickest, lines without a rate last.
+            ->sortBy(fn(array $line) => [$line['placed'] ? 0 : 1, $line['minutes'] === null ? 1 : 0, $line['minutes'] ?? 0, $line['name']])
+            ->values()
+            ->all();
+
+        $timed = array_filter($lineRows, fn(array $line) => $line['minutes'] !== null);
+
+        if (count($lineRows) > 1 && $timed) {
+            $fastest = min(array_column($timed, 'minutes'));
+
+            foreach ($lineRows as &$line) {
+                $line['fastest'] = $line['minutes'] !== null && abs($line['minutes'] - $fastest) < 1e-9;
+            }
+            unset($line);
+        }
+
+        // Stock from the warehouse each line would take a material from: the
+        // placed line's alone, or every candidate's while it's unplaced (they
+        // usually agree, so it's one figure).
+        $sourceLines = $placedId ? $lines->where('id', $placedId) : $lines;
+        $stock       = [];
+
+        $materials = array_values(array_map(function (array $material) use ($sourceLines, &$stock) {
+            $warehouseIds = $sourceLines
+                ->map(fn(Line $line) => $this->lineRuns->warehouseFor($line, $material['item_type_id']))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $rows = $warehouseIds->map(function (int $warehouseId) use ($material, &$stock) {
+                $key = "{$warehouseId}:{$material['item_id']}:{$material['item_unit_id']}";
+
+                if (!array_key_exists($key, $stock)) {
+                    $stock[$key] = $this->inventory->available($warehouseId, $material['item_id'], $material['item_unit_id']);
+                }
+
+                return ['warehouse_name' => $this->warehouseName($warehouseId), 'available' => $stock[$key]];
+            })->all();
 
             return $material + [
-                'warehouse_name' => $warehouseId ? $this->warehouseName($warehouseId) : null,
-                'available'      => $warehouseId ? $this->inventory->available($warehouseId, $material['item_id'], $material['item_unit_id']) : null,
+                'stock' => $rows,
+                'short' => collect($rows)->contains(fn(array $s) => $s['available'] !== null && $s['available'] + 1e-6 < $material['total']),
             ];
         }, $this->lineRuns->materials($recipe, $batches)));
 
+        $timedRows = array_values(array_filter($lineRows, fn(array $line) => $line['minutes'] !== null));
+
         return [
-            'line_name'       => $line?->name,
-            'placed'          => $placed,
-            'stages'          => $rate['stages'] ?? [],
-            'bottleneck'      => $rate['bottleneck'] ?? null,
-            'missing'         => $rate['missing'] ?? [],
+            'placed'          => (bool) $placedId,
+            'lines'           => $lineRows,
+            // What the header quotes: the placed line, else the fastest.
+            'lead'            => $placedId ? ($lineRows[0] ?? null) : ($timedRows[0] ?? null),
             'per_batch'       => $perBatch,
-            'per_hour'        => $perHour ? $perHour * $perBatch : null,
-            'duration'        => $perHour ? (int) round($batches / $perHour * 60) : null,
             'output_quantity' => $batches * $perBatch,
             'output_unit'     => $this->lineRuns->unitName((int) $recipe->item_id, $recipe->item_unit_id) ?? '',
             'materials'       => $materials,
+            'short'           => count(array_filter($materials, fn(array $m) => $m['short'])),
         ];
     }
 

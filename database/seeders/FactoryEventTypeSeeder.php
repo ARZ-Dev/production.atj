@@ -45,7 +45,7 @@ class FactoryEventTypeSeeder extends Seeder
                 'has_recipe' => false,
                 'start_items_unverifiable' => false,
                 'duration' => 40,
-                'item_type_ids' => [15],          // RM Bolacha
+                'item_type_ids' => [11],          // Raw Materials
             ],
 
             // Massa Tomate

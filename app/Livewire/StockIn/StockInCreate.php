@@ -80,11 +80,18 @@ class StockInCreate extends Component
                 'quantity'     => format_quantity($input->quantity),
             ])->toArray();
 
-            // Pre-load units for each existing row
+            // Pre-load units for each existing row from the warehouse's item
+            // list, which carries them — one call per line made a long document
+            // (the seeded testing stock) take minutes to open. Only an item the
+            // warehouse no longer lists is fetched on its own.
+            $listedUnits = collect($this->allItems)->pluck('units', 'id');
+
             foreach ($this->stockInItems as $index => $row) {
-                $this->rowUnits[$index] = $row['item_id']
-                    ? $this->fetchUnitsForItem($row['item_id'])
-                    : [];
+                $this->rowUnits[$index] = match (true) {
+                    !$row['item_id']                   => [],
+                    $listedUnits->has($row['item_id']) => $listedUnits[$row['item_id']] ?? [],
+                    default                            => $this->fetchUnitsForItem($row['item_id']),
+                };
             }
         } else {
             $this->addRow();

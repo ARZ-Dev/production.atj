@@ -782,6 +782,15 @@ class PlanBoard extends Component
             return;
         }
 
+        // A line run has one Stop for the whole line and for one station; a
+        // stop of the whole line (a pause) is that modal's "whole line" choice.
+        if ($action === 'pause' && $this->lineRuns->isRun($event)) {
+            $this->openPauseActivities($eventId);
+            $this->runStopScope = 'line';
+
+            return;
+        }
+
         // An event must be placed on a preparation or line before it
         // can be started — that placement determines which warehouse stock
         // moves from.
@@ -872,12 +881,14 @@ class PlanBoard extends Component
 
         $verb   = $action === 'terminate' ? 'ending' : 'resuming';
         $plural = $count > 1;
+        $isRun  = $this->lineRuns->isRun($event);
+        $noun   = $isRun ? 'station stop' : 'emergency event';
 
         $this->dispatch('swal:error', [
-            'title' => 'Ongoing emergency events',
-            'text'  => "{$subject} has {$count} ongoing emergency event" . ($plural ? 's' : '')
-                . '. Use the "Emergency" button to end ' . ($plural ? 'them' : 'it')
-                . " before {$verb} the event.",
+            'title' => 'Ongoing ' . $noun . 's',
+            'text'  => "{$subject} has {$count} ongoing {$noun}" . ($plural ? 's' : '')
+                . '. Use the "' . ($isRun ? 'Stop' : 'Emergency') . '" button to end ' . ($plural ? 'them' : 'it')
+                . " before {$verb} the " . ($isRun ? 'run' : 'event') . '.',
         ]);
 
         return true;
@@ -1203,13 +1214,8 @@ class PlanBoard extends Component
 
     protected function preparePauseModal(Event $event): void
     {
+        // A line run's pause is the Stop modal's "whole line" (updateEventStatus).
         $this->eventAction = $this->baseActionPayload($event, 'pause');
-
-        // A line run stops as a whole: say which station stopped it.
-        if ($this->lineRuns->isRun($event)) {
-            $this->eventAction['run']      = true;
-            $this->eventAction['stations'] = $this->runStations($event);
-        }
     }
 
     protected function prepareResumeModal(Event $event): void
@@ -1531,6 +1537,8 @@ class PlanBoard extends Component
             // running); otherwise the modal is just for ending the ongoing ones.
             'can_add'             => $canAdd,
             'run'                 => $isRun,
+            // A running line can also be stopped as a whole from here (a pause).
+            'can_stop_line'       => $isRun && $event->status === 'in_progress',
             'stations'            => $isRun ? $this->runStations($event) : [],
             // All activities ever recorded for the event, so earlier pauses
             // (and legacy pauses without a log) stay visible.
@@ -1842,8 +1850,21 @@ class PlanBoard extends Component
             ['actionTime.required' => 'Please enter the time.', 'actionTime.date' => 'Please enter a valid time.']
         );
 
-        // Recording emergency events is not a status transition.
+        // Recording emergency events is not a status transition — except a
+        // run's Stop of the whole line, which pauses it, charged to a station.
         if ($action === 'activities') {
+            if ($this->runStopScope === 'line' && $this->lineRuns->isRun($event)) {
+                if (!$this->assertTransitionAllowed($event, 'pause', 'a run')) {
+                    $this->closeActionModal();
+
+                    return;
+                }
+
+                $this->submitPause($event);
+
+                return;
+            }
+
             $this->submitPauseActivities($event);
 
             return;
