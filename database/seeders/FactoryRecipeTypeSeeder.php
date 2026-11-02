@@ -30,15 +30,15 @@ class FactoryRecipeTypeSeeder extends Seeder
     public function run(): void
     {
         $recipeTypes = [
-            ['name' => 'Preparation Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [12]],   // RM → SFG Massa Tomate
+            ['name' => 'Preparation Massa Tomate', 'item_type_ids' => [11], 'output_item_type_ids' => [12]],   // Raw Materials → SFG Massa Tomate
             // The whole can line as one run, its recipes in stages (filling & seaming,
             // pasteurizing, packing): SFG + Packaging Materials → Fb. Tomate - Massa
             // Tomate, Pelado, Vinegar, Ketchup, in cases
             ['name' => 'Production Massa Tomate', 'item_type_ids' => [12, 13], 'output_item_type_ids' => [4, 5, 6, 7]],
             // Retired 2026-10-28 — packing is the line's last station now:
             // ['name' => 'Packaging Massa Tomate', 'item_type_ids' => [4, 5, 6, 7, 13], 'output_item_type_ids' => [4, 5, 6, 7]],
-            // RM Bolacha + the RM Massa Tomate items both factories share + SFG (Xarope) → SFG Bolacha
-            ['name' => 'Preparation Bolacha', 'item_type_ids' => [15, 11, 16], 'output_item_type_ids' => [16]],
+            // Raw Materials (both factories', one type) + SFG (Xarope) → SFG Bolacha
+            ['name' => 'Preparation Bolacha', 'item_type_ids' => [11, 16], 'output_item_type_ids' => [16]],
             // The whole biscuit line as one run, its recipes in stages (cutting, cooking,
             // creaming, packaging, packing): SFG + Packaging Materials Bolacha + Massa
             // Tomate's (the shared tape) → Fb. Bolacha - Hard, Soft, Wafer, in boxes

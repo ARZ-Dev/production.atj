@@ -11,7 +11,7 @@ use RuntimeException;
 class MassaTomateRecipeSeeder extends Seeder
 {
     /**
-     * Seeded by FactoryRecipeTypeSeeder: uses RM Massa Tomate, makes SFG Massa
+     * Seeded by FactoryRecipeTypeSeeder: uses Raw Materials, makes SFG Massa
      * Tomate (whose items auth-service's MassaTomateBomSemiFinishedGoodItemSeeder
      * creates).
      */
@@ -41,7 +41,7 @@ class MassaTomateRecipeSeeder extends Seeder
         'SFGMT-09' => [130, 158, 'Sauce of Peeled Tomato'],
     ];
 
-    private const RAW_MATERIAL_ITEM_TYPE_ID = 11; // RM Massa Tomate
+    private const RAW_MATERIAL_ITEM_TYPE_ID = 11; // Raw Materials
 
     /**
      * The raw materials the BOM uses, from auth-service's

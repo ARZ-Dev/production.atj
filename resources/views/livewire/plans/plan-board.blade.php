@@ -325,8 +325,10 @@
                         $actionMeta = array_merge($actionMeta, match ($eventAction['action']) {
                             'start'      => ['title' => 'Start Run', 'submit' => 'Start Run'],
                             'terminate'  => ['title' => 'End Run', 'submit' => 'End Run'],
-                            'pause'      => ['title' => 'Stop the Line', 'submit' => 'Stop the Line'],
-                            'activities' => ['title' => 'Station Stops', 'submit' => 'Save Station Stops'],
+                            // One Stop for the whole line (a pause) and for one station.
+                            'activities' => !empty($eventAction['can_stop_line']) && $runStopScope === 'line'
+                                ? ['title' => 'Stop', 'icon' => 'pause-fill', 'btn' => 'btn-warning', 'submit' => 'Stop the Line']
+                                : ['title' => 'Stop', 'icon' => 'exclamation-octagon', 'submit' => 'Save Station Stops'],
                             default      => [],
                         });
                     }
@@ -521,37 +523,16 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        @if(!empty($eventAction['run']) && !empty($eventAction['stations']))
-                        <div class="col-md-6">
-                            <label class="form-label">Station that stopped the line <span class="text-danger">*</span></label>
-                            <select class="form-select @error('actionStationId') is-invalid @enderror" wire:model="actionStationId">
-                                <option value="">Select station…</option>
-                                @foreach(collect($eventAction['stations'])->groupBy('type') as $type => $group)
-                                <optgroup label="{{ $type }}">
-                                    @foreach($group as $station)
-                                    <option value="{{ $station['id'] }}">{{ $station['name'] }}</option>
-                                    @endforeach
-                                </optgroup>
-                                @endforeach
-                            </select>
-                            @error('actionStationId')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        @endif
                         <div class="col-12">
                             <label class="form-label">Reason</label>
                             <textarea class="form-control" rows="3" wire:model="actionReason"
-                                placeholder="{{ !empty($eventAction['run']) ? 'What happened? e.g. oven belt drifting' : 'Why is this event being paused?' }}"></textarea>
+                                placeholder="Why is this event being paused?"></textarea>
                         </div>
                         <div class="col-12">
                             <div class="alert alert-info py-2 px-3 mb-0" style="font-size: 12px;">
                                 <i class="bi bi-exclamation-triangle me-1"></i>
-                                @if(!empty($eventAction['run']))
-                                Use this when the <strong>whole line</strong> stops. When one machine stops and the rest
-                                runs on, record a <strong>station stop</strong> instead.
-                                @else
                                 Once paused, use the "Emergency" button on the event to record
                                 emergency events (Cleaning, Maintenance, …).
-                                @endif
                             </div>
                         </div>
                     </div>
@@ -628,27 +609,36 @@
 
                     @elseif($eventAction['action'] === 'activities')
 
-                    @if($eventAction['can_add'] && !empty($eventAction['run']) && empty($eventAction['paused']))
-                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
-                        <i class="bi bi-info-circle me-1"></i>
-                        The line is running. A station stop is one machine down while the rest runs on —
-                        if the whole line stopped, use <strong>Pause</strong> instead.
+                    @php
+                        // A line run's one Stop: the whole line (a pause) or one station.
+                        $runStop  = !empty($eventAction['run']);
+                        $lineStop = !empty($eventAction['can_stop_line']) && $runStopScope === 'line';
+                    @endphp
+
+                    @if($eventAction['can_add'] && $runStop && empty($eventAction['paused']))
+                    <div class="d-flex align-items-center gap-2 mb-3" style="font-size: 12px;">
+                        <span class="badge bg-success">Running</span>
+                        <span class="text-muted">Record a stop of one station, or of the whole line, below.</span>
                     </div>
                     @elseif($eventAction['can_add'])
                     <div class="d-flex align-items-center gap-2 mb-3" style="font-size: 12px;">
-                        <span class="badge bg-warning text-dark">Paused</span>
+                        <span class="badge bg-warning text-dark">{{ $runStop ? 'Line stopped' : 'Paused' }}</span>
                         <span class="text-muted">since {{ $eventAction['paused_at'] ?? '—' }}</span>
                     </div>
                     @else
                     <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 12px;">
                         <i class="bi bi-exclamation-triangle me-1"></i>
+                        @if($runStop)
+                        This run still has ongoing station stops — end them below.
+                        @else
                         This event still has ongoing emergency events — end them below.
                         New emergency events can only be added while the event is paused.
+                        @endif
                     </div>
                     @endif
 
                     <div class="mb-3">
-                        <div class="fw-bold mb-1" style="font-size: 13px;">Recorded Emergency Events</div>
+                        <div class="fw-bold mb-1" style="font-size: 13px;">{{ $runStop ? 'Recorded Station Stops' : 'Recorded Emergency Events' }}</div>
                         @if(count($eventAction['existing_activities']))
                         <div class="table-responsive">
                             <table class="table table-sm mb-0" style="font-size: 12px;">
@@ -707,7 +697,7 @@
                             </table>
                         </div>
                         @else
-                        <div class="text-muted" style="font-size: 12px;">No emergency events have been recorded for this event yet.</div>
+                        <div class="text-muted" style="font-size: 12px;">{{ $runStop ? 'No station stops have been recorded for this run yet.' : 'No emergency events have been recorded for this event yet.' }}</div>
                         @endif
 
                         @if($endingActivity)
@@ -715,7 +705,7 @@
                         <div class="border rounded p-3 mt-2 bg-light">
                             <div class="fw-bold mb-2" style="font-size: 13px;">
                                 <i class="bi bi-stop-fill text-danger me-1"></i>
-                                End Emergency Event{{ $endingRow ? ' — ' . $endingRow['type_name'] : '' }}
+                                {{ $runStop ? 'End Station Stop' : 'End Emergency Event' }}{{ $endingRow ? ' — ' . $endingRow['type_name'] : '' }}
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-5">
@@ -735,7 +725,7 @@
                                     <button type="button" class="btn btn-light-secondary btn-sm" wire:click="cancelEndActivity">Cancel</button>
                                     <button type="button" class="btn btn-danger btn-sm" wire:click="submitEndActivity"
                                         wire:loading.attr="disabled" wire:target="submitEndActivity">
-                                        <i class="bi bi-stop-fill me-1"></i> End Emergency Event
+                                        <i class="bi bi-stop-fill me-1"></i> {{ $runStop ? 'End Station Stop' : 'End Emergency Event' }}
                                     </button>
                                 </div>
                             </div>
@@ -744,7 +734,69 @@
                     </div>
 
                     @if($eventAction['can_add'])
-                    <div class="fw-bold mb-1" style="font-size: 13px;">{{ !empty($eventAction['run']) ? 'Add Station Stops' : 'Add Emergency Events' }}</div>
+                    @if(!empty($eventAction['can_stop_line']))
+                    <div class="mb-3">
+                        <div class="fw-bold mb-1" style="font-size: 13px;">What stopped?</div>
+                        <div class="btn-group w-100" role="group" aria-label="What stopped">
+                            <input type="radio" class="btn-check" name="run_stop_scope" id="run_stop_station"
+                                wire:model.live="runStopScope" value="station" autocomplete="off">
+                            <label class="btn btn-outline-primary btn-sm" for="run_stop_station">
+                                <i class="bi bi-gear me-1"></i> One station — the line runs on
+                            </label>
+                            <input type="radio" class="btn-check" name="run_stop_scope" id="run_stop_line"
+                                wire:model.live="runStopScope" value="line" autocomplete="off">
+                            <label class="btn btn-outline-warning btn-sm" for="run_stop_line">
+                                <i class="bi bi-pause-fill me-1"></i> The whole line
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            @if($lineStop)
+                            The run pauses until you resume it, charged to the station that stopped it. What's done
+                            meanwhile (cleaning, a repair …) is recorded with Stop again, as a station stop.
+                            @else
+                            One machine is down while the rest of the line runs on, as fast as that stage's other
+                            stations allow.
+                            @endif
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($lineStop)
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Stop Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control @error('actionTime') is-invalid @enderror"
+                                wire:model="actionTime">
+                            @error('actionTime')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        @if(!empty($eventAction['stations']))
+                        <div class="col-md-6">
+                            <label class="form-label">Station that stopped the line <span class="text-danger">*</span></label>
+                            <select class="form-select @error('actionStationId') is-invalid @enderror" wire:model="actionStationId">
+                                <option value="">Select station…</option>
+                                @foreach(collect($eventAction['stations'])->groupBy('type') as $type => $group)
+                                <optgroup label="{{ $type }}">
+                                    @foreach($group as $station)
+                                    <option value="{{ $station['id'] }}">{{ $station['name'] }}</option>
+                                    @endforeach
+                                </optgroup>
+                                @endforeach
+                            </select>
+                            @error('actionStationId')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        @endif
+                        <div class="col-12">
+                            <label class="form-label">Reason</label>
+                            <textarea class="form-control" rows="3" wire:model="actionReason"
+                                placeholder="What happened? e.g. oven belt drifting"></textarea>
+                        </div>
+                    </div>
+                    @else
+                    @if(empty($eventAction['can_stop_line']))
+                    <div class="fw-bold mb-1" style="font-size: 13px;">{{ $runStop ? 'Add Station Stops' : 'Add Emergency Events' }}</div>
+                    @endif
                     <div class="mb-2" style="max-width: 260px;">
                         <label class="form-label mb-1" style="font-size: 12px;">Time <span class="text-danger">*</span></label>
                         <input type="datetime-local" class="form-control form-control-sm @error('actionTime') is-invalid @enderror"
@@ -756,7 +808,7 @@
                     <div class="mb-3">
                         <label class="form-label mb-1" style="font-size: 12px;">Reason <span class="text-danger">*</span></label>
                         <textarea class="form-control form-control-sm @error('actionReason') is-invalid @enderror" rows="2"
-                            wire:model="actionReason" placeholder="Why are these emergency events happening?"></textarea>
+                            wire:model="actionReason" placeholder="{{ $runStop ? 'What happened? e.g. film roll change' : 'Why are these emergency events happening?' }}"></textarea>
                         @error('actionReason')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -874,6 +926,7 @@
                     <button type="button" class="btn btn-light-primary btn-sm" wire:click="addPauseActivityRow">
                         <i class="bi bi-plus-circle me-1"></i> Add another
                     </button>
+                    @endif
                     @endif
 
                     @endif

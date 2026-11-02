@@ -150,18 +150,19 @@
                             @else
                             @hasPermission('production.event-create')
                             @if($isRun && in_array($statusKey, ['in_progress', 'paused'], true))
-                            {{-- A line run: hourly counts, and stops of one machine while the rest runs. --}}
+                            {{-- A line run: hourly counts, and one Stop — of one station
+                                 while the rest runs, or of the whole line (its pause). --}}
                             <button type="button" class="btn btn-light-info btn-sm"
                                 wire:click.stop="openHourlyCount({{ $event->id }})"
                                 wire:loading.attr="disabled" wire:target="openHourlyCount"
                                 title="Record the last station's counter against the hour's target">
                                 <i class="bi bi-speedometer2"></i> Count
                             </button>
-                            <button type="button" class="btn btn-light-primary btn-sm"
+                            <button type="button" class="btn btn-light-warning btn-sm"
                                 wire:click.stop="openPauseActivities({{ $event->id }})"
                                 wire:loading.attr="disabled" wire:target="openPauseActivities"
-                                title="One machine stopped while the rest of the line runs on">
-                                <i class="bi bi-exclamation-octagon"></i> Station stop
+                                title="{{ $statusKey === 'paused' ? 'The line is stopped — record what is done meanwhile, or end a station stop' : 'A station stopped, or the whole line' }}">
+                                <i class="bi bi-exclamation-octagon"></i> Stop
                                 @if($event->has_open_emergencies ?? false)
                                 <span class="badge bg-danger ms-1">!</span>
                                 @endif
@@ -190,11 +191,14 @@
                                 </button>
                                 @endif
                             @elseif($statusKey === 'in_progress')
+                            {{-- A run pauses through its Stop button. --}}
+                            @unless($isRun)
                             <button type="button" class="btn btn-light-warning btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'pause')"
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
                                 <i class="bi bi-pause-fill"></i> Pause
                             </button>
+                            @endunless
                             <button type="button" class="btn btn-light-danger btn-sm"
                                 wire:click.stop="updateEventStatus({{ $event->id }}, 'terminate')"
                                 wire:loading.attr="disabled" wire:target="updateEventStatus">
