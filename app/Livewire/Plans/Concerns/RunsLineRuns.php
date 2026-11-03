@@ -208,16 +208,8 @@ trait RunsLineRuns
 
         $this->resetActionForm();
 
-        // On the hour, the usual time of a count — now, when the last count
-        // already took this hour.
-        $time  = now()->startOfHour();
-        $after = $this->lineRuns->nextCountAfter($event);
-
-        if ($after && $time->lte($after['at'])) {
-            $time = now()->startOfMinute();
-        }
-
-        $this->actionTime = $time->format('Y-m-d\TH:i');
+        // The counter is read now.
+        $this->actionTime = now()->format('Y-m-d\TH:i');
         $this->runCount   = ['counter' => '', 'reason' => ''];
 
         $this->eventAction = array_merge($this->baseActionPayload($event, 'count'), [
