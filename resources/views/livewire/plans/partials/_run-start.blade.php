@@ -1,7 +1,7 @@
 {{-- Start of a line run: nothing is taken from stock here — the line's dough
      is mixed while it runs, and stock moves once, at End. --}}
 @php
-    $fmt = fn($n, $dp = 2) => $n === null ? '—' : rtrim(rtrim(number_format((float) $n, $dp), '0'), '.');
+    $fmt = fn($n, $dp = 2) => $n === null ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
 @endphp
 
 <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">

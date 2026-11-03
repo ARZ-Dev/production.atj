@@ -1,7 +1,7 @@
 {{-- Details modal: a line run's line, rate, planned mixes and counts. --}}
 @php
     $run = $selectedEvent['run'];
-    $fmt = fn($n, $dp = 2) => $n === null ? '—' : rtrim(rtrim(number_format((float) $n, $dp), '0'), '.');
+    $fmt = fn($n, $dp = 2) => $n === null ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
 @endphp
 <div class="col-12">
     <div class="pvc-body-label">Line run</div>

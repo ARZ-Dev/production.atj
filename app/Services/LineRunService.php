@@ -472,7 +472,10 @@ class LineRunService
      * since the previous count (or the start), against the line's rate over
      * that time.
      *
-     * @return array{from: Carbon, minutes: int, quantity: float, target: ?float, pace: ?float, previous: float}
+     * `too_early` is set when $at isn't after the run's last count (or its
+     * start, before the first count) — such a count is refused.
+     *
+     * @return array{from: Carbon, minutes: int, quantity: float, target: ?float, pace: ?float, previous: float, too_early: ?string}
      */
     public function countPreview(Event $run, Carbon $at, float $counter): array
     {
@@ -488,13 +491,46 @@ class LineRunService
         $target   = $perHour !== null ? round($perHour * $minutes / 60, 2) : null;
 
         return [
-            'from'     => $from,
-            'minutes'  => $minutes,
-            'quantity' => $quantity,
-            'target'   => $target,
-            'pace'     => $target ? round($quantity / $target * 100, 1) : null,
-            'previous' => (float) ($previous?->counter ?? 0),
+            'from'      => $from,
+            'minutes'   => $minutes,
+            'quantity'  => $quantity,
+            'target'    => $target,
+            'pace'      => $target ? round($quantity / $target * 100, 1) : null,
+            'previous'  => (float) ($previous?->counter ?? 0),
+            'too_early' => $this->countTooEarly($run, $at),
         ];
+    }
+
+    /**
+     * The time a run's next count has to come after — its last count, or its
+     * start before the first count — with what it is. Null for a run with
+     * neither.
+     *
+     * @return array{at: Carbon, what: string}|null
+     */
+    public function nextCountAfter(Event $run): ?array
+    {
+        $last = $run->counts()->reorder()->orderByDesc('counted_at')->orderByDesc('id')->first();
+
+        if ($last) {
+            return ['at' => Carbon::parse($last->counted_at), 'what' => 'The last count was'];
+        }
+
+        $start = $run->statusLogs()->where('action', 'start')->orderBy('id')->first();
+
+        return $start
+            ? ['at' => Carbon::parse($start->happened_at ?? $start->created_at), 'what' => 'The run started']
+            : null;
+    }
+
+    /** Why a count at $at can't be taken, or null when it can. */
+    public function countTooEarly(Event $run, Carbon $at): ?string
+    {
+        $after = $this->nextCountAfter($run);
+
+        return $after && $at->lte($after['at'])
+            ? $after['what'] . ' at ' . $after['at']->format('d M H:i') . ' — a count must be later than that.'
+            : null;
     }
 
     /** The run's rate in its final count unit (boxes an hour), or null. */
