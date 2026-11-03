@@ -3,7 +3,7 @@
 @php
     $run     = $eventHistory['run'];
     $summary = $run['summary'];
-    $fmt     = fn($n, $dp = 2) => $n === null ? '—' : rtrim(rtrim(number_format((float) $n, $dp), '0'), '.');
+    $fmt     = fn($n, $dp = 2) => $n === null ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
 @endphp
 
 <div class="border rounded p-3 mb-3">

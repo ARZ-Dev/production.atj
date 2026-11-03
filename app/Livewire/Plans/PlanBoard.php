@@ -1430,6 +1430,12 @@ class PlanBoard extends Component
 
         // An hourly count's figures follow its time and counter reading.
         if (($this->eventAction['action'] ?? null) === 'count' && in_array($property, ['actionTime', 'runCount.counter'], true)) {
+            // A refused time's error goes with the time; the preview warns
+            // again if the new one is still too early.
+            if ($property === 'actionTime') {
+                $this->resetErrorBag('actionTime');
+            }
+
             $this->refreshCountPreview();
         }
 

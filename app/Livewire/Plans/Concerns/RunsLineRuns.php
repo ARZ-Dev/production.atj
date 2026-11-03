@@ -208,8 +208,16 @@ trait RunsLineRuns
 
         $this->resetActionForm();
 
-        // On the hour, the usual time of a count.
-        $this->actionTime = now()->startOfHour()->format('Y-m-d\TH:i');
+        // On the hour, the usual time of a count — now, when the last count
+        // already took this hour.
+        $time  = now()->startOfHour();
+        $after = $this->lineRuns->nextCountAfter($event);
+
+        if ($after && $time->lte($after['at'])) {
+            $time = now()->startOfMinute();
+        }
+
+        $this->actionTime = $time->format('Y-m-d\TH:i');
         $this->runCount   = ['counter' => '', 'reason' => ''];
 
         $this->eventAction = array_merge($this->baseActionPayload($event, 'count'), [
@@ -242,13 +250,14 @@ trait RunsLineRuns
         $preview = $this->lineRuns->countPreview($event, Carbon::parse($this->actionTime), $counter ?? 0.0);
 
         $this->eventAction['preview'] = [
-            'from'     => $preview['from']->format('H:i'),
-            'minutes'  => $preview['minutes'],
-            'previous' => $preview['previous'],
-            'quantity' => $counter !== null ? $preview['quantity'] : null,
-            'target'   => $preview['target'],
-            'pace'     => $counter !== null ? $preview['pace'] : null,
-            'stops'    => $this->stopsBetween($event, $preview['from'], Carbon::parse($this->actionTime)),
+            'from'      => $preview['from']->format('H:i'),
+            'minutes'   => $preview['minutes'],
+            'previous'  => $preview['previous'],
+            'quantity'  => $counter !== null ? $preview['quantity'] : null,
+            'target'    => $preview['target'],
+            'pace'      => $counter !== null ? $preview['pace'] : null,
+            'stops'     => $this->stopsBetween($event, $preview['from'], Carbon::parse($this->actionTime)),
+            'too_early' => $preview['too_early'],
         ];
     }
 
@@ -298,6 +307,14 @@ trait RunsLineRuns
         $at      = $this->parsedActionTime();
         $counter = (float) $this->runCount['counter'];
         $preview = $this->lineRuns->countPreview($event, $at, $counter);
+
+        // A count at or before the last one has no time of its own to be
+        // measured against (no target, no pace) and would land between counts.
+        if ($preview['too_early']) {
+            $this->addError('actionTime', $preview['too_early']);
+
+            return;
+        }
 
         if ($preview['quantity'] < 0) {
             $this->addError('runCount.counter', 'Lower than the previous count (' . $this->lineRuns->formatNumber($preview['previous']) . ') — the counter only goes up during a run.');

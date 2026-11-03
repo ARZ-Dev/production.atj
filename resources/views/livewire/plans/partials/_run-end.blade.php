@@ -2,7 +2,7 @@
      go, its leftovers, and what was used of each material. "Check figures"
      works it out without saving; End checks again and moves the stock. --}}
 @php
-    $fmt   = fn($n, $dp = 3) => $n === null || $n === '' ? '—' : rtrim(rtrim(number_format((float) $n, $dp), '0'), '.');
+    $fmt   = fn($n, $dp = 3) => $n === null || $n === '' ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
     $check = $runEndCheck;
 @endphp
 

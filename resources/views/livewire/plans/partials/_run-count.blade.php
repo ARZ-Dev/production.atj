@@ -2,9 +2,10 @@
      line's rate since the previous count. For watching the pace — no stock
      moves. --}}
 @php
-    $fmt     = fn($n, $dp = 2) => $n === null ? '—' : rtrim(rtrim(number_format((float) $n, $dp), '0'), '.');
+    $fmt     = fn($n, $dp = 2) => $n === null ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
     $preview = $eventAction['preview'] ?? null;
-    $below   = $preview && $preview['pace'] !== null && $preview['pace'] < \App\Services\LineRunService::PACE_REASON_BELOW;
+    $early   = $preview['too_early'] ?? null;
+    $below   = $preview && !$early && $preview['pace'] !== null && $preview['pace'] < \App\Services\LineRunService::PACE_REASON_BELOW;
 @endphp
 
 <div class="row g-3">
@@ -21,7 +22,11 @@
     </div>
 </div>
 
-@if($preview)
+@if($early && !$errors->has('actionTime'))
+<div class="alert alert-warning py-2 mt-3 mb-2" style="font-size: 13px;">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ $early }}
+</div>
+@elseif($preview && !$early)
 <div class="pv-stats mt-3 mb-2" style="margin-bottom: 12px;">
     <div class="pv-stat pv-stat--primary">
         <div class="s-label">Since {{ $preview['from'] }} ({{ $preview['minutes'] }} min)</div>
