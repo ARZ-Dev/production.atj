@@ -46,7 +46,7 @@ class DatabaseSeeder extends Seeder
         // Since 2026-10-28 (later) a line picks its machines from the stations list.
         // $this->call(LineStationSeeder::class);
         $this->call(StationSeeder::class);
-        // Packing is the lines' last station now; no packaging lanes are seeded.
+        // The lines box their own output at their last station; no packaging lanes are seeded.
         // $this->call(PackagingSeeder::class);
         $this->call(CapacitySeeder::class);
         // Testing stock: an approved Stock In of 1,000 of every item per production

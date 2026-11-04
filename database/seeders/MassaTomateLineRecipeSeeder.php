@@ -14,9 +14,10 @@ class MassaTomateLineRecipeSeeder extends Seeder
      * Run the database seeds.
      *
      * One recipe per Massa Tomate SKU, run on a can line as one event across
-     * its stations: Filling & Seaming → Pasteurizing → Packing. Replaces
-     * MassaTomateProductionRecipeSeeder (SFG → cans, in the basic unit), whose
-     * figures it reads, since 2026-10-28.
+     * its stations: Filling & Seaming → Pasteurizing → Packaging (the case
+     * packer — Packing until 2026-11-04, when Packing became wrapping).
+     * Replaces MassaTomateProductionRecipeSeeder (SFG → cans, in the basic
+     * unit), whose figures it reads, since 2026-10-28.
      *
      * A batch is one case: the recipe makes 1 case (the item's case unit) from
      * the sheet's net weight of paste. Every stage puts out the case's cans, so
@@ -108,7 +109,7 @@ class MassaTomateLineRecipeSeeder extends Seeder
                 $stageIds = $this->syncStages($recipe, [
                     'Filling & Seaming' => ['output_quantity' => $perCase, 'output_item_unit_id' => $basicUnitId],
                     'Pasteurizing'      => ['output_quantity' => $perCase, 'output_item_unit_id' => $basicUnitId, 'stock_leftovers' => (bool) $caseUnit],
-                    'Packing'           => $caseUnit
+                    'Packaging'         => $caseUnit
                         ? ['output_quantity' => 1, 'output_item_unit_id' => $caseUnit]
                         : ['output_quantity' => $perCase, 'output_item_unit_id' => $basicUnitId],
                 ]);

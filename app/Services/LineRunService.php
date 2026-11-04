@@ -665,7 +665,7 @@ class LineRunService
     /**
      * Schedule the preparation events that make a placed run's dough: for each
      * input another recipe makes, enough mixes (one batch of that recipe each,
-     * the last one part of a batch) on a preparation of the run's production
+     * the last one part of a batch) on the preparations of the run's production
      * line, each ready shortly before the line needs it at its rate. Earlier
      * planned mixes for the run are replaced; started ones stop it.
      *
@@ -700,9 +700,10 @@ class LineRunService
             throw new RuntimeException("The stations of {$line->name} have no rates, so the mixes can't be timed. Set the rates on the Stations page.");
         }
 
+        // In the order the board lists them.
         $preparations = Preparation::with('eventTypes')
             ->whereHas('productionLines', fn($q) => $q->where('production_lines.id', $run->production_line_id))
-            ->orderBy('name')
+            ->orderBy('id')
             ->get();
 
         $batches   = $this->batchCount($run);
@@ -712,7 +713,10 @@ class LineRunService
         $notes     = [];
         $plans     = [];
 
-        foreach ($recipe->inputs as $input) {
+        $stageOrder = $recipe->stages->pluck('sequence', 'id');
+        $inputs     = $recipe->inputs->sortBy(fn($input) => [(int) ($stageOrder[$input->recipe_stage_id] ?? 0), $input->id]);
+
+        foreach ($inputs as $input) {
             $mixRecipe = Recipe::where('item_id', $input->item_id)
                 ->where('status', true)
                 ->whereDoesntHave('stages')
@@ -725,9 +729,9 @@ class LineRunService
 
             [$itemName] = $this->itemAndUnitNames($input->item_id, $input->item_unit_id);
 
-            [$preparation, $eventType] = $this->mixerFor($preparations, (int) $mixRecipe->item_type_id);
+            $eligible = $this->mixersFor($preparations, (int) $mixRecipe->item_type_id);
 
-            if (!$preparation) {
+            if (!$eligible) {
                 $notes[] = "No preparation on this production line makes {$itemName}.";
                 continue;
             }
@@ -742,20 +746,37 @@ class LineRunService
             $mixes    = (int) ceil($needed / $perMix - 1e-9);
             $interval = $perMix / $perHourU * 60;
 
-            $plans[] = compact('input', 'mixRecipe', 'preparation', 'eventType', 'perMix', 'needed', 'mixes', 'interval', 'itemName');
+            $plans[] = compact('input', 'mixRecipe', 'eligible', 'perMix', 'needed', 'mixes', 'interval', 'itemName');
         }
 
         if (!$plans) {
             throw new RuntimeException($notes ? implode(' ', $notes) : 'Nothing in this recipe is made by a preparation recipe.');
         }
 
+        // Each material gets a mixer of its own where the line has one to spare
+        // (a wafer's batter its dough tank, the cream its cream tank), in stage
+        // order; mixers no material took are shared, so a dough alternates
+        // between its line's two mixers.
+        $homes = [];
+        foreach ($plans as $i => $plan) {
+            $free      = collect($plan['eligible'])->first(fn($mixer) => !in_array($mixer[0]->id, $homes, true));
+            $homes[$i] = ($free ?? $plan['eligible'][0])[0]->id;
+        }
+        foreach ($plans as $i => $plan) {
+            $plans[$i]['mixers'] = array_values(array_filter(
+                $plan['eligible'],
+                fn($mixer) => $mixer[0]->id === $homes[$i] || !in_array($mixer[0]->id, $homes, true)
+            ));
+        }
+
         // Re-planning replaces what was planned before.
         $run->feedingEvents()->whereNull('status')->delete();
 
         foreach ($plans as $plan) {
-            ['mixRecipe' => $mixRecipe, 'preparation' => $preparation, 'eventType' => $eventType] = $plan;
+            ['mixRecipe' => $mixRecipe, 'mixers' => $mixers] = $plan;
 
             for ($k = 0; $k < $plan['mixes']; $k++) {
+                [$preparation, $eventType] = $mixers[$k % count($mixers)];
                 $share = min(1.0, $plan['needed'] / $plan['perMix'] - $k);
                 $count = $k === $plan['mixes'] - 1 ? round($share, 4) : 1.0;
 
@@ -802,7 +823,7 @@ class LineRunService
                 $plan['mixes'],
                 $plan['mixes'] === 1 ? '' : 'es',
                 $this->formatNumber(round($plan['perMix'], 2)),
-                $preparation->name,
+                collect($mixers)->take($plan['mixes'])->map(fn($mixer) => $mixer[0]->name)->join(', ', ' and '),
                 (int) round($plan['interval'])
             );
         }
@@ -810,19 +831,26 @@ class LineRunService
         return ['created' => $created, 'notes' => $notes];
     }
 
-    /** A preparation of the line, and its event type, that make this item type. */
-    protected function mixerFor(Collection $preparations, int $itemTypeId): array
+    /**
+     * The line's preparations that make this item type, each with its event
+     * type that does.
+     *
+     * @return array<int, array{0: Preparation, 1: \App\Models\EventType}>
+     */
+    protected function mixersFor(Collection $preparations, int $itemTypeId): array
     {
+        $mixers = [];
+
         foreach ($preparations as $preparation) {
             $eventType = $preparation->eventTypes->first(fn($type) => $type->has_recipe
                 && in_array($itemTypeId, array_map('intval', $type->item_type_ids ?? []), true));
 
             if ($eventType) {
-                return [$preparation, $eventType];
+                $mixers[] = [$preparation, $eventType];
             }
         }
 
-        return [null, null];
+        return $mixers;
     }
 
     /**
