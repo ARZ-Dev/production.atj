@@ -26,10 +26,12 @@ class LineSeeder extends Seeder
      *
      * Bolacha's come from "Equipment and capacity Biscuit factory.xlsx" (sheet
      * FAB DE BOLACHA), one line per oven as the user chose on 2026-10-28 —
-     * 2 × 1,200 kg/h, 1 × 2,000 kg/h, 2 × 1,000 kg/h — plus the wafer line.
-     * Line 2 (Prod Boalcha L1 until then) is the first of them. They take dough
-     * from SFG Bolacha and film, cartons and tape from RM BOLACHA, and put
-     * boxes into FG BOLACHA.
+     * 2 × 1,200 kg/h, 1 × 2,000 kg/h, 2 × 1,000 kg/h — plus the wafer line,
+     * and Naya Vertical from the factory's line drawings of 2026-11-04. Each
+     * is alone on the production line of its drawing (ProductionLineSeeder),
+     * with its mixers. Line 2 (Prod Boalcha L1 until 2026-10-28) is the first
+     * of them. They take dough from SFG Bolacha and film, cartons and tape
+     * from RM BOLACHA, and put boxes into FG BOLACHA.
      */
     public function run(): void
     {
@@ -39,7 +41,6 @@ class LineSeeder extends Seeder
             'fg_warehouse_id' => 6,             // FG BOLACHA
             'item_type_warehouses' => [],
             'event_type_ids' => [5],            // Production Bolacha
-            'production_line_ids' => [2],       // Bolacha Production Line PL1
         ];
 
         $lines = [
@@ -63,12 +64,13 @@ class LineSeeder extends Seeder
                 'event_type_ids' => [3],         // Production Massa Tomate
                 'production_line_ids' => [1],    // Cans Tomato Paste Line
             ],
-            ['id' => 2, 'name' => 'Biscuit Line 1'] + $bolacha, // oven 1,200 kg/h
-            ['id' => 4, 'name' => 'Biscuit Line 2'] + $bolacha, // oven 1,200 kg/h
-            ['id' => 5, 'name' => 'Biscuit Line 3'] + $bolacha, // oven 2,000 kg/h
-            ['id' => 6, 'name' => 'Biscuit Line 4'] + $bolacha, // oven 1,000 kg/h
-            ['id' => 7, 'name' => 'Biscuit Line 5'] + $bolacha, // oven 1,000 kg/h
-            ['id' => 8, 'name' => 'Wafer Line'] + $bolacha,     // Franz Haas, 40 plates/min
+            ['id' => 2, 'name' => 'Biscuit Line 1', 'production_line_ids' => [2]] + $bolacha,      // Line 01 · oven 1,200 kg/h
+            ['id' => 4, 'name' => 'Biscuit Line 2', 'production_line_ids' => [3]] + $bolacha,      // Line 02 · oven 1,200 kg/h
+            ['id' => 5, 'name' => 'Biscuit Line 3', 'production_line_ids' => [4]] + $bolacha,      // Line 03 · oven 2,000 kg/h
+            ['id' => 6, 'name' => 'Biscuit Line 4', 'production_line_ids' => [5]] + $bolacha,      // Line 04 · oven 1,000 kg/h
+            ['id' => 7, 'name' => 'Biscuit Line 5', 'production_line_ids' => [6]] + $bolacha,      // Line 05 · oven 1,000 kg/h
+            ['id' => 9, 'name' => 'Naya Vertical Line', 'production_line_ids' => [7]] + $bolacha,  // Naya Vertical · oven without a rate
+            ['id' => 8, 'name' => 'Wafer Line', 'production_line_ids' => [8]] + $bolacha,          // Wafer · Franz Haas, 40 plates/min
         ];
 
         DB::transaction(function () use ($lines) {

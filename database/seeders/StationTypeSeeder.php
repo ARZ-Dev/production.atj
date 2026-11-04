@@ -19,16 +19,20 @@ class StationTypeSeeder extends Seeder
      * a line, 1–9 (the user's choice, 2026-10-29), for the dropdowns. Matched
      * on id, so re-running renames in place (soft-deleted rows restored).
      *
+     * Packing wraps and Packaging boxes, in that order, as the factory's line
+     * drawings of 2026-11-04 have it (the user's choice that day — until then
+     * it was the other way round, with the same ids).
+     *
      * @var array<int, array{0: string, 1: int, 2: ?string}> id => [name, order, description]
      */
     public const TYPES = [
         1 => ['Filling & Seaming', 5, 'Fills the cans and seams the lids on.'],
         2 => ['Pasteurizing', 6, 'Heats the sealed cans; runs on pasteurizing time.'],
-        3 => ['Packing', 9, 'Puts the packets or cans into boxes / cartons.'],
-        4 => ['Cutting', 2, 'Laminates the dough sheet and cuts the biscuits.'],
+        3 => ['Packing', 8, 'Wraps the biscuits into packets (flow wrap, folding).'],
+        4 => ['Cutting', 2, 'Forms and cuts the biscuits: a lamination line with its cutter, or a rotary moulder.'],
         5 => ['Cooking', 3, 'Bakes — the ovens and the wafer line.'],
         6 => ['Creaming', 4, 'Puts the cream between two-part products.'],
-        7 => ['Packaging', 8, 'Wraps the biscuits into packets (flow wrap, folding).'],
+        7 => ['Packaging', 9, 'Puts the packets or cans into boxes / cartons.'],
         8 => ['Labelling', 7, 'Puts the labels on the cans.'],
         9 => ['Mixing', 1, 'Mixes doughs, creams and paste — preparation equipment.'],
     ];
