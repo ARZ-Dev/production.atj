@@ -1,5 +1,6 @@
 {{-- Start of a line run: nothing is taken from stock here — the line's dough
-     is mixed while it runs, and stock moves once, at End. --}}
+     is mixed while it runs, and stock moves once, at End. Every material the
+     run needs is checked against its stock first (runMaterialsCheck()). --}}
 @php
     $fmt = fn($n, $dp = 2) => $n === null ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
 @endphp
@@ -8,6 +9,7 @@
     <i class="bi bi-diagram-3 me-1"></i>
     <strong>{{ $eventAction['planned'] + 0 }} {{ $eventAction['unit'] }}</strong> on <strong>{{ $eventAction['line_name'] }}</strong>.
     Every station runs at once from this start; nothing is taken from stock now — what each station counts is entered when the run ends.
+    The run starts only when there is enough of every material below.
 </div>
 
 <div class="ec-run-stations mb-2">
@@ -27,31 +29,73 @@
     @endif
 </div>
 
-@if($eventAction['first_inputs'])
-<div class="fw-bold mb-1" style="font-size: 13px;">What the first station starts with</div>
+@if($eventAction['materials'] ?? [])
+@php $problems = $eventAction['problems'] ?? []; @endphp
+<div class="fw-bold mb-1" style="font-size: 13px;"><i class="bi bi-box-seam me-1 text-primary"></i> Materials for this run</div>
+<div class="table-responsive">
 <table class="table table-sm align-middle aqt-table mb-2" style="font-size: 12px;">
     <thead>
-        <tr><th>Item</th><th>Warehouse</th><th class="text-end">In stock now</th></tr>
+        <tr>
+            <th>Item</th>
+            <th>Warehouse</th>
+            <th class="text-end">Needed</th>
+            <th class="text-end">In stock now</th>
+            <th class="text-end">Still to mix</th>
+            <th class="text-end" style="width: 110px;"></th>
+        </tr>
     </thead>
     <tbody>
-        @foreach($eventAction['first_inputs'] as $input)
-        <tr>
-            <td>{{ $input['item_name'] }} <span class="text-muted">· {{ $input['stage'] }}</span></td>
-            <td>{{ $input['warehouse_name'] ?? '—' }}</td>
+        @foreach($eventAction['materials'] as $material)
+        <tr wire:key="rs-material-{{ $material['warehouse_id'] }}-{{ $material['item_id'] }}-{{ $material['item_unit_id'] }}">
+            <td>
+                {{ $material['item_name'] }} <span class="text-muted">({{ $material['unit_name'] }})</span>
+                @if($material['stage'])<div class="text-muted" style="font-size: 11px;">{{ $material['stage'] }}</div>@endif
+            </td>
+            <td>{{ $material['warehouse_name'] ?? '—' }}</td>
+            <td class="text-end">{{ $fmt($material['needed'], 4) }}</td>
             <td class="text-end">
-                @if($input['available'] === null)
+                @if($material['available'] === null)
                     <span class="aqt-stock aqt-stock--unknown">—</span>
                 @else
-                    <span class="aqt-stock {{ $input['available'] > 0 ? 'aqt-stock--ok' : 'aqt-stock--none' }}">{{ $fmt($input['available'], 3) }} {{ $input['unit_name'] }}</span>
+                    <span class="aqt-stock {{ in_array($material['status'], ['short', 'empty'], true) ? 'aqt-stock--none' : 'aqt-stock--ok' }}">{{ $fmt($material['available'], 4) }}</span>
                 @endif
+            </td>
+            <td class="text-end">{{ $material['coming'] > 0 ? $fmt($material['coming'], 4) : '—' }}</td>
+            <td class="text-end">
+                @switch($material['status'])
+                    @case('ok')
+                        <span class="badge bg-success-subtle text-success"><i class="bi bi-check-lg me-1"></i>Enough</span>
+                        @break
+                    @case('short')
+                        <span class="badge bg-danger-subtle text-danger">{{ $fmt($material['short'], 4) }} short</span>
+                        @break
+                    @case('empty')
+                        <span class="badge bg-danger-subtle text-danger">None to start</span>
+                        @break
+                    @case('unknown')
+                        <span class="badge bg-warning-subtle text-warning">Not read</span>
+                        @break
+                    @default
+                        <span class="badge bg-danger-subtle text-danger">No warehouse</span>
+                @endswitch
             </td>
         </tr>
         @endforeach
     </tbody>
 </table>
+</div>
+@if($problems)
+<div class="alert alert-danger py-2 px-3 mb-2" style="font-size: 12px;">
+    <div class="fw-semibold mb-1"><i class="bi bi-x-circle me-1"></i>The run can't start yet:</div>
+    <ul class="mb-0 ps-3">
+        @foreach($problems as $problem)<li>{{ $problem }}</li>@endforeach
+    </ul>
+</div>
+@endif
 <div class="text-muted mb-2" style="font-size: 11px;">
     <i class="bi bi-info-circle me-1"></i>
-    The run can't start while there is none — the rest is mixed while the line runs.
+    Every material must cover the whole run; dough also counts the mixes still planned for this run, and the first station needs some on hand.
+    Nothing is held now — stock is read again when you press Start, and moves at End.
 </div>
 @endif
 

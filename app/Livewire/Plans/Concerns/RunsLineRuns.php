@@ -13,6 +13,7 @@ use App\Models\Station;
 use App\Models\StockIn;
 use App\Models\Waste;
 use App\Services\InventoryService;
+use App\Services\LineRunService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -26,7 +27,8 @@ use Illuminate\Support\Facades\DB;
  *    line — a pause, charged to a station — or a station stop, one station
  *    down while the rest run on, which is an emergency event with a station.
  *  - End: what each station counted, its rejects and leftovers, and what was
- *    used of each material; checked, then stock moves in one batch.
+ *    used of each material; checked, then stock moves in one batch. Rejects,
+ *    leftovers and the tolerance are off while LineRunService::LOSS_FIELDS is.
  *
  * Expects the host component's $lineRuns, $inventory, $durationService,
  * $carryOverService, $plan, $eventAction, $actionTime, $actionNotes and its
@@ -92,7 +94,7 @@ trait RunsLineRuns
 
     /**
      * A run starts with nothing taken from stock; the modal shows the line's
-     * stations and rate, and what the first stage has to start with.
+     * stations and rate, and every material the run needs against its stock.
      */
     protected function prepareRunStartModal(Event $event): bool
     {
@@ -121,38 +123,103 @@ trait RunsLineRuns
             'per_hour'     => $rate['batches_per_hour'] ? $rate['batches_per_hour'] * (float) $recipe->quantity_per_batch : null,
             'unit'         => $unit,
             'planned'      => $this->lineRuns->batchCount($event) * (float) $recipe->quantity_per_batch,
-            'first_inputs' => $this->firstStageStock($event, $recipe, $line),
         ]);
+
+        [$this->eventAction['materials'], $this->eventAction['problems']] = $this->runMaterialsCheck($event, $recipe, $line);
 
         return true;
     }
 
-    /** What the first stage uses, with what its warehouse holds now. */
-    protected function firstStageStock(Event $event, Recipe $recipe, Line $line): array
+    /**
+     * Every material a run of this size needs — dough, cream, tape, film … —
+     * against what the warehouse it's taken from holds now, read live. Nothing
+     * is reserved; this is what Start refuses on:
+     *  - a material whose stock doesn't cover the whole run. Dough is mixed
+     *    while the line runs, so the mixes still planned or running for this
+     *    run (into that warehouse) count towards it;
+     *  - a first-stage material with none on hand: the line can't start on it;
+     *  - a stock that can't be read, or a line with no warehouse to take from.
+     * Rows are per warehouse, item and unit (an item used at two stages is
+     * one row, its quantities added up).
+     *
+     * @return array{0: array, 1: array<int, string>} [rows, problems]
+     */
+    protected function runMaterialsCheck(Event $event, Recipe $recipe, Line $line): array
     {
-        $first = $recipe->stages->sortBy('sequence')->first();
+        $recipe->loadMissing('stages', 'inputs');
 
-        if (!$first) {
-            return [];
+        $batches = $this->lineRuns->batchCount($event);
+        $firstId = $recipe->stages->sortBy('sequence')->first()?->id;
+        $coming  = $this->lineRuns->mixesStillToCome($event);
+        $rows    = [];
+
+        foreach ($this->lineRuns->materials($recipe, $batches) as $material) {
+            $warehouseId = $this->lineRuns->warehouseFor($line, $material['item_type_id']);
+            $key         = ($warehouseId ?: 0) . ":{$material['item_id']}:{$material['item_unit_id']}";
+
+            $rows[$key] ??= [
+                'item_id'        => $material['item_id'],
+                'item_unit_id'   => $material['item_unit_id'],
+                'item_name'      => $material['item_name'],
+                'unit_name'      => $material['unit_name'],
+                'warehouse_id'   => $warehouseId,
+                'warehouse_name' => $warehouseId ? $this->warehouseName($warehouseId) : null,
+                'stages'         => [],
+                'first_stage'    => false,
+                'needed'         => 0.0,
+            ];
+
+            $rows[$key]['stages'][]    = $material['stage'];
+            $rows[$key]['first_stage'] = $rows[$key]['first_stage'] || ($firstId && $material['stage_id'] === $firstId);
+            $rows[$key]['needed']      = round($rows[$key]['needed'] + $material['total'], 4);
         }
 
-        return $recipe->inputs
-            ->where('recipe_stage_id', $first->id)
-            ->map(function ($input) use ($line, $first) {
-                [$itemName, $unitName] = $this->lineRuns->itemAndUnitNames((int) $input->item_id, (int) $input->item_unit_id);
-                $warehouseId           = $this->lineRuns->warehouseFor($line, $input->item_type_id ? (int) $input->item_type_id : null);
+        $problems = [];
 
-                return [
-                    'stage'          => $first->name,
-                    'item_id'        => (int) $input->item_id,
-                    'item_name'      => $itemName,
-                    'unit_name'      => $unitName,
-                    'warehouse_name' => $warehouseId ? $this->warehouseName($warehouseId) : null,
-                    'available'      => $warehouseId ? $this->inventory->available($warehouseId, (int) $input->item_id, (int) $input->item_unit_id) : null,
-                ];
-            })
-            ->values()
-            ->all();
+        foreach ($rows as &$row) {
+            $label = $row['item_name'] . ($row['unit_name'] ? " ({$row['unit_name']})" : '');
+            $where = $row['warehouse_name'] ?: "the line's warehouse";
+
+            $row['stage']     = implode(', ', array_unique(array_filter($row['stages'])));
+            $row['available'] = $row['warehouse_id']
+                ? $this->inventory->available($row['warehouse_id'], $row['item_id'], $row['item_unit_id'])
+                : null;
+
+            // The run's own mixes of this item, into this warehouse, in this unit.
+            $row['coming'] = round(collect($coming)
+                ->filter(fn(array $mix) => $row['warehouse_id'] && $mix['item_id'] === $row['item_id'] && $mix['warehouse_id'] === $row['warehouse_id'])
+                ->sum(fn(array $mix) => $mix['quantity']
+                    * $this->lineRuns->unitFormula($row['item_id'], $mix['item_unit_id'])
+                    / $this->lineRuns->unitFormula($row['item_id'], $row['item_unit_id'])), 4);
+
+            $row['short'] = $row['available'] === null
+                ? null
+                : max(0.0, round($row['needed'] - $row['available'] - $row['coming'], 4));
+
+            if (!$row['warehouse_id']) {
+                $row['status'] = 'no_warehouse';
+                $problems[]    = "{$line->name} has no warehouse to take {$label} from — set its source warehouses.";
+            } elseif ($row['available'] === null) {
+                $row['status'] = 'unknown';
+                $problems[]    = "Couldn't read the stock of {$label} in {$where} — try again.";
+            } elseif ($row['first_stage'] && $row['available'] <= 0) {
+                $row['status'] = 'empty';
+                $problems[]    = "There is no {$label} in {$where} yet — the {$row['stage']} station has nothing to start with.";
+            } elseif ($row['short'] > 1e-6) {
+                $row['status'] = 'short';
+                $problems[]    = "Not enough {$label} in {$where}: the run needs " . $this->lineRuns->formatNumber($row['needed'])
+                    . ', available ' . $this->lineRuns->formatNumber($row['available'])
+                    . ($row['coming'] > 0 ? ' and ' . $this->lineRuns->formatNumber($row['coming']) . ' still to be mixed' : '')
+                    . ' (' . $this->lineRuns->formatNumber($row['short']) . ' short).';
+            } else {
+                $row['status'] = 'ok';
+            }
+
+            unset($row['stages']);
+        }
+        unset($row);
+
+        return [array_values($rows), $problems];
     }
 
     protected function submitRunStart(Event $event): void
@@ -167,18 +234,20 @@ trait RunsLineRuns
             return;
         }
 
-        // The line can't start without what its first station takes — read
-        // live, not from when the window opened.
-        foreach ($this->firstStageStock($event, $event->recipe, $line) as $input) {
-            if (($input['available'] ?? 0) <= 0) {
-                $this->dispatch('swal:error', [
-                    'title' => 'Cannot start the run',
-                    'text'  => "There is no {$input['item_name']} in " . ($input['warehouse_name'] ?: 'the line\'s warehouse')
-                        . " yet — the {$input['stage']} station has nothing to start with.",
-                ]);
+        // Every material the run needs, read live — not from when the window
+        // opened. The table is refreshed so it shows what refused the start.
+        [$materials, $problems] = $this->runMaterialsCheck($event, $event->recipe, $line);
 
-                return;
-            }
+        if ($problems) {
+            $this->eventAction['materials'] = $materials;
+            $this->eventAction['problems']  = $problems;
+
+            $this->dispatch('swal:error', [
+                'title' => 'Cannot start the run',
+                'text'  => implode(' ', $problems),
+            ]);
+
+            return;
         }
 
         DB::transaction(fn() => $this->applyStatusChange($event, 'start', [
@@ -384,6 +453,8 @@ trait RunsLineRuns
 
         foreach ($stages as $stage) {
             $isLast = $stage->id === $last->id;
+            // Rejects and stage leftovers are hidden while LOSS_FIELDS is off.
+            $rework = LineRunService::LOSS_FIELDS && $stage->canRework();
 
             $this->runEnd['stages']['s' . $stage->id] = [
                 'id'              => $stage->id,
@@ -395,10 +466,10 @@ trait RunsLineRuns
                 'made'            => $isLast && $lastCount ? $this->plainNumber($lastCount->counter) : '',
                 'rejects'         => '',
                 'reject_reason'   => '',
-                'reject_action'   => $stage->canRework() ? ($stage->reject_action ?: 'waste') : 'waste',
-                'can_rework'      => $stage->canRework(),
-                'rework_label'    => $stage->canRework() ? $this->lineRuns->itemAndUnitNames((int) $stage->rework_item_id, (int) $stage->rework_item_unit_id)[0] : null,
-                'has_leftover'    => !$isLast && $stage->stock_leftovers && $stage->output_item_unit_id,
+                'reject_action'   => $rework ? ($stage->reject_action ?: 'waste') : 'waste',
+                'can_rework'      => $rework,
+                'rework_label'    => $rework ? $this->lineRuns->itemAndUnitNames((int) $stage->rework_item_id, (int) $stage->rework_item_unit_id)[0] : null,
+                'has_leftover'    => LineRunService::LOSS_FIELDS && !$isLast && $stage->stock_leftovers && $stage->output_item_unit_id,
                 'leftover'        => '',
             ];
         }
@@ -499,11 +570,14 @@ trait RunsLineRuns
         $rules = [];
 
         foreach ($this->runEnd['stages'] ?? [] as $key => $stage) {
-            $rules["runEnd.stages.{$key}.made"]          = (!empty($stage['is_last']) ? 'required' : 'nullable') . '|numeric|min:0';
-            $rules["runEnd.stages.{$key}.rejects"]       = 'nullable|numeric|min:0';
-            $rules["runEnd.stages.{$key}.reject_reason"] = 'nullable|string|max:255';
-            $rules["runEnd.stages.{$key}.reject_action"] = !empty($stage['can_rework']) ? 'required|in:waste,rework' : 'required|in:waste';
-            $rules["runEnd.stages.{$key}.leftover"]      = 'nullable|numeric|min:0';
+            $rules["runEnd.stages.{$key}.made"] = (!empty($stage['is_last']) ? 'required' : 'nullable') . '|numeric|min:0';
+
+            if (LineRunService::LOSS_FIELDS) {
+                $rules["runEnd.stages.{$key}.rejects"]       = 'nullable|numeric|min:0';
+                $rules["runEnd.stages.{$key}.reject_reason"] = 'nullable|string|max:255';
+                $rules["runEnd.stages.{$key}.reject_action"] = !empty($stage['can_rework']) ? 'required|in:waste,rework' : 'required|in:waste';
+                $rules["runEnd.stages.{$key}.leftover"]      = 'nullable|numeric|min:0';
+            }
         }
 
         foreach (array_keys($this->runEnd['inputs'] ?? []) as $key) {

@@ -201,112 +201,135 @@
                         <div class="alert alert-danger">{{ $message }}</div>
                         @enderror
 
-                        @if($stages)
-                        <div class="table-responsive">
-                            <table class="table align-middle rs-table mb-2">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 72px">Order</th>
-                                        <th>Stage <span class="text-danger">*</span></th>
-                                        <th style="width: 120px">Makes per batch <span class="text-danger">*</span></th>
-                                        <th style="width: 170px">Counted in</th>
-                                        <th style="width: 90px" class="text-center">Leftovers to stock</th>
-                                        <th style="width: 130px">Rejects go to</th>
-                                        <th>Rework into</th>
-                                        <th style="width: 100px">Rework per reject</th>
-                                        <th style="width: 52px"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($stages as $key => $stage)
-                                    <tr wire:key="stage-{{ $key }}">
-                                        <td>
-                                            <div class="d-flex align-items-center gap-1">
-                                                <span class="ir-idx">{{ $loop->iteration }}</span>
-                                                @unless($viewing)
-                                                <div class="btn-group-vertical btn-group-sm">
-                                                    <button type="button" class="btn btn-link p-0 lh-1" title="Move up"
-                                                        wire:click="moveStage('{{ $key }}', -1)" @disabled($loop->first)>
-                                                        <i class="bi bi-chevron-up"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-link p-0 lh-1" title="Move down"
-                                                        wire:click="moveStage('{{ $key }}', 1)" @disabled($loop->last)>
-                                                        <i class="bi bi-chevron-down"></i>
-                                                    </button>
-                                                </div>
-                                                @endunless
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <select class="form-select" wire:model.live="stages.{{ $key }}.station_type_id" @disabled($viewing)>
-                                                <option value="">Select a station type</option>
-                                                @foreach($stationTypes as $type)
-                                                <option value="{{ $type->id }}" @selected((string) ($stage['station_type_id'] ?? '') === (string) $type->id)>{{ $type->name }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error("stages.{$key}.station_type_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                                        </td>
-                                        <td>
-                                            <input type="text" class="form-control cleave-input" wire:model="stages.{{ $key }}.output_quantity" placeholder="e.g. 1.2">
-                                            @error("stages.{$key}.output_quantity")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                                        </td>
-                                        <td>
-                                            {{-- Keyed by the product: its units are the options (see §3 "Livewire"). --}}
-                                            <select class="form-select" wire:model.live="stages.{{ $key }}.output_item_unit_id" @disabled($viewing)
-                                                wire:key="stage-unit-{{ $key }}-{{ $item_id }}">
-                                                <option value="" @selected(($stage['output_item_unit_id'] ?? '') == '')>kg — by weight</option>
-                                                @foreach($headerUnits as $unit)
-                                                @php $formula = (float) ($unit['formula'] ?? 1); @endphp
-                                                <option value="{{ $unit['id'] }}" @selected((string) ($stage['output_item_unit_id'] ?? '') === (string) $unit['id'])>{{ $unit['name'] }}{{ $formula != 1 ? ' (' . rtrim(rtrim(number_format($formula, 4, '.', ''), '0'), '.') . ' basic)' : '' }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error("stages.{$key}.output_item_unit_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                                        </td>
-                                        <td class="text-center">
-                                            <input type="checkbox" class="form-check-input" wire:model="stages.{{ $key }}.stock_leftovers"
-                                                @checked(!empty($stage['stock_leftovers'])) @disabled($viewing || empty($stage['output_item_unit_id']))
-                                                title="What's left on this stage at End goes into stock, in its unit (packets not boxed, cans not cased).">
-                                        </td>
-                                        <td>
-                                            <select class="form-select" wire:model.live="stages.{{ $key }}.reject_action">
-                                                <option value="waste">Waste</option>
-                                                <option value="rework">Rework</option>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select class="form-select" wire:model="stages.{{ $key }}.rework_item_id" @disabled(($stage['reject_action'] ?? 'waste') !== 'rework')>
-                                                <option value="">— none —</option>
-                                                @foreach($reworkItems as $item)
-                                                <option value="{{ $item['id'] }}" @selected(($stage['rework_item_id'] ?? null) == $item['id'])>{{ $item['name'] }}{{ $item['unit_name'] ? ' · ' . $item['unit_name'] : '' }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error("stages.{$key}.rework_item_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                                        </td>
-                                        <td>
-                                            <input type="text" class="form-control cleave-input" wire:model="stages.{{ $key }}.rework_factor" placeholder="1">
-                                        </td>
-                                        <td class="text-end">
-                                            @unless($viewing)
-                                            <button type="button" class="btn btn-light-danger icon-btn-sm" title="Remove stage"
-                                                wire:click="removeStage('{{ $key }}')">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                            @endunless
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                        {{-- Same row editor as the ingredient sections. The rejects /
+                             leftovers / rework columns show only while
+                             LineRunService::LOSS_FIELDS is on. --}}
+                        @php $stageCols = $lossFields ? 'ir-cols-lstage-full' : 'ir-cols-lstage'; @endphp
+                        <div class="ir-editor">
+                            @if($stages)
+                            <div class="ir-head {{ $stageCols }}">
+                                <div class="ir-idx-h">Order</div>
+                                <div>Stage <span class="text-danger">*</span></div>
+                                <div>Makes per batch <span class="text-danger">*</span></div>
+                                <div>Counted in</div>
+                                @if($lossFields)
+                                <div class="text-center">Leftovers to stock</div>
+                                <div>Rejects go to</div>
+                                <div>Rework into</div>
+                                <div>Rework per reject</div>
+                                @endif
+                                <div></div>
+                            </div>
+                            @endif
+
+                            @forelse($stages as $key => $stage)
+                            <div class="ir-row {{ $stageCols }}" wire:key="stage-{{ $key }}">
+                                <div class="ir-idx-cell ir-stage-order">
+                                    <span class="ir-idx">{{ $loop->iteration }}</span>
+                                    @unless($viewing)
+                                    <div class="ir-move">
+                                        <button type="button" title="Move up" wire:click="moveStage('{{ $key }}', -1)" @disabled($loop->first)><i class="bi bi-chevron-up"></i></button>
+                                        <button type="button" title="Move down" wire:click="moveStage('{{ $key }}', 1)" @disabled($loop->last)><i class="bi bi-chevron-down"></i></button>
+                                    </div>
+                                    @endunless
+                                </div>
+
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Stage</span>
+                                    <select class="form-select" wire:model.live="stages.{{ $key }}.station_type_id" @disabled($viewing)>
+                                        <option value="">Select a station type</option>
+                                        @foreach($stationTypes as $type)
+                                        <option value="{{ $type->id }}" @selected((string) ($stage['station_type_id'] ?? '') === (string) $type->id)>{{ $type->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error("stages.{$key}.station_type_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                </div>
+
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Makes per batch</span>
+                                    <input type="text" class="form-control cleave-input" wire:model="stages.{{ $key }}.output_quantity" placeholder="e.g. 1.2">
+                                    @error("stages.{$key}.output_quantity")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                </div>
+
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Counted in</span>
+                                    {{-- Keyed by the product: its units are the options (see §3 "Livewire"). --}}
+                                    <select class="form-select" wire:model.live="stages.{{ $key }}.output_item_unit_id" @disabled($viewing)
+                                        wire:key="stage-unit-{{ $key }}-{{ $item_id }}">
+                                        <option value="" @selected(($stage['output_item_unit_id'] ?? '') == '')>kg — by weight</option>
+                                        @foreach($headerUnits as $unit)
+                                        @php $formula = (float) ($unit['formula'] ?? 1); @endphp
+                                        <option value="{{ $unit['id'] }}" @selected((string) ($stage['output_item_unit_id'] ?? '') === (string) $unit['id'])>{{ $unit['name'] }}{{ $formula != 1 ? ' (' . rtrim(rtrim(number_format($formula, 4, '.', ''), '0'), '.') . ' basic)' : '' }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error("stages.{$key}.output_item_unit_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                </div>
+
+                                @if($lossFields)
+                                <div class="ir-cell text-md-center">
+                                    <span class="ir-cell-label">Leftovers to stock</span>
+                                    <input type="checkbox" class="form-check-input mt-2" wire:model="stages.{{ $key }}.stock_leftovers"
+                                        @checked(!empty($stage['stock_leftovers'])) @disabled($viewing || empty($stage['output_item_unit_id']))
+                                        title="What's left on this stage at End goes into stock, in its unit (packets not boxed, cans not cased).">
+                                </div>
+
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Rejects go to</span>
+                                    <select class="form-select" wire:model.live="stages.{{ $key }}.reject_action">
+                                        <option value="waste">Waste</option>
+                                        <option value="rework">Rework</option>
+                                    </select>
+                                </div>
+
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Rework into</span>
+                                    <select class="form-select" wire:model="stages.{{ $key }}.rework_item_id" @disabled(($stage['reject_action'] ?? 'waste') !== 'rework')>
+                                        <option value="">— none —</option>
+                                        @foreach($reworkItems as $item)
+                                        <option value="{{ $item['id'] }}" @selected(($stage['rework_item_id'] ?? null) == $item['id'])>{{ $item['name'] }}{{ $item['unit_name'] ? ' · ' . $item['unit_name'] : '' }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error("stages.{$key}.rework_item_id")<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                </div>
+
+                                <div class="ir-cell">
+                                    <span class="ir-cell-label">Rework per reject</span>
+                                    <input type="text" class="form-control cleave-input" wire:model="stages.{{ $key }}.rework_factor" placeholder="1">
+                                </div>
+                                @endif
+
+                                <div class="ir-remove-cell">
+                                    @unless($viewing)
+                                    <button type="button" class="ir-remove" title="Remove stage" wire:click="removeStage('{{ $key }}')">
+                                        <i class="bi bi-trash"></i><span class="ir-remove-text">Remove</span>
+                                    </button>
+                                    @endunless
+                                </div>
+                            </div>
+                            @empty
+                            <div class="ir-empty">No stages — the recipe runs as an ordinary event.</div>
+                            @endforelse
+
+                            @unless($viewing)
+                            <button type="button" class="ir-add" wire:click="addStage">
+                                <i class="bi bi-plus-lg"></i> Add stage
+                            </button>
+                            @endunless
                         </div>
-                        <p class="text-muted small mb-3">
+
+                        @if($stages)
+                        <p class="text-muted small mt-2 mb-0">
                             <i class="bi bi-info-circle me-1"></i>
-                            <strong>Makes per batch</strong> is what the stage puts out for one batch of this recipe, <strong>counted in</strong> one of the product's units or in kg (dough through the cutter and oven).
-                            Machine rates are in the basic unit, so a stage that makes boxes or cases converts with the unit's formula (a packer at 200 packets/min makes 250 boxes of 48 an hour).
-                            The last stage is counted at End in the recipe's own output unit — that is what goes into stock.
+                            <strong>Makes per batch</strong> is what the stage puts out for one batch, <strong>counted in</strong> one of the product's units or in kg.
+                            Station rates are in the basic unit, so a stage counted in boxes or cases converts with the unit's formula.
+                            The last stage is counted at End in the recipe's own unit — that's what goes into stock.
+                            @if($lossFields)
                             <strong>Rework per reject</strong> is how much of the rework item one reject gives (e.g. 0.036 kg of powder from one 36 g packet).
+                            @endif
                         </p>
 
-                        <div class="row g-3">
+                        @if($lossFields)
+                        <div class="row g-3 mt-1">
                             <div class="col-12 col-md-4">
                                 <label class="form-label" for="balance_tolerance">Tolerance at End (%)</label>
                                 <input type="text" id="balance_tolerance" class="form-control cleave-input" wire:model="balance_tolerance" placeholder="1">
@@ -321,12 +344,7 @@
                             </div>
                         </div>
                         @endif
-
-                        @unless($viewing)
-                        <button type="button" class="ir-add mt-3" wire:click="addStage">
-                            <i class="bi bi-plus-lg"></i> Add stage
-                        </button>
-                        @endunless
+                        @endif
                     </div>
                 </div>
                 @endif

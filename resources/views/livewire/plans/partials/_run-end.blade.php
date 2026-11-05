@@ -1,9 +1,12 @@
 {{-- End of a line run: what each station counted, its rejects and where they
      go, its leftovers, and what was used of each material. "Check figures"
-     works it out without saving; End checks again and moves the stock. --}}
+     works it out without saving; End checks again and moves the stock.
+     Rejects, leftovers and the tolerance are hidden while
+     LineRunService::LOSS_FIELDS is off. --}}
 @php
-    $fmt   = fn($n, $dp = 3) => $n === null || $n === '' ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
-    $check = $runEndCheck;
+    $fmt    = fn($n, $dp = 3) => $n === null || $n === '' ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
+    $check  = $runEndCheck;
+    $losses = \App\Services\LineRunService::LOSS_FIELDS;
 @endphp
 
 <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
@@ -26,10 +29,12 @@
         <tr>
             <th>Station</th>
             <th style="width: 150px;">Made</th>
+            @if($losses)
             <th style="width: 120px;">Rejects</th>
             <th>Reject reason</th>
             <th style="width: 150px;">Rejects go to</th>
             <th style="width: 130px;">Left over → stock</th>
+            @endif
         </tr>
     </thead>
     <tbody>
@@ -48,6 +53,7 @@
                 <div class="text-muted" style="font-size: 11px;">worked out: {{ $fmt($figures['made']) }}</div>
                 @endif
             </td>
+            @if($losses)
             <td>
                 <input type="text" inputmode="decimal" class="form-control form-control-sm @error("runEnd.stages.{$key}.rejects") is-invalid @enderror"
                     wire:model="runEnd.stages.{{ $key }}.rejects" placeholder="0">
@@ -73,6 +79,7 @@
                 <span class="text-muted">—</span>
                 @endif
             </td>
+            @endif
         </tr>
         @endforeach
     </tbody>
@@ -138,7 +145,9 @@
     <i class="bi bi-info-circle me-1"></i>
     Used = what you enter, else fed − left, else the recipe figure for what was made.
     Dough left on the line is kept in its warehouse, or written off on a Waste.
+    @if($losses)
     A material more than {{ $fmt($eventAction['tolerance'], 1) }} % off the recipe flags the run for review — it doesn't stop it.
+    @endif
 </div>
 
 <div class="d-flex align-items-center gap-2 mb-3">
