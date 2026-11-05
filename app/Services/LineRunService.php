@@ -34,6 +34,17 @@ use RuntimeException;
  */
 class LineRunService
 {
+    /**
+     * Rejects (and where they go: waste or rework, into what, how much per
+     * reject), stage leftovers to stock, the End tolerance (the Needs review
+     * flag) and the reject allowance planned on top of the mixes. Hidden on
+     * the recipe form and in the End modal, and left out of settle() and
+     * planMixes(), until it's decided how they should work (2026-11-05).
+     * Their columns and stored values are kept as they are — set this to
+     * true to bring all of it back.
+     */
+    public const LOSS_FIELDS = false;
+
     /** Percent a material may stray from the recipe at End before the run is flagged. */
     public const DEFAULT_TOLERANCE = 1.0;
 
@@ -335,11 +346,19 @@ class LineRunService
      * × the recipe figure; what was used is the figure entered, else fed −
      * left, else the expected figure itself.
      *
+     * While LOSS_FIELDS is off, rejects and leftovers count as none whatever
+     * the form sends, and nothing is flagged for review.
+     *
      * @return array{errors: array, flagged: bool, good_batches: float, stages: array, inputs: array}
      */
     public function settle(array $stages, array $inputs, ?float $tolerance = null): array
     {
         $tolerance ??= self::DEFAULT_TOLERANCE;
+
+        if (!self::LOSS_FIELDS) {
+            $stages = array_map(fn($stage) => ['rejects' => null, 'leftover' => null] + $stage, $stages);
+        }
+
         $stages    = array_values($stages);
         $errors    = [];
         $out       = [];
@@ -443,7 +462,7 @@ class LineRunService
             }
 
             $variance = $expected > 0 ? round(($used - $expected) / $expected * 100, 2) : null;
-            $over     = $variance !== null && abs($variance) > $tolerance + 1e-9;
+            $over     = self::LOSS_FIELDS && $variance !== null && abs($variance) > $tolerance + 1e-9;
             $flagged  = $flagged || $over;
 
             $inputsOut[$input['key']] = [
@@ -707,7 +726,8 @@ class LineRunService
             ->get();
 
         $batches   = $this->batchCount($run);
-        $allowance = 1 + max(0.0, (float) $recipe->reject_allowance) / 100;
+        // No reject allowance while LOSS_FIELDS is off.
+        $allowance = self::LOSS_FIELDS ? 1 + max(0.0, (float) $recipe->reject_allowance) / 100 : 1.0;
         $runStart  = Carbon::parse($run->from_time);
         $created   = collect();
         $notes     = [];
@@ -871,6 +891,32 @@ class LineRunService
             ->get()
             ->groupBy('item_id')
             ->map(fn($rows) => (float) $rows->sum('actual_quantity'))
+            ->all();
+    }
+
+    /**
+     * Dough the run's mixes will still put into stock: every planned or
+     * running mix feeding it, into its preparation's output warehouse, in the
+     * mix recipe's unit. An ended mix's dough is in stock already.
+     *
+     * @return array<int, array{warehouse_id: ?int, item_id: int, item_unit_id: int, quantity: float}>
+     */
+    public function mixesStillToCome(Event $run): array
+    {
+        return $run->feedingEvents()
+            ->with('recipe', 'placeable')
+            ->where(fn($q) => $q->whereNull('status')->orWhere('status', '!=', 'terminated'))
+            ->get()
+            ->filter(fn(Event $mix) => $mix->recipe)
+            ->map(fn(Event $mix) => [
+                'warehouse_id' => $mix->placeable && method_exists($mix->placeable, 'destinationWarehouseId')
+                    ? $mix->placeable->destinationWarehouseId()
+                    : null,
+                'item_id'      => (int) $mix->recipe->item_id,
+                'item_unit_id' => (int) $mix->recipe->item_unit_id,
+                'quantity'     => $this->batchCount($mix) * (float) $mix->recipe->quantity_per_batch,
+            ])
+            ->values()
             ->all();
     }
 

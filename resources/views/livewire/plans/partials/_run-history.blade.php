@@ -1,9 +1,13 @@
 {{-- History modal: how a line run went — against what the line could have
-     made, where the rest went, what each station counted, and the materials. --}}
+     made, where the rest went, what each station counted, and the materials.
+     The rejects and leftover columns show while LineRunService::LOSS_FIELDS is
+     on, or when the run recorded any (one ended before they were hidden). --}}
 @php
     $run     = $eventHistory['run'];
     $summary = $run['summary'];
     $fmt     = fn($n, $dp = 2) => $n === null ? '—' : ($dp > 0 ? rtrim(rtrim(number_format((float) $n, $dp), '0'), '.') : number_format((float) $n));
+    $losses  = \App\Services\LineRunService::LOSS_FIELDS
+        || collect($run['stages'])->contains(fn($stage) => $stage['rejects'] || $stage['leftover']);
 @endphp
 
 <div class="border rounded p-3 mb-3">
@@ -34,15 +38,17 @@
 
     @if($run['stages'])
     <table class="table table-sm mb-3" style="font-size: 12px;">
-        <thead><tr><th>Station</th><th class="text-end">Made</th><th class="text-end">Rejects</th><th>Rejects went to</th><th class="text-end">Left over</th></tr></thead>
+        <thead><tr><th>Station</th><th class="text-end">Made</th>@if($losses)<th class="text-end">Rejects</th><th>Rejects went to</th><th class="text-end">Left over</th>@endif</tr></thead>
         <tbody>
             @foreach($run['stages'] as $stage)
             <tr>
                 <td>{{ $stage['name'] }}</td>
                 <td class="text-end">{{ $fmt($stage['made'], 3) }} {{ $stage['unit'] }}@unless($stage['counted'])<span class="text-muted"> (worked out)</span>@endunless</td>
+                @if($losses)
                 <td class="text-end">{{ $stage['rejects'] ? $fmt($stage['rejects'], 3) : '—' }}</td>
                 <td>{{ $stage['rejects'] ? ucfirst($stage['disposition'] ?? '') . ($stage['reject_reason'] ? ' · ' . $stage['reject_reason'] : '') : '—' }}</td>
                 <td class="text-end">{{ $stage['leftover'] ? $fmt($stage['leftover'], 3) : '—' }}</td>
+                @endif
             </tr>
             @endforeach
         </tbody>

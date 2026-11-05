@@ -9,6 +9,7 @@ use App\Models\RecipeStage;
 use App\Models\RecipeType;
 use App\Models\StationType;
 use App\Services\ApiService;
+use App\Services\LineRunService;
 use DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
@@ -133,7 +134,7 @@ class RecipeCreate extends Component
             ];
         }
 
-        if ($this->stages) {
+        if ($this->stages && LineRunService::LOSS_FIELDS) {
             $this->loadReworkItems();
         }
 
@@ -420,7 +421,9 @@ class RecipeCreate extends Component
             'rework_factor'       => '1',
         ];
 
-        $this->loadReworkItems();
+        if (LineRunService::LOSS_FIELDS) {
+            $this->loadReworkItems();
+        }
     }
 
     public function removeStage(string $key): void
@@ -593,12 +596,15 @@ class RecipeCreate extends Component
             $rules["stages.{$key}.output_quantity"] = 'required|numeric|min:0.0001';
             // One of the product's units, or blank for kg.
             $rules["stages.{$key}.output_item_unit_id"] = ['nullable', Rule::in(array_map('strval', array_column($this->headerUnits, 'id')))];
-            $rules["stages.{$key}.reject_action"]   = 'required|in:waste,rework';
-            $rules["stages.{$key}.rework_item_id"]  = ($this->stages[$key]['reject_action'] ?? 'waste') === 'rework' ? 'required|integer' : 'nullable|integer';
-            $rules["stages.{$key}.rework_factor"]   = 'nullable|numeric|min:0';
+
+            if (LineRunService::LOSS_FIELDS) {
+                $rules["stages.{$key}.reject_action"]  = 'required|in:waste,rework';
+                $rules["stages.{$key}.rework_item_id"] = ($this->stages[$key]['reject_action'] ?? 'waste') === 'rework' ? 'required|integer' : 'nullable|integer';
+                $rules["stages.{$key}.rework_factor"]  = 'nullable|numeric|min:0';
+            }
         }
 
-        if ($this->stages) {
+        if ($this->stages && LineRunService::LOSS_FIELDS) {
             $rules['balance_tolerance'] = 'nullable|numeric|min:0|max:100';
             $rules['reject_allowance']  = 'nullable|numeric|min:0|max:100';
         }
@@ -661,9 +667,13 @@ class RecipeCreate extends Component
                 'batch_volume'      => $this->batch_volume,
                 'status'            => $this->status,
                 'notes'             => $this->notes,
-                'balance_tolerance' => $this->stages && $this->balance_tolerance !== null && $this->balance_tolerance !== '' ? $this->balance_tolerance : null,
-                'reject_allowance'  => $this->stages && $this->reject_allowance !== null && $this->reject_allowance !== '' ? $this->reject_allowance : null,
             ];
+
+            // Hidden (LineRunService::LOSS_FIELDS): a saved recipe keeps what it has.
+            if (LineRunService::LOSS_FIELDS) {
+                $recipeData['balance_tolerance'] = $this->stages && $this->balance_tolerance !== null && $this->balance_tolerance !== '' ? $this->balance_tolerance : null;
+                $recipeData['reject_allowance']  = $this->stages && $this->reject_allowance !== null && $this->reject_allowance !== '' ? $this->reject_allowance : null;
+            }
 
             $recipe = $this->editing
                 ? tap(Recipe::findOrFail($this->id))->update($recipeData)
@@ -775,14 +785,21 @@ class RecipeCreate extends Component
                 'name'                => $types[(int) $stage['station_type_id']] ?? '',
                 'output_quantity'     => (float) $stage['output_quantity'],
                 'output_item_unit_id' => $unitId,
-                // Only a stage that counts the product itself can stock its leftovers.
-                'stock_leftovers'     => $unitId && !empty($stage['stock_leftovers']),
-                'reject_action'       => $stage['reject_action'] === 'rework' && $reworkItem ? 'rework' : 'waste',
-                'rework_item_type_id' => $reworkItem['item_type_id'] ?? null,
-                'rework_item_id'      => $reworkItem['id'] ?? null,
-                'rework_item_unit_id' => $reworkItem['unit_id'] ?? null,
-                'rework_factor'       => $stage['rework_factor'] !== null && $stage['rework_factor'] !== '' ? (float) $stage['rework_factor'] : 1,
             ];
+
+            // Hidden (LineRunService::LOSS_FIELDS): a saved stage keeps what it
+            // has, a new one the columns' defaults (no leftovers, rejects to waste).
+            if (LineRunService::LOSS_FIELDS) {
+                $data += [
+                    // Only a stage that counts the product itself can stock its leftovers.
+                    'stock_leftovers'     => $unitId && !empty($stage['stock_leftovers']),
+                    'reject_action'       => $stage['reject_action'] === 'rework' && $reworkItem ? 'rework' : 'waste',
+                    'rework_item_type_id' => $reworkItem['item_type_id'] ?? null,
+                    'rework_item_id'      => $reworkItem['id'] ?? null,
+                    'rework_item_unit_id' => $reworkItem['unit_id'] ?? null,
+                    'rework_factor'       => $stage['rework_factor'] !== null && $stage['rework_factor'] !== '' ? (float) $stage['rework_factor'] : 1,
+                ];
+            }
 
             $model = !empty($stage['id']) ? RecipeStage::where('recipe_id', $recipe->id)->find($stage['id']) : null;
             $model ? $model->update($data) : $model = $recipe->stages()->create($data);
@@ -808,6 +825,7 @@ class RecipeCreate extends Component
             'sideSections'        => $this->sideSections,
             'sideSectionItems'    => $this->sideSectionItems,
             'stationTypes'        => StationType::orderBy('sequence')->orderBy('name')->get(['id', 'name']),
+            'lossFields'          => LineRunService::LOSS_FIELDS,
         ]);
     }
 }
