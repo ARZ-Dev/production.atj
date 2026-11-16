@@ -18,11 +18,12 @@ class ProductionLineSeeder extends Seeder
      * preparations and lines under each production line are attached by
      * PreparationSeeder and LineSeeder.
      *
-     * Bolacha has one per line of the factory's drawings of 2026-11-04 (LINE
-     * 01 … 05, NAYA VERTICAL, WAFER), each holding its line and the mixers or
-     * tanks that feed only it — a run's mixes are planned on its production
-     * line's preparations. Until then one production line (id 2, "Bolacha
-     * Production Line PL1") held every Bolacha lane.
+     * Bolacha has one per line of the factory's drawings (LINE 01 … 06, WAFER
+     * LINE — of 2026-11-16, which call the vertical line LINE 06 (VERTICAL);
+     * it was "Naya Vertical" from the drawings of 2026-11-04), each holding
+     * its line and the mixers that feed only it — a run's mixes are planned on
+     * its production line's preparations. Until 2026-11-04 one production line
+     * (id 2, "Bolacha Production Line PL1") held every Bolacha lane.
      */
     public function run(): void
     {
@@ -43,7 +44,7 @@ class ProductionLineSeeder extends Seeder
             ['id' => 4, 'name' => 'Line 03'] + $bolacha,
             ['id' => 5, 'name' => 'Line 04'] + $bolacha,
             ['id' => 6, 'name' => 'Line 05'] + $bolacha,
-            ['id' => 7, 'name' => 'Naya Vertical'] + $bolacha,
+            ['id' => 7, 'name' => 'Line 06 (Vertical)'] + $bolacha,
             ['id' => 8, 'name' => 'Wafer'] + $bolacha,
         ];
 
