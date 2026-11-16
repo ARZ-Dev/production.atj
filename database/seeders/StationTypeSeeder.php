@@ -16,25 +16,31 @@ class StationTypeSeeder extends Seeder
      * Fixed ids, in the order the 2026_10_29 migration creates them from the
      * old per-line stations (so a migrated database and a fresh one agree),
      * then Labelling and Mixing, which no line had. Order is the position in
-     * a line, 1–9 (the user's choice, 2026-10-29), for the dropdowns. Matched
+     * a line, numbered 1, 2, 3 … (the user's choice, 2026-10-29), for the
+     * dropdowns. Matched
      * on id, so re-running renames in place (soft-deleted rows restored).
      *
      * Packing wraps and Packaging boxes, in that order, as the factory's line
      * drawings of 2026-11-04 have it (the user's choice that day — until then
      * it was the other way round, with the same ids).
      *
+     * Refrigeration (10) came with the drawings of 2026-11-16: the wafer line
+     * cools its creamed sheets before cutting them. It takes 5, after
+     * Creaming, and the types after it moved down one (1–10).
+     *
      * @var array<int, array{0: string, 1: int, 2: ?string}> id => [name, order, description]
      */
     public const TYPES = [
-        1 => ['Filling & Seaming', 5, 'Fills the cans and seams the lids on.'],
-        2 => ['Pasteurizing', 6, 'Heats the sealed cans; runs on pasteurizing time.'],
-        3 => ['Packing', 8, 'Wraps the biscuits into packets (flow wrap, folding).'],
-        4 => ['Cutting', 2, 'Forms and cuts the biscuits: a lamination line with its cutter, or a rotary moulder.'],
-        5 => ['Cooking', 3, 'Bakes — the ovens and the wafer line.'],
-        6 => ['Creaming', 4, 'Puts the cream between two-part products.'],
-        7 => ['Packaging', 9, 'Puts the packets or cans into boxes / cartons.'],
-        8 => ['Labelling', 7, 'Puts the labels on the cans.'],
-        9 => ['Mixing', 1, 'Mixes doughs, creams and paste — preparation equipment.'],
+        1  => ['Filling & Seaming', 6, 'Fills the cans and seams the lids on.'],
+        2  => ['Pasteurizing', 7, 'Heats the sealed cans; runs on pasteurizing time.'],
+        3  => ['Packing', 9, 'Wraps the biscuits into packets (flow wrap, folding).'],
+        4  => ['Cutting', 2, 'Forms and cuts: a lamination line with its cutter or a rotary moulder, before the oven — and the wafer line\'s cutter, after the cream.'],
+        5  => ['Cooking', 3, 'Bakes — the ovens, the wafer line\'s included.'],
+        6  => ['Creaming', 4, 'Puts the cream between two-part products.'],
+        7  => ['Packaging', 10, 'Puts the packets or cans into boxes / cartons and tapes them shut.'],
+        8  => ['Labelling', 8, 'Puts the labels on the cans.'],
+        9  => ['Mixing', 1, 'Mixes doughs, creams and paste, and holds them in tanks — preparation equipment.'],
+        10 => ['Refrigeration', 5, 'Cools the creamed wafer sheets before they\'re cut.'],
     ];
 
     /** The fixed id of a type by its name. */

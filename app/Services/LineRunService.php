@@ -774,9 +774,10 @@ class LineRunService
         }
 
         // Each material gets a mixer of its own where the line has one to spare
-        // (a wafer's batter its dough tank, the cream its cream tank), in stage
-        // order; mixers no material took are shared, so a dough alternates
-        // between its line's two mixers.
+        // (a wafer's batter its dough mixer, the cream its cream mixer), in
+        // stage order; mixers no material took are shared, so a dough
+        // alternates between its line's two mixers — and on a line with one,
+        // every material's mixes go on it.
         $homes = [];
         foreach ($plans as $i => $plan) {
             $free      = collect($plan['eligible'])->first(fn($mixer) => !in_array($mixer[0]->id, $homes, true));
