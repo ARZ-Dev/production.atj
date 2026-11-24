@@ -34,23 +34,37 @@ class StationSeeder extends Seeder
      * replace those of 2026-11-04. Each biscuit line forms the biscuits (Lines
      * 01, 02 and 05 on the sheet's three Laser lamination lines, 03 and 04 on
      * a Laser rotary moulder, 06 on an Angobake lamination line), bakes them in
-     * its oven — Laser Ovens 1–5 on Lines 01–05 in the sheet's order, as chosen
-     * on 2026-10-28; Line 06's is an Angobake — then packs (wraps) them on the
+     * its oven — Laser Ovens 1–5 on Lines 01–05; Line 06's is an Angobake — then
+     * packs (wraps) them on the
      * drawing's wrappers and packages (boxes) them on its taping machines. The
      * wafer line bakes, creams, cools and cuts on its Franz Haas machines
      * ("HASSE" in the drawing), then packs and packages the same way.
      *
-     * The drawings name every wrapper the sheet lists, once: Flow Wraps on
-     * Lines 01, 02 and 04 (by their numbers, 247–254 — the sheet doesn't number
-     * them), the Cavanas on Line 05, PAKONAs on Line 06 ("PAKONA PK-70VL") and
-     * two DACHUANs on Line 03. Line 03's other two read "BAPM08" / "BAPM07",
-     * a make the sheet doesn't have — taken to be two of its HEBEIs, the only
-     * make left over; the wafer line's three are too small to read and get
-     * what remains: one DACHUAN, one PAKONA, one HEBEI. The wrappers' rate is
-     * the low end of their sheet range (the user's choice, 2026-10-29), so on
-     * most lines they, not the oven, set the speed. HEBEI, the lamination
-     * lines, rotary moulders, taping machines and the drawings' machines the
-     * sheet doesn't list have no rate.
+     * The wrappers, as the drawings name them: Flow Wraps on Lines 01, 02 and
+     * 04 (by their numbers, 247–254 — the sheet doesn't number them), the
+     * Cavanas on Line 05, two PAKONAs on Line 06, two DACHUANs ("DAUCHUAN
+     * MACHINERY") on Line 03 and one on the wafer line, and three "BAPM"s —
+     * BAPM08 / BAPM07 on Line 03, BA/PM/09 on the wafer line — a make the sheet
+     * doesn't have, taken to be its three HEBEIs. The wafer line's Packing 02
+     * is an "… AF300 FLOW" (its make's name too small to read even in the clear
+     * copy), which the sheet doesn't list (93); the sheet's third PAKONA is on
+     * no drawing, so on no line.
+     *
+     * Capacities — the drawings carry them in green (sent 2026-11-20, a clear
+     * copy 2026-11-24). Stored as rates: the ovens, 1,200 / 1,200 / 1,000 /
+     * 1,000 / 2,000 / 300 kg/h on Lines 01–06 (until 2026-11-20 Lines 03 and 05
+     * had the sheet's 2,000 and 1,000 the other way round, as placed in sheet
+     * order on 2026-10-28, and Line 06's Angobake none), and the wrappers, at
+     * the low end of each drawing's range as the user chose for the sheet's on
+     * 2026-10-29 — Flow Wrap 90–110 → 90, Cavana 90–120 → 90, DACHUAN and
+     * BAPM / HEBEI 100–110 → 100 (HEBEI had none before), PAKONA 55–60 → 55,
+     * the AF300 100–110 → 100. So on most lines the wrappers, not the oven, set
+     * the speed. In the notes only, since none is a per-hour rate in the
+     * stage's unit: the mixers' and tanks' kg a batch, the wafer oven's sheets
+     * a minute, the refrigeration's sheets held and the cutter's cuts a
+     * minute. No capacity anywhere for the lamination lines, rotary moulders,
+     * the cream machine, Cavana 03 (its sheet figure stays) or the taping
+     * machines (model MH-FJ-1AW).
      *
      * The mixers and tanks are preparation equipment, on no line; each mixer
      * has a preparation of its name (PreparationSeeder; the sheet gives kg a
@@ -81,10 +95,11 @@ class StationSeeder extends Seeder
         // ── Bolacha: ovens ──────────────────────────────────────────────────
         10 => ['Oven 1', 'Cooking', 'Laser', 1200, 'hour', '4 zones, cyclothermal. Laser 1221044 in Line 01\'s drawing.', 'bolacha'],
         11 => ['Oven 2', 'Cooking', 'Laser', 1200, 'hour', '4 zones, cyclothermal. Laser 1201001 in Line 02\'s drawing.', 'bolacha'],
-        12 => ['Oven 3', 'Cooking', 'Laser', 2000, 'hour', '5 zones: 2 direct flame, 3 cyclothermal.', 'bolacha'],
+        // Lines 03 and 05: 1,000 and 2,000 kg/h in their drawings — the other way round from the sheet's order.
+        12 => ['Oven 3', 'Cooking', 'Laser', 1000, 'hour', '3 zones, cyclothermal. 1,000 kg/h in Line 03\'s drawing.', 'bolacha'],
         13 => ['Oven 4', 'Cooking', 'Laser', 1000, 'hour', '3 zones, cyclothermal.', 'bolacha'],
-        14 => ['Oven 5', 'Cooking', 'Laser', 1000, 'hour', '3 zones, cyclothermal.', 'bolacha'],
-        15 => ['Franz Haas Oven', 'Cooking', 'Franz Haas', null, 'minute', 'The wafer line: 40 plates/minute — the plates per box are not known, so no rate in the wafer recipes\' kg.', 'bolacha'],
+        14 => ['Oven 5', 'Cooking', 'Laser', 2000, 'hour', '5 zones: 2 direct flame, 3 cyclothermal. 2,000 kg/h in Line 05\'s drawing.', 'bolacha'],
+        15 => ['Franz Haas Oven', 'Cooking', 'Franz Haas', null, 'minute', 'The wafer line: 40 sheets/minute (sheet and drawing) — the sheets per box are not known, so no rate in the wafer recipes\' kg.', 'bolacha'],
 
         // ── Bolacha: lamination lines ───────────────────────────────────────
         16 => ['Lamination Line 1', 'Cutting', 'Laser', null, 'hour', 'Laser 1221042 in Line 01\'s drawing.', 'bolacha'],
@@ -104,15 +119,16 @@ class StationSeeder extends Seeder
         27 => ['Cavana 1', 'Packing', 'Cavana 05NKZ', 90, 'minute', self::CAVANA, 'bolacha'],
         28 => ['Cavana 2', 'Packing', 'Cavana 05NKZ', 90, 'minute', self::CAVANA, 'bolacha'],
         29 => ['Cavana 3', 'Packing', 'Cavana 05NKZ', 90, 'minute', self::CAVANA, 'bolacha'],
-        30 => ['HEBEI 1', 'Packing', 'HEBEI HBEP30', null, 'minute', self::HEBEI . ' Line 03\'s Packing 01, "BAPM08" in its drawing — taken to be a HEBEI, the only make left over.', 'bolacha'],
-        31 => ['HEBEI 2', 'Packing', 'HEBEI HBEP30', null, 'minute', self::HEBEI . ' Line 03\'s Packing 04, "BAPM07" in its drawing — taken to be a HEBEI, the only make left over.', 'bolacha'],
-        32 => ['HEBEI 3', 'Packing', 'HEBEI HBEP30', null, 'minute', self::HEBEI . ' On the wafer line, whose drawing can\'t be read: the HEBEI left over.', 'bolacha'],
+        // HEBEI 1–3 until 2026-11-24, renamed by the drawings' tags.
+        30 => ['HEBEI BAPM08', 'Packing', 'HEBEI HBEP30', 100, 'minute', self::HEBEI . ' Line 03\'s Packing 01.', 'bolacha'],
+        31 => ['HEBEI BAPM07', 'Packing', 'HEBEI HBEP30', 100, 'minute', self::HEBEI . ' Line 03\'s Packing 04.', 'bolacha'],
+        32 => ['HEBEI BAPM09', 'Packing', 'HEBEI HBEP30', 100, 'minute', self::HEBEI . ' The wafer line\'s Packing 01 ("BA/PM/09").', 'bolacha'],
         33 => ['DACHUAN 1', 'Packing', 'DACHUAN DC250B', 100, 'minute', self::DACHUAN . ' Line 03\'s Packing 02.', 'bolacha'],
         34 => ['DACHUAN 2', 'Packing', 'DACHUAN DC250B', 100, 'minute', self::DACHUAN . ' Line 03\'s Packing 03.', 'bolacha'],
-        35 => ['DACHUAN 3', 'Packing', 'DACHUAN DC250B', 100, 'minute', self::DACHUAN . ' On the wafer line, whose drawing can\'t be read: the DACHUAN left over.', 'bolacha'],
+        35 => ['DACHUAN 3', 'Packing', 'DACHUAN DC250B', 100, 'minute', self::DACHUAN . ' The wafer line\'s Packing 03.', 'bolacha'],
         36 => ['PAKONA 1', 'Packing', 'PAKONA PK70VL', 55, 'minute', self::PAKONA . ' Line 06\'s Packing 01.', 'bolacha'],
         37 => ['PAKONA 2', 'Packing', 'PAKONA PK70VL', 55, 'minute', self::PAKONA . ' Line 06\'s Packing 02.', 'bolacha'],
-        38 => ['PAKONA 3', 'Packing', 'PAKONA PK70VL', 55, 'minute', self::PAKONA . ' On the wafer line, whose drawing can\'t be read: the PAKONA left over.', 'bolacha'],
+        38 => ['PAKONA 3', 'Packing', 'PAKONA PK70VL', 55, 'minute', '55–60 pcs/min (sheet) · vertical folding · BOPP, tape, box, ribbon. On no drawing, so on no line (until 2026-11-24 it stood in for the wafer line\'s Packing 02).', 'bolacha'],
 
         // ── Bolacha: mixers (preparation equipment) ─────────────────────────
         39 => ['Mixer ZM 500 1', 'Mixing', 'Laser ZM 500', null, 'hour', '250 kg a batch.', 'bolacha'],
@@ -128,37 +144,38 @@ class StationSeeder extends Seeder
 
         // ── Bolacha: in the line drawings, not in the equipment sheet ───────
         // "Franz Haas Cream Station" until 2026-11-16.
-        49 => ['Franz Haas Cream Machine', 'Creaming', 'Franz Haas', null, 'minute', 'Creams the wafer sheets, from the cream tank.', 'bolacha'],
+        49 => ['Franz Haas Cream Machine', 'Creaming', 'Franz Haas WSTM-FOX', null, 'minute', 'Creams the wafer sheets, from the cream tank. No capacity in the drawing.', 'bolacha'],
         50 => ['Rotary Molding 1', 'Cutting', 'Laser', null, 'hour', 'Line 03\'s former ("Laser Rotary" in its drawing).', 'bolacha'],
         51 => ['Rotary Molding 2', 'Cutting', 'Laser', null, 'hour', 'Line 04\'s former ("Laser Rotary" in its drawing).', 'bolacha'],
         52 => ['Lamination Line 4', 'Cutting', 'Angobake', null, 'hour', 'Line 06\'s, in its drawing; the equipment sheet lists 3, all Laser.', 'bolacha'],
-        53 => ['Oven 6', 'Cooking', 'Angobake', null, 'hour', 'Line 06\'s, in its drawing; the equipment sheet lists 5 ovens, so no rate.', 'bolacha'],
-        69 => ['Franz Haas Refrigeration Machine', 'Refrigeration', 'Franz Haas', null, 'minute', 'Cools the creamed wafer sheets.', 'bolacha'],
-        70 => ['Franz Haas Cutting Machine', 'Cutting', 'Franz Haas', null, 'minute', 'Cuts the cooled wafer sheets into pieces.', 'bolacha'],
-        71 => ['Wafer Dough Mixer', 'Mixing', 'Franz Haas ATM120', null, 'hour', 'Mixes the wafer batter into the dough tank.', 'bolacha'],
-        72 => ['Wafer Dough Tank', 'Mixing', 'Franz Haas ATM120', null, 'hour', 'Holds the batter and feeds the oven.', 'bolacha'],
-        73 => ['Wafer Cream Mixer', 'Mixing', 'Franz Haas CAB190 AZ-A', null, 'hour', 'Mixes the wafer cream for the cream tank.', 'bolacha'],
-        74 => ['Wafer Cream Tank', 'Mixing', 'Franz Haas CAB190 AZ-A', null, 'hour', 'Holds the cream and feeds the cream machine.', 'bolacha'],
+        53 => ['Oven 6', 'Cooking', 'Angobake', 300, 'hour', 'Line 06\'s; not in the equipment sheet. 300 kg/h in its drawing.', 'bolacha'],
+        69 => ['Franz Haas Refrigeration Machine', 'Refrigeration', 'Franz Haas', null, 'minute', 'Cools the creamed wafer sheets. Holds 180 sheets (drawing) — a buffer, not a rate.', 'bolacha'],
+        70 => ['Franz Haas Cutting Machine', 'Cutting', 'Franz Haas', null, 'minute', 'Cuts the cooled wafer sheets into pieces. 10–14 cuts/minute (drawing) — no rate in kg.', 'bolacha'],
+        71 => ['Wafer Dough Mixer', 'Mixing', 'Franz Haas ATM120', null, 'hour', 'Mixes the wafer batter into the dough tank. 165 kg a batch (drawing).', 'bolacha'],
+        72 => ['Wafer Dough Tank', 'Mixing', 'Franz Haas ATM120', null, 'hour', 'Holds the batter and feeds the oven. 190 kg (drawing).', 'bolacha'],
+        73 => ['Wafer Cream Mixer', 'Mixing', 'Franz Haas CAB190 MZ-M', null, 'hour', 'Mixes the wafer cream for the cream tank. 220 kg a batch (drawing).', 'bolacha'],
+        74 => ['Wafer Cream Tank', 'Mixing', 'Franz Haas CAB190 MZ-M', null, 'hour', 'Holds the cream and feeds the cream machine. 220 kg (drawing).', 'bolacha'],
+        93 => ['AF300 Flow Wrap', 'Packing', null, 100, 'minute', 'The wafer line\'s Packing 02: "… AF300 FLOW" in its drawing (the make\'s name too small to read), not in the equipment sheet. 100–110 pcs/min (drawing).', 'bolacha'],
 
         // ── Bolacha: taping machines, one per wrapper or pair ───────────────
-        75 => ['Line 01 Taping Machine 1', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        76 => ['Line 01 Taping Machine 2', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        77 => ['Line 01 Taping Machine 3', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        78 => ['Line 02 Taping Machine 1', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        79 => ['Line 02 Taping Machine 2', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        80 => ['Line 02 Taping Machine 3', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        81 => ['Line 03 Taping Machine 1', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        82 => ['Line 03 Taping Machine 2', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        83 => ['Line 03 Taping Machine 3', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        84 => ['Line 03 Taping Machine 4', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        85 => ['Line 04 Taping Machine 1', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        86 => ['Line 04 Taping Machine 2', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        87 => ['Line 05 Taping Machine 1', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        88 => ['Line 05 Taping Machine 2', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        89 => ['Line 05 Taping Machine 3', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        90 => ['Line 06 Taping Machine 1', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        91 => ['Wafer Taping Machine 1', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
-        92 => ['Wafer Taping Machine 2', 'Packaging', null, null, 'minute', self::TAPING, 'bolacha'],
+        75 => ['Line 01 Taping Machine 1', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        76 => ['Line 01 Taping Machine 2', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        77 => ['Line 01 Taping Machine 3', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        78 => ['Line 02 Taping Machine 1', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        79 => ['Line 02 Taping Machine 2', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        80 => ['Line 02 Taping Machine 3', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        81 => ['Line 03 Taping Machine 1', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        82 => ['Line 03 Taping Machine 2', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        83 => ['Line 03 Taping Machine 3', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        84 => ['Line 03 Taping Machine 4', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        85 => ['Line 04 Taping Machine 1', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        86 => ['Line 04 Taping Machine 2', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        87 => ['Line 05 Taping Machine 1', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        88 => ['Line 05 Taping Machine 2', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        89 => ['Line 05 Taping Machine 3', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        90 => ['Line 06 Taping Machine 1', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        91 => ['Wafer Taping Machine 1', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
+        92 => ['Wafer Taping Machine 2', 'Packaging', 'MH-FJ-1AW', null, 'minute', self::TAPING, 'bolacha'],
     ];
 
     /**
@@ -170,12 +187,12 @@ class StationSeeder extends Seeder
      */
     public const RETIRED = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68];
 
-    private const FLOW_WRAP = '90–110 pcs/min · Edge · BOPP, tape, box, ribbon, ink.';
-    private const CAVANA    = '90–120 pcs/min · Edge · BOPP, tape, box, ribbon. "ZER05NKZXL" in Line 05\'s drawing.';
-    private const HEBEI     = 'No capacity given · X-fold · BOPP, tape, box, ribbon.';
-    private const DACHUAN   = '100–110 pcs/min · pile folding · BOPP, tape, box, ribbon, ink.';
-    private const PAKONA    = '55–60 pcs/min · vertical folding · BOPP, tape, box, ribbon.';
-    private const TAPING    = 'Tapes the boxes shut. Not in the equipment sheet, so no rate.';
+    private const FLOW_WRAP = '90–110 pcs/min (sheet and drawings) · Edge · BOPP, tape, box, ribbon, ink.';
+    private const CAVANA    = '90–120 pcs/min (sheet; Line 05\'s drawing for Cavana 01 / 02) · Edge · BOPP, tape, box, ribbon. "ZER05NKZXL" in the drawing.';
+    private const HEBEI     = '100–110 pcs/min in the drawings (the sheet gives none) · X-fold · BOPP, tape, box, ribbon. "BAPM" in the drawings, a make the sheet doesn\'t have — taken to be its three HEBEIs.';
+    private const DACHUAN   = '100–110 pcs/min (sheet and drawings) · pile folding · BOPP, tape, box, ribbon, ink.';
+    private const PAKONA    = '55–60 pcs/min (sheet and Line 06\'s drawing) · vertical folding · BOPP, tape, box, ribbon.';
+    private const TAPING    = 'Tapes the boxes shut. Model MH-FJ-1AW (drawings); no capacity in the drawings or the sheet, so no rate.';
 
     /** line id => its stations, in the order the product passes them (each stage's machines top to bottom in its drawing). */
     public const LINES = [
@@ -187,7 +204,7 @@ class StationSeeder extends Seeder
         6 => [51, 13, 22, 20, 85, 86],                   // Biscuit Line 4 (LINE 04): Rotary Molding 2, Oven 4, Flow Wrap 250, 248, 2 taping machines
         7 => [18, 14, 27, 28, 29, 87, 88, 89],           // Biscuit Line 5 (LINE 05): Lamination Line 3, Oven 5, Cavana 1–3, 3 taping machines
         9 => [52, 53, 36, 37, 90],                       // Biscuit Line 6 (LINE 06, vertical): Lamination Line 4, Oven 6, PAKONA 1, 2, 1 taping machine
-        8 => [15, 49, 69, 70, 35, 38, 32, 91, 92],       // Wafer Line: oven, cream, refrigeration, cutting, DACHUAN 3, PAKONA 3, HEBEI 3, 2 taping machines
+        8 => [15, 49, 69, 70, 32, 93, 35, 91, 92],       // Wafer Line: oven, cream, refrigeration, cutting, Packing 01 HEBEI BAPM09, 02 AF300, 03 DACHUAN 3, 2 taping machines
     ];
 
     public function run(): void
